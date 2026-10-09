@@ -1,0 +1,41 @@
+# ==============================
+# Sistema Integral Delfino Pando
+# .gitignore
+# ==============================
+
+# Entornos virtuales y dependencias de Python (Backend)
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dependencias de Node.js (Frontend)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Archivos de compilación y empaquetado (.exe)
+/build/
+/dist/
+*.exe
+*.log
+/frontend/build/*
+!/frontend/build/.gitkeep
+/backend/static/*
+!/backend/static/.gitkeep
+
+# Variables de entorno y secretos (NUNCA SUBIR A GIT)
+.env
+.env.local
+secrets.json
+
+# Archivos temporales del "Cerebro" (OCR y respaldos en tránsito)
+temp/
+tmp/
+*.tmp
+
+# Archivos de la base de datos local (SQLite o logs de desarrollo)
+*.sqlite3
+*.db
