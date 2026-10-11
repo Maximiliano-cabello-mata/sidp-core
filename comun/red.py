@@ -1,20 +1,17 @@
 """Clientes HTTP hacia la plataforma con certificado fijado (pinning)."""
 import os
 import ssl
-import tempfile
 import httpx
 from comun import configuracion
+from comun.politicas import Transporte
 
 
 def contexto_tls(certificado_pem):
     """Confía solo en el certificado de la instalación, sin depender del nombre o IP."""
-    contexto = ssl.create_default_context()
-    with tempfile.NamedTemporaryFile('w', suffix='.pem', delete=False) as archivo:
-        archivo.write(certificado_pem)
-    try:
-        contexto.load_verify_locations(archivo.name)
-    finally:
-        os.unlink(archivo.name)
+    # No cargar autoridades del SO: la instalación es la única raíz de confianza.
+    contexto = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    contexto.minimum_version = ssl.TLSVersion.TLSv1_2
+    contexto.load_verify_locations(cadata=certificado_pem)
     contexto.check_hostname = False  # Las IP de la LAN cambian; la confianza es el certificado.
     contexto.verify_mode = ssl.CERT_REQUIRED
     return contexto
@@ -24,11 +21,19 @@ def verificacion(paquete):
     return contexto_tls(paquete.certificado) if paquete and paquete.certificado else True
 
 
-def cliente(url, token=None, paquete=None, timeout=10):
+def cliente(url, token=None, paquete=None, timeout=None):
+    destino = httpx.URL(url)
+    if destino.scheme not in ('http', 'https') or not destino.host or destino.userinfo:
+        raise ValueError('URL de plataforma inválida')
+    if paquete and paquete.certificado and destino.scheme != 'https':
+        raise ValueError('Una instalación TLS no admite degradación a HTTP')
+    politica = Transporte.cargar()
     cabeceras = {'Authorization': 'Bearer ' + token} if token else {}
     # trust_env=False: el tráfico de la LAN nunca pasa por proxies configurados en el sistema.
-    return httpx.Client(base_url=url, headers=cabeceras, timeout=timeout, verify=verificacion(paquete),
-                        trust_env=False)
+    limites = httpx.Limits(max_connections=politica.conexiones, max_keepalive_connections=politica.conexiones)
+    plazo = timeout if timeout is not None else httpx.Timeout(politica.lectura_s, connect=politica.conexion_s)
+    return httpx.Client(base_url=url, headers=cabeceras, timeout=plazo, verify=verificacion(paquete),
+                        limits=limites, follow_redirects=False, trust_env=False)
 
 
 def resolver(rol, paquete=None):
@@ -41,3 +46,4 @@ def resolver(rol, paquete=None):
     if not token:
         raise SystemExit(f'Sin credencial para {rol}: ejecute "sidp unirse" o defina SIDP_TOKEN')
     return url, token
+

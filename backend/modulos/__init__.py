@@ -34,5 +34,6 @@ def ordenar(modulos):
 
 def registrados():
     # Importación tardía: cada módulo importa este paquete para declarar su Modulo.
-    from backend.modulos import escolar, identidad, orquestacion, sistema
-    return ordenar([sistema.MODULO, identidad.MODULO, orquestacion.MODULO, escolar.MODULO])
+    from backend.modulos import escolar, identidad, mensajeria, orquestacion, sistema
+    return ordenar([sistema.MODULO, mensajeria.MODULO, identidad.MODULO, orquestacion.MODULO, escolar.MODULO])
+

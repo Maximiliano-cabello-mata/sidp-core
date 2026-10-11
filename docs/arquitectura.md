@@ -1,3 +1,4 @@
+<!-- Documento rector: la investigación y el protocolo enlazados abajo detallan la base ampliada. -->
 # Arquitectura SIDP
 
 Versión 0.2 · 2026-10-11. Documento rector. Describe la arquitectura objetivo y lo que ya está construido y probado. Lo pendiente se marca como tal.
@@ -94,6 +95,7 @@ La plataforma es **un proceso** (uvicorn con un solo worker, sin recarga) que co
 |---|---|---|---|
 | `sistema` | `auditoria` | `/api/salud`, `/api/v1/sistema`, `/api/v1/sistema/latido` | — |
 | `identidad` | `identidades`, `invitaciones` | `/api/v1/enrolamiento/*`, `/api/v1/identidades/*`, `/api/v1/invitaciones` | sistema |
+| `mensajeria` | `salida_eventos` | `/api/v1/eventos` | sistema |
 | `orquestacion` | `dispositivos`, `tareas`, `eventos` | `/api/v1/tareas*`, `/api/v1/dispositivos/registro` | identidad |
 | `escolar` | `alumnos`, `ciclos_escolares` | `/api/alumnos` | sistema |
 
@@ -107,7 +109,7 @@ Cada módulo declara un `Modulo` con nombre, versión, migraciones ordenadas, ro
 - Los archivos de base **nunca se comparten por red**: solo la plataforma los abre.
 - Se adopta la cola de laboratorio anterior (`user_version=1`) sin perder datos.
 
-SQLite cubre con holgura esta escala: un escritor, unas decenas de escrituras por minuto. Migrar a PostgreSQL queda como opción si cambia la escala (ADR-008).
+SQLite es la elección inicial para un escritor local. La capacidad real debe medirse en los equipos de la escuela; no se deduce solo del número de alumnos. Revisar PostgreSQL si aparecen bloqueos sostenidos o requisitos de réplica (ADR-015).
 
 ## 6. Instalación, descubrimiento y enrolamiento
 
@@ -148,7 +150,7 @@ sequenceDiagram
 `sidp iniciar`, que también se ejecuta sin argumentos, lee `nodo.json` y lanza un **proceso hijo por rol**. Reinicia con espera creciente (1 s a 60 s), vuelve a la espera mínima tras 5 minutos estable y se detiene en orden con Ctrl+C o SIGTERM. La plataforma arranca primero; los agentes reintentan solos hasta encontrarla.
 
 - **Agente.** Entrega primero los resultados pendientes, que guarda en disco antes de enviarlos. Luego reclama, ejecuta y guarda. Cuando no hay trabajo, espera de 2 s hasta 15 s. Si pierde a la plataforma cinco veces seguidas, la busca de nuevo y actualiza `nodo.json` (la IP del servidor puede cambiar). Con 401 o 403 termina con código 3.
-- **Cerebro.** Por ahora es una orden puntual (`sidp cerebro --clave X`). El supervisor continuo está pendiente.
+- **Cerebro.** `sidp cerebro --clave X` crea un diagnóstico; `sidp cerebro --servicio` observa eventos propios y guarda cursor/inbox. El supervisor usa el modo servicio. La planificación administrativa multietapa sigue pendiente.
 - **Plataforma.** Corre HTTPS en `0.0.0.0:8443` y un hilo de descubrimiento en UDP 47800. Sin paquete, arranca en modo laboratorio en `127.0.0.1:8000`.
 
 ## 8. Seguridad
@@ -213,3 +215,12 @@ frontend/    interfaz futura (se servirá desde backend/static)
 ```
 
 Documentos relacionados: [decisiones](arquitectura/decisiones.md) · [contratos](arquitectura/contratos.md) · [módulos](arquitectura/modulos.md) · [instalación](arquitectura/instalacion.md) · [operación](arquitectura/operacion.md) · [plan](PLAN.md).
+
+
+## Base ampliada: fundamentos y garantías
+
+Consultar [investigación primaria](investigacion/fundamentos-distribuidos.md), [comunicación y recursos](arquitectura/comunicacion-y-recursos.md) y [SQL](arquitectura/sql-y-procedimientos.md). Estas especificaciones prevalecen sobre estimaciones iniciales de recursos, que no son mediciones.
+
+La cola incorpora telemetria y politicas_nodo, vista resumen_cola e índice único de trabajo activo por agente. La configuración requiere revisión esperada. La admisión predeterminada limita a dos tareas globales, una por agente y mil pendientes. No son cuotas duras de CPU/RAM.
+
+Eventos de tareas se escriben en salida_eventos en la misma transacción del cambio. El cerebro mantiene inbox/cursor propio sin acceder al SQLite central. No hay event sourcing, consenso ni multi-master. SQLite no tiene procedimientos almacenados CREATE PROCEDURE; se usan servicios transaccionales y un trigger de integridad.

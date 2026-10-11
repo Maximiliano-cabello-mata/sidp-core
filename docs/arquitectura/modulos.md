@@ -44,3 +44,10 @@ Una capacidad es una función incorporada y repetible que el agente ejecuta cuan
 ## Ciclo de vida de un módulo
 
 Diseño (ADR si cambia fronteras) → contrato en `contratos/` → migraciones → servicio → rutas → pruebas → registro → documentación en `docs/arquitectura.md` (tabla de módulos).
+
+
+## Publicar eventos de un nuevo módulo
+
+Declarar dependencia de mensajeria. En la misma transacción que el cambio llamar `backend.modulos.mensajeria.publicar(db, tipo, correlacion, propietario, datos)`. No pasar expedientes completos en datos: incluir identificadores/metadatos autorizados. Un fallo revierte cambio y evento. El propietario controla visibilidad del consumidor; no se publica por HTTP arbitrario.
+
+El canal común no hace idempotente un nuevo efecto automáticamente. Definir su clave y prueba de repetición. Los handlers largos deben usar renovación de reserva y reconciliación: echo es aún la única capacidad habilitada.

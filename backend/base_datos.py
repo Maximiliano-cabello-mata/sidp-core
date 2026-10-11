@@ -49,14 +49,23 @@ class BaseDatos:
             return fila[0] if fila else 0
 
     def migrar(self, modulo, migraciones):
-        actual = self.version(modulo)
-        if actual > len(migraciones):
-            raise RuntimeError(f"Base de {modulo} (v{actual}) más nueva que esta aplicación (v{len(migraciones)})")
-        for numero, sql in enumerate(migraciones[actual:], start=actual + 1):
-            with self.conexion() as db:
-                # executescript no admite parámetros; el nombre del módulo es una constante interna.
-                db.executescript(f"BEGIN IMMEDIATE;\n{sql}\nINSERT INTO esquema VALUES('{modulo}',{numero}) "
-                                 f"ON CONFLICT(modulo) DO UPDATE SET version=excluded.version;\nCOMMIT;")
+        # Leer versión DENTRO del bloqueo: CLI y servidor pueden arrancar a la vez.
+        with self.transaccion() as db:
+            fila = db.execute('SELECT version FROM esquema WHERE modulo=?', (modulo,)).fetchone()
+            actual = fila[0] if fila else 0
+            if actual > len(migraciones):
+                raise RuntimeError(f"Base de {modulo} (v{actual}) más nueva que esta aplicación (v{len(migraciones)})")
+            for numero, sql in enumerate(migraciones[actual:], start=actual + 1):
+                sentencia = ''
+                for caracter in sql:
+                    sentencia += caracter
+                    if caracter == ';' and sqlite3.complete_statement(sentencia):
+                        db.execute(sentencia)
+                        sentencia = ''
+                if sentencia.strip():
+                    raise ValueError('Migración incompleta: terminar cada sentencia con punto y coma')
+                db.execute('INSERT INTO esquema VALUES(?,?) ON CONFLICT(modulo) DO UPDATE SET version=excluded.version',
+                           (modulo, numero))
 
     @staticmethod
     def _adoptar_legado(db):
@@ -64,3 +73,4 @@ class BaseDatos:
         if db.execute("PRAGMA user_version").fetchone()[0] == 1 and db.execute(
                 "SELECT 1 FROM sqlite_master WHERE name='tareas'").fetchone():
             db.execute("INSERT OR IGNORE INTO esquema VALUES('orquestacion',1)")
+

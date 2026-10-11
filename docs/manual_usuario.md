@@ -62,3 +62,10 @@ python -m pip install -r requirements-build.txt
 python despliegue/compilar.py                                   # genérico
 python despliegue/compilar.py --paquete /tmp/sidp/servidor/instalacion.json   # preconfigurado
 ```
+
+
+## Base de comunicaciones ampliada
+
+Ver [comunicación y recursos](arquitectura/comunicacion-y-recursos.md). El perfil coordinador ahora arranca `cerebro --servicio` para observar sus eventos. Crear una tarea con `sidp cerebro --clave prueba-001` sigue siendo una orden separada. Una CPU/RAM/disco insuficiente retrasa tareas nuevas; un nodo pausado aún entrega pendientes.
+
+En servidor: `sidp respaldo --destino RUTA_NUEVA.db`. Es copia de base, no de secretos ni documentos externos. Consultar operación para restauración y cursores.

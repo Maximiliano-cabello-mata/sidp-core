@@ -65,3 +65,12 @@ Pendiente: actualización firmada distribuida por la plataforma, con verificaci�
 ## Observabilidad pendiente
 
 Métricas de cola, pendientes y fallos por capacidad; latido visible por equipo en una interfaz; alertas para el personal; retención de eventos y auditoría.
+
+
+## Copia en caliente y diario (base ampliada)
+
+`sidp respaldo --destino RUTA_NUEVA.db` crea copia SQL consistente y JSON de hash/versiones; no reemplaza un archivo existente. No incluye archivos escolares ni secretos. Copia sin manifiesto o con comando fallido no se acepta. Ver sql-y-procedimientos.md para restauración.
+
+Al restaurar una copia anterior, detener consumidores y reiniciar sus cursores a cero (`UPDATE cursores SET secuencia=0` en cada cerebro/eventos.db). Conservar recibidos para deduplicar UUID anteriores. No conservar un cursor adelantado respecto del servidor restaurado: ocultaría eventos nuevos hasta alcanzarlo. Reconciliar tareas externas antes de reconectar; actualmente solo echo.
+
+Nuevas variables SIDP_TRANSPORTE y SIDP_COLA se validan al arrancar; ejemplos en comunicacion-y-recursos.md. La política por equipo se administra mediante API con revisión esperada. Un latido viejo bloquea asignación a agentes nuevos; no bloquea entrega de resultados existentes.

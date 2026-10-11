@@ -7,10 +7,11 @@
 | 2 Flujo técnico | Implementada | Crear, reclamar y completar echo; identidad técnica y capacidades |
 | 3 Resiliencia mínima | Implementada | Persistencia, duplicados, concurrencia, reserva vencida y límite |
 | 3b Base de instalación | **Implementada** | Ejecutable único, paquete, descubrimiento firmado, TLS fijado, enrolamiento con aprobación e invitación, revocación, supervisor, módulos y una base WAL con migraciones por módulo |
+| 3c Infraestructura investigada | **Implementada** | Outbox/inbox, recursos y políticas revisadas, cupos, renovación, backup bajo comando, exportación SQL y TLS restringido |
 | 4 Identidad escolar | Pendiente | Login del personal, sesiones, roles escolares por ámbito y aprobaciones |
-| 5 Persistencia producción | Pendiente | Copia en caliente programada, archivos escolares con manifiesto, restauración ensayada |
-| 6 Cerebro ampliado | Pendiente | Supervisor continuo, plan multietapa persistente, políticas y explicación |
-| 7 Agentes ampliados | Pendiente | Manifiestos y límites por capacidad, renovación de reservas, actualización firmada del ejecutable |
+| 5 Persistencia producción | Pendiente | Copia SQL bajo comando ya implementada; pendiente programación/retención, archivos y ensayo físico de restauración |
+| 6 Cerebro ampliado | Pendiente | Observador continuo implementado; pendiente plan multietapa, políticas de negocio y explicación |
+| 7 Agentes ampliados | Pendiente | Admisión/renovación API implementadas; pendientes aislamiento duro, handlers largos y actualización firmada |
 | 8 Sincronización | Pendiente | Diario de captura escolar sin conexión y conflictos explícitos |
 | 9 Interfaz/operación | Pendiente | Panel del personal, equipos y tareas, salud y alertas |
 | 10 Piloto | Pendiente | Medir recuperación en los tres equipos reales con datos de prueba |
@@ -18,7 +19,7 @@
 ## Próximo incremento
 
 1. Rotación de secreto y certificado de la instalación, y expiración de tokens.
-2. Copia en caliente (`VACUUM INTO`) programada desde el supervisor del servidor.
+2. Programar y rotar copias con la Backup API ya implementada; ensayar restauración con configuración/secretos y cursores.
 3. Login del personal (fase 4) como módulo `personal`, sobre el contrato de módulos.
 4. Interfaz mínima servida desde `backend/static`: estado de equipos, aprobaciones y tareas.
 
@@ -42,3 +43,4 @@ Las pruebas automáticas (`pruebas/`) cubren lo marcado, incluido un servidor TL
 ## Decisiones del piloto
 
 Confirmar sistemas operativos, servidor, energía/UPS, LAN (difusión permitida o IP fija), periféricos y acceso externo. Propuesta a validar: copia diaria externa y recuperación en una jornada; no es una garantía medida. No prometer años sin mantenimiento.
+

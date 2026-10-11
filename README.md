@@ -7,7 +7,7 @@ Sistema modular de gestión escolar para una primaria, pensado para **tres compu
 | `sidp` | Lanzador único: instalación, alta de equipos, supervisor y roles |
 | Plataforma (`backend/`) | Autoridad de datos y permisos; monolito modular sobre SQLite WAL |
 | Agente (`agente/`) | Ejecuta capacidades autorizadas y guarda resultados antes de enviarlos |
-| Cerebro (`cerebro/`) | Coordinador; hoy crea planes técnicos de un paso |
+| Cerebro (`cerebro/`) | Coordinador; planes técnicos de un paso y observador durable de eventos |
 | `comun/`, `contratos/` | Biblioteca compartida (TLS, descubrimiento, configuración) y mensajes versionados |
 
 ## Inicio rápido
@@ -23,6 +23,12 @@ Equipos adicionales: abrir `sidp.exe` con el paquete de la escuela (incrustado c
 
 ## Documentación
 
+- [Investigación: modelos, teorías y fuentes primarias](docs/investigacion/fundamentos-distribuidos.md)
+- [Comunicación y recursos](docs/arquitectura/comunicacion-y-recursos.md)
+- [SQL y operaciones transaccionales](docs/arquitectura/sql-y-procedimientos.md)
+- [Esquema SQL generado](database/esquema_actual.sql)
+
+
 - [Arquitectura](docs/arquitectura.md): documento rector
 - [Instalación y alta de equipos](docs/arquitectura/instalacion.md)
 - [Contrato de módulos](docs/arquitectura/modulos.md)
@@ -31,6 +37,8 @@ Equipos adicionales: abrir `sidp.exe` con el paquete de la escuela (incrustado c
 - [Operación y recuperación](docs/arquitectura/operacion.md)
 - [Plan y aceptación](docs/PLAN.md)
 - [Manual de laboratorio](docs/manual_usuario.md)
+
+[Evidencia y límites de validación](docs/VALIDACION_INFRAESTRUCTURA.md).
 
 ## Estado real
 
@@ -47,4 +55,7 @@ Equipos adicionales: abrir `sidp.exe` con el paquete de la escuela (incrustado c
 - agente con espera adaptativa y redescubrimiento;
 - salud real de base y disco.
 
-**Pendiente:** login del personal, interfaz, copia en caliente, rotación de secretos, planes multietapa, actualizaciones firmadas, periféricos y sincronización escolar sin conexión. No hay IA ni autoprogramación. Las validaciones documentales están fuera de alcance (la ruta heredada responde 501).
+**Añadido:** outbox/inbox con cursor, política por equipo con revisión, telemetría, límites de admisión, renovación de reservas, copia SQLite en caliente bajo comando local y exportación SQL.
+
+**Pendiente:** login del personal, interfaz, programación/retención de copias, rotación de secretos, planes multietapa, actualizaciones firmadas, periféricos y sincronización escolar sin conexión. No hay IA ni autoprogramación. Las validaciones documentales están fuera de alcance (la ruta heredada responde 501).
+

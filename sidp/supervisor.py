@@ -16,9 +16,12 @@ ESTABLE = 300
 
 
 def comando(rol):
+    if rol not in ('plataforma', 'agente', 'cerebro'):
+        raise ValueError('Rol de proceso desconocido')
+    argumentos = [rol, '--servicio'] if rol == 'cerebro' else [rol]
     if rutas.congelado():
-        return [sys.executable, rol]
-    return [sys.executable, '-m', 'sidp', rol]
+        return [sys.executable, *argumentos]
+    return [sys.executable, '-m', 'sidp', *argumentos]
 
 
 class Proceso:
@@ -68,3 +71,4 @@ def supervisar(roles):
     finally:
         for proceso in reversed(procesos):
             proceso.detener()
+

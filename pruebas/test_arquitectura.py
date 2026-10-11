@@ -101,7 +101,7 @@ def test_adopta_cola_de_laboratorio(tmp_path):
                          "creada REAL NOT NULL, UNIQUE(actor, clave));"
                          "CREATE TABLE eventos(secuencia INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, tarea TEXT, "
                          "actor TEXT, fecha REAL); PRAGMA user_version=1;")
-    assert Almacen(ruta).bd.version('orquestacion') == 2
+    assert Almacen(ruta).bd.version('orquestacion') == 3
 
 
 def test_api_sin_cerebro_y_agente_persistente(tmp_path, monkeypatch):
@@ -145,3 +145,4 @@ def test_api_sin_cerebro_y_agente_persistente(tmp_path, monkeypatch):
             assert db.execute("SELECT COUNT(*) FROM auditoria WHERE accion='alumno.registrado'").fetchone()[0] == 1
         monkeypatch.setenv('SIDP_IDENTIDADES', '{}')
         assert cliente.get('/api/v1/tareas').status_code == 503
+

@@ -40,7 +40,7 @@ def leer_json(ruta):
 
 @dataclass
 class Paquete:
-    """Datos públicos de una instalación. Viaja con el ejecutable, nunca a Git."""
+    """Paquete confidencial: contiene secreto compartido. Nunca publicar ni subir a Git."""
     instalacion: str
     nombre: str
     secreto: str
@@ -121,3 +121,4 @@ def nombre_equipo():
     # Solo ASCII: el contrato exige [a-z0-9-] (un "Aula-Música" se vuelve "aula-m-sica").
     nombre = ''.join(c if c.isascii() and c.isalnum() else '-' for c in socket.gethostname().lower()).strip('-')
     return (nombre or 'equipo')[:40]
+

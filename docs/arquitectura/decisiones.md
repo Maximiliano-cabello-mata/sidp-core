@@ -22,7 +22,7 @@ Aceptada. El cerebro coordina y la plataforma autoriza. Sin shell genérico ni a
 Aceptada. Por solicitud del usuario no se implementan CURP, actas ni OCR. La ruta heredada devuelve 501.
 
 ## ADR-008 — SQLite WAL como base de producción, una base por instalación
-Aceptada (2026-10-11). Con tres equipos modestos y unos 140 alumnos, PostgreSQL añade un servicio, memoria y administración sin beneficio medible. Una sola `plataforma.db` en modo WAL, con `synchronous=FULL`, migraciones por módulo y `BEGIN IMMEDIATE`. Permite transacciones atómicas entre el cambio escolar y su auditoría. Se elimina SQLAlchemy/aiosqlite, lo que reduce dependencias y tamaño del ejecutable. Condición de revisión: más de un escritor concurrente sostenido, más de 2 GB de datos o acceso de muchos usuarios simultáneos. La base nunca se comparte por SMB.
+Aceptada (2026-10-11). Con tres equipos modestos y unos 140 alumnos, PostgreSQL añade un servicio, memoria y administración sin beneficio medible. Una sola `plataforma.db` en modo WAL, con `synchronous=FULL`, migraciones por módulo y `BEGIN IMMEDIATE`. Permite transacciones atómicas entre el cambio escolar y su auditoría. Se elimina SQLAlchemy/aiosqlite, lo que reduce dependencias y tamaño del ejecutable. Condición de revisión: contención sostenida medida, necesidad de escritores independientes o requisitos de réplica; no un umbral fijo de tamaño. La base nunca se comparte por SMB.
 
 ## ADR-009 — Un solo ejecutable con roles
 Aceptada. `sidp.exe` contiene plataforma, agente, cerebro y supervisor; la configuración decide qué corre en cada equipo. Se distribuye y actualiza un solo archivo. Cada rol sigue siendo un proceso con su propia credencial. Paquetes: `sidp` (composición, único que importa todo) y `comun` (sin dependencias internas).
@@ -41,3 +41,20 @@ Aceptada. `sidp iniciar` lanza un proceso hijo por rol y lo reinicia con espera 
 
 ## ADR-014 — Módulos estáticos
 Aceptada. Los módulos y capacidades se registran en código y se compilan en el ejecutable. Sin descarga ni carga dinámica: lo que corre es exactamente lo que se probó. Las actualizaciones reemplazan el ejecutable completo (actualización firmada pendiente).
+
+
+## ADR-015 — Base investigada: comunicación, recursos y SQL
+
+Aceptada 2026-10-11 UTC. Ver investigación con fuentes primarias. HTTPS/JSON y pull de tareas, outbox transaccional con inbox del cerebro; autoridad de escritura única. MQTT/gRPC/consenso quedan como alternativas documentadas. SQLite se mantiene sin inventar procedimientos almacenados: servicios transaccionales Python, SQL restringido, vista e integridad mediante trigger. El esquema se exporta desde migraciones.
+
+## ADR-016 — Admisión y revisiones
+
+Aceptada. Telemetría acotada, política por equipo con revisión esperada y cupos de cola. No elevar recursos por código remoto. Agentes anteriores conservan compatibilidad echo; los nuevos exigen muestra vigente. Las muestras no son atestación de seguridad ni límites duros del SO.
+
+## ADR-017 — Eventos, no event sourcing
+
+Aceptada. Diario append-only a nivel de aplicación, con UUID/cursor y consumo idempotente. No almacena mensajes de tareas en sus metadatos. Tablas de dominio siguen siendo autoridad. Retención y tratamiento de cursores después de una restauración requieren operación explícita. El observador no ejecuta automáticamente acciones administrativas.
+
+## ADR-018 — Transporte y supervisor
+
+Corregir confianza TLS: contexto sin autoridades del sistema; solo certificado del paquete. Rechazar degradación HTTP. Cerebro supervisado usa --servicio; --clave es comando puntual. No reintentos automáticos de cualquier POST; backoff solo en bucles que conocen la semántica.

@@ -41,7 +41,10 @@ def validar(paquete, reto, mensaje, origen):
         datos = _datos_respuesta(paquete.instalacion, reto, respuesta['esquema'], int(respuesta['puerto']))
     except (ValueError, KeyError, TypeError):
         return None
-    if respuesta.get('sidp') != 'plataforma' or not firma.verificar(paquete.secreto, datos, respuesta.get('prueba')):
+    if (datos['esquema'] != paquete.esquema or not 1 <= datos['puerto'] <= 65535
+            or respuesta.get('instalacion') != paquete.instalacion
+            or respuesta.get('sidp') != 'plataforma'
+            or not firma.verificar(paquete.secreto, datos, respuesta.get('prueba'))):
         return None
     return f"{datos['esquema']}://{origen}:{datos['puerto']}"
 
@@ -102,3 +105,4 @@ class Respondedor(threading.Thread):
         self.alto.set()
         self.join(timeout=2)
         self.conexion.close()
+

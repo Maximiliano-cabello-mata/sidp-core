@@ -54,4 +54,7 @@ Idempotencia por actor+clave. Una misma clave con otro contenido responde 409. R
 
 ## Compatibilidad
 
-Agregar campos opcionales o rutas nuevas no cambia de versión. Quitar o cambiar significados exige `v2` en paralelo con `v1` hasta actualizar todos los equipos. Pendiente: modelos públicos de salida, eventos con cursor, cancelación, renovación de reservas y estado de revisión para efectos inciertos.
+Agregar campos opcionales o rutas nuevas no cambia de versión. Quitar o cambiar significados exige `v2` en paralelo con `v1` hasta actualizar todos los equipos. Implementados eventos con cursor y contrato público LoteEventos, telemetría, configuración revisada y renovación de reservas; ver comunicacion-y-recursos.md. Pendientes: estabilizar salidas de tareas, cancelación y estado de revisión para efectos inciertos.
+
+
+Contratos adicionales en `contratos/infraestructura.py`; guía de rutas y valores en [comunicación y recursos](comunicacion-y-recursos.md).

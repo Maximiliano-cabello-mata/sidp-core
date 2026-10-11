@@ -115,6 +115,12 @@ def invitacion(args):
     return 0
 
 
+def respaldo(args):
+    from backend.respaldos import crear
+    print(json.dumps(crear(_local().bd, args.destino), indent=2))
+    return 0
+
+
 def _rol(nombre, *argumentos):
     from sidp import roles
     return getattr(roles, nombre)(*argumentos)
@@ -154,6 +160,10 @@ def construir():
     p.add_argument('--horas', type=int, default=24)
     p.set_defaults(funcion=invitacion)
 
+    p = sub.add_parser('respaldo', help='Servidor: snapshot SQLite consistente y manifiesto')
+    p.add_argument('--destino', required=True, help='Archivo nuevo, preferentemente en medio externo')
+    p.set_defaults(funcion=respaldo)
+
     p = sub.add_parser('plataforma', help='Rol plataforma (lo usa el supervisor)')
     p.add_argument('--anfitrion')
     p.add_argument('--puerto', type=int)
@@ -174,3 +184,4 @@ def main(argumentos=None):
     except ErrorInstalacion as error:
         print(f'Error: {error}', file=sys.stderr)
         sys.exit(1)
+

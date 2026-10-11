@@ -5,7 +5,10 @@ import sys
 import time
 import httpx
 from agente.capacidades import CAPACIDADES
+from agente.recursos import medir
 from comun import configuracion, descubrimiento, red, registros, rutas
+from comun.politicas import Transporte, espera_reintento
+from contratos.infraestructura import PoliticaNodo, motivo_bloqueo
 from contratos.v1 import Dispositivo, Resultado
 
 registro = logging.getLogger('sidp.agente')
@@ -17,8 +20,8 @@ def preparar(db):
     db.execute('CREATE TABLE IF NOT EXISTS pendientes(id TEXT PRIMARY KEY,reserva TEXT,mensaje TEXT)')
 
 
-def registrar(cliente):
-    respuesta = cliente.post('/api/v1/dispositivos/registro', json=Dispositivo(capacidades=list(CAPACIDADES)).model_dump())
+def registrar(cliente, recursos=False):
+    respuesta = cliente.post('/api/v1/dispositivos/registro', json=Dispositivo(capacidades=list(CAPACIDADES), protocolo_recursos=recursos).model_dump())
     respuesta.raise_for_status()
 
 
@@ -74,17 +77,32 @@ def main():
     registros.configurar('agente')
     paquete = configuracion.cargar_paquete()
     url, token = red.resolver('agente', paquete)
-    fallos, espera = 0, ESPERA_MINIMA
+    politica_red = Transporte.cargar()
+    fallos, espera = 0, politica_red.espera_minima_s
     with sqlite3.connect(rutas.datos_agente() / 'pendientes.db') as db:
         cliente = red.cliente(url, token, paquete)
         registro.info('Agente iniciado contra %s con %s', url, list(CAPACIDADES))
         while True:
             try:
-                trabajo = ciclo(cliente, db)
-                fallos, espera = 0, (0 if trabajo else min(espera * 2, ESPERA_MAXIMA))
+                # Entregar resultados incluso si el equipo está pausado o sobrecargado.
+                preparar(db)
+                entrego = entregar(cliente, db)
+                muestra = medir(rutas.datos_agente())
+                respuesta = cliente.post('/api/v1/dispositivos/latido', json=muestra.model_dump())
+                if respuesta.status_code == 409:
+                    registrar(cliente, recursos=True)
+                    respuesta = cliente.post('/api/v1/dispositivos/latido', json=muestra.model_dump())
+                respuesta.raise_for_status()
+                politica = PoliticaNodo.model_validate(respuesta.json()['politica'])
+                bloqueado = motivo_bloqueo(muestra, politica)
+                trabajo = entrego or False
+                if not bloqueado:
+                    trabajo = ciclo(cliente, db) or trabajo
+                fallos = 0
+                espera = politica_red.espera_minima_s if trabajo else min(max(espera, politica_red.espera_minima_s) * 2, politica_red.espera_maxima_s)
             except httpx.TransportError:
                 fallos += 1
-                espera = ESPERA_MAXIMA
+                espera = espera_reintento(fallos, politica_red)
                 registro.warning('Plataforma no disponible; pendientes conservados')
                 if fallos % 5 == 0 and (nueva := redescubrir(paquete)) and nueva != url:
                     cliente.close()
@@ -94,10 +112,11 @@ def main():
                     registro.error('Credencial rechazada (%s): revise aprobación o revocación', error.response.status_code)
                     sys.exit(SALIDA_CONFIGURACION)
                 registro.warning('Plataforma respondió %s; reintento', error.response.status_code)
-                espera = ESPERA_MAXIMA
-            time.sleep(max(espera, 0.05))
-            espera = espera or ESPERA_MINIMA
+                fallos += 1
+                espera = espera_reintento(fallos, politica_red)
+            time.sleep(espera)
 
 
 if __name__ == '__main__':
     main()
+

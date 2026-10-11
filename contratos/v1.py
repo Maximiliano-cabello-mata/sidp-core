@@ -14,6 +14,7 @@ class Contrato(BaseModel):
 
 
 class Dispositivo(Contrato):
+    protocolo_recursos: bool = False
     capacidades: list[Capacidad] = Field(min_length=1, max_length=16)
 
 
@@ -45,3 +46,4 @@ class SolicitudIngreso(Contrato):
 class NuevaInvitacion(Contrato):
     rol: Rol = "agente"
     horas: int = Field(default=24, ge=1, le=168)
+
