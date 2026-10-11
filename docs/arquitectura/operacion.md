@@ -1,34 +1,67 @@
 # Operación y recuperación
 
-## Instalación inicial
+## Instalación
 
-Servidor de plataforma, agente por equipo, cerebro CLI opcional. Arrancar desde raíz. Loopback por defecto; antes de habilitar LAN preparar HTTPS/proxy y restricciones. No transmitir tokens por HTTP fuera del laboratorio local.
+La instalación del servidor y el alta de equipos están en [instalacion.md](instalacion.md). Diagnóstico de cualquier equipo: `sidp estado` muestra la carpeta, la instalación, los roles y el estado de cada credencial.
 
-/api/salud heredada solo indica que API responde; no certifica base/disco/integridad. Diagnóstico real pendiente.
+## Salud
+
+- `GET /api/salud` (cualquier identidad aprobada): comprueba que la base responde y el espacio libre en disco. Devuelve **verde**, o **amarillo** con menos de 200 MB libres. Si la base falla, responde 503: nunca un falso "vivo".
+- `GET /api/v1/sistema/latido`: público y sin datos, solo para comprobar la URL.
+- Registros: `SIDP_HOME/registros/<rol>.log`, rotación 1 MB × 3. No se registra cada petición HTTP.
 
 ## Datos
 
-- Escolar: backend/sidp_nodo_local.db por defecto.
-- Cola: datos/orquestacion.db, migración 001 y user_version=1.
-- Agente: datos-agente/pendientes.db.
-- SIDP_DATA_DIR reubica ambas bases de plataforma, pero no migra archivos.
+| Archivo | Equipo | Contenido |
+|---|---|---|
+| `plataforma/plataforma.db` (+ `-wal`, `-shm`) | servidor | Todos los módulos |
+| `plataforma/tls/clave.pem` | servidor | Clave TLS (secreta) |
+| `instalacion.json` | todos | Paquete (secreto de instalación) |
+| `credenciales/*.json` | todos | Tokens propios |
+| `agente/pendientes.db` | con agente | Resultados por entregar |
 
-Para cambiar ruta: detener procesos, respaldar, copiar ambas bases conservando nombres, configurar ruta, verificar conteos. Directorio vacío sin copia mostrará instalación vacía. No borrar original antes de comprobar.
+Migración desde el laboratorio anterior: la cola `datos/orquestacion.db` se adopta tal cual si se copia como `plataforma/plataforma.db`. Los alumnos de `backend/sidp_nodo_local.db` usan el mismo esquema y se copian con:
+
+```sql
+ATTACH 'sidp_nodo_local.db' AS viejo;
+INSERT INTO alumnos SELECT * FROM viejo.alumnos;
+INSERT INTO ciclos_escolares SELECT * FROM viejo.ciclos_escolares;
+```
 
 ## Copia y restauración manual
 
-1. Detener cerebro, agentes y plataforma para copia coherente.
-2. Copiar las bases y pendientes a medio externo restringido; registrar versión de aplicación. Conservar configuración de identidades separada y protegida.
-3. Verificar lectura de copias y registrar fecha. Archivos escolares futuros necesitarán manifiesto coherente.
-4. Restaurar en carpeta distinta, probar con credenciales de prueba y comparar conteos y tareas. No conectar agentes productivos a esa copia.
-5. Mantener una sola plataforma escritora al recuperar, evitando servidor antiguo y restaurado simultáneos.
+1. Detener el nodo del servidor con Ctrl+C, o deteniendo la tarea programada. El supervisor detiene los roles en orden.
+2. Copiar **toda** la carpeta `SIDP_HOME` del servidor (base, WAL, TLS, paquete y credenciales) a un medio externo restringido. Registrar la versión (`sidp estado`, `/api/v1/sistema`).
+3. Verificar que la copia se lee y anotar la fecha.
+4. Restaurar en otra carpeta con `SIDP_HOME` apuntando a ella. Probar en un puerto distinto, sin agentes productivos conectados.
+5. Mantener **una sola plataforma** escribiendo. Antes de arrancar el servidor restaurado, apagar el anterior. Los agentes lo encontrarán solos si conserva el paquete.
 
-Copia automática, cifrado administrado, rotación y ejercicio periódico pendientes. Sin RPO/RTO medidos.
+Copia en caliente: pendiente (`sqlite3 .backup` o `VACUUM INTO` programado). Sin RPO/RTO medidos.
+
+## Cambio de servidor
+
+Copiar `SIDP_HOME` completo al equipo nuevo, apagar el anterior y arrancar el nuevo. El paquete y el certificado viajan con la carpeta, así que los agentes no notan el cambio salvo la IP, que redescubren solos.
 
 ## Actualizaciones
 
-Respaldar antes de migrar. Cola tiene migración aditiva; esquema más nuevo que código se rechaza. create_all escolar es legado y no reemplaza migraciones de producción. Actualizar procesos separados preservando contratos; probar primero un agente. Futura actualización verificará firma/hash, compatibilidad, salud y reversión. No migrar irreversiblemente sin restauración prevista.
+1. Respaldar (pasos anteriores).
+2. Reemplazar `sidp.exe` primero en un equipo con solo agente y comprobar `sidp estado`.
+3. Reemplazarlo en el servidor. Las migraciones se aplican solas al arrancar; si la base es más nueva que el ejecutable, la plataforma se niega a arrancar (volver a la versión nueva o restaurar la copia).
+4. Reemplazarlo en los demás equipos. Los contratos v1 son compatibles entre versiones menores.
+
+Pendiente: actualización firmada distribuida por la plataforma, con verificación de hash, salud y reversión.
+
+## Incidentes frecuentes
+
+| Síntoma | Causa probable | Acción |
+|---|---|---|
+| "No se encontró la plataforma en la red" | Servidor apagado, cortafuegos o difusión bloqueada | Encender el servidor, abrir TCP 8443/UDP 47800 en la red privada, o `sidp unirse --url https://IP:8443` |
+| `CERTIFICATE_VERIFY_FAILED` | El paquete no corresponde a este servidor | Usar el `instalacion.json` del servidor actual |
+| Agente reinicia cada 60 s, registro "Credencial rechazada" | Identidad pendiente o revocada | `sidp identidades listar` / `aprobar` |
+| 409 "La identidad ya existe" con `--equipo` | Reinstalación con nombre fijo | Revocar la identidad anterior y repetir |
+| "Reloj del equipo desfasado" | Hora incorrecta | Sincronizar la hora del equipo |
+| Salud amarilla | Disco casi lleno | Liberar espacio; revisar registros y copias |
 
 ## Observabilidad pendiente
 
-Métricas de cola, pendientes, fallos por capacidad, disco y latidos. Límites/retención de eventos; listado actual máximo 100, sin paginación. Alertas para personal y escalamiento técnico. Agente reintenta errores de transporte; errores HTTP de autorización detienen el proceso para corregir configuración.
+Métricas de cola, pendientes y fallos por capacidad; latido visible por equipo en una interfaz; alertas para el personal; retención de eventos y auditoría.

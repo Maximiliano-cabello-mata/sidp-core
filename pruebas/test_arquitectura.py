@@ -5,7 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
-from backend.tareas import Almacen, Conflicto
+from backend.base_datos import BaseDatos
+from backend.modulos import Modulo, ordenar
+from backend.modulos.orquestacion.almacen import Almacen, Conflicto
 from contratos.v1 import NuevaTarea, Resultado
 
 
@@ -58,14 +60,48 @@ def test_limite_de_reintentos(almacen):
     assert almacen.listar({'id': 'admin', 'rol': 'admin'})[0]['estado'] == 'fallida'
 
 
-def test_fronteras_de_importacion():
-    for carpeta, prohibidas in [('backend', {'cerebro', 'agente'}), ('cerebro', {'backend', 'agente'}), ('agente', {'backend', 'cerebro'})]:
-        for archivo in Path(carpeta).rglob('*.py'):
-            for nodo in ast.walk(ast.parse(archivo.read_text())):
-                if isinstance(nodo, ast.Import):
-                    assert not {a.name.split('.')[0] for a in nodo.names} & prohibidas
-                if isinstance(nodo, ast.ImportFrom):
-                    assert (nodo.module or '').split('.')[0] not in prohibidas
+def importaciones(carpeta):
+    for archivo in Path(carpeta).rglob('*.py'):
+        for nodo in ast.walk(ast.parse(archivo.read_text(encoding='utf-8'))):
+            if isinstance(nodo, ast.Import):
+                yield from (a.name.split('.')[0] for a in nodo.names)
+            if isinstance(nodo, ast.ImportFrom) and nodo.level == 0:
+                yield (nodo.module or '').split('.')[0]
+
+
+@pytest.mark.parametrize('carpeta,prohibidas', [
+    ('backend', {'cerebro', 'agente', 'sidp'}),
+    ('cerebro', {'backend', 'agente', 'sidp'}),
+    ('agente', {'backend', 'cerebro', 'sidp'}),
+    ('comun', {'backend', 'cerebro', 'agente', 'sidp', 'fastapi'}),
+    ('contratos', {'backend', 'cerebro', 'agente', 'sidp', 'comun'}),
+])
+def test_fronteras_de_importacion(carpeta, prohibidas):
+    assert not set(importaciones(carpeta)) & prohibidas
+
+
+def test_migraciones_por_modulo(tmp_path):
+    ruta = tmp_path / 'b.db'
+    BaseDatos(ruta, [Modulo('demo', '1', 'x', ('CREATE TABLE a(x);', 'CREATE TABLE b(x);'))])
+    bd = BaseDatos(ruta)
+    assert bd.version('demo') == 2
+    with pytest.raises(RuntimeError, match='más nueva'):
+        bd.migrar('demo', ('CREATE TABLE a(x);',))
+    with pytest.raises(RuntimeError, match='requiere'):
+        ordenar([Modulo('b', '1', 'x', depende=('a',))])
+
+
+def test_adopta_cola_de_laboratorio(tmp_path):
+    ruta = tmp_path / 'orquestacion.db'
+    with sqlite3.connect(ruta) as db:
+        db.executescript("CREATE TABLE dispositivos(id TEXT PRIMARY KEY, capacidades TEXT NOT NULL, ultimo REAL NOT NULL);"
+                         "CREATE TABLE tareas(id TEXT PRIMARY KEY, actor TEXT NOT NULL, clave TEXT NOT NULL, "
+                         "operacion TEXT NOT NULL, mensaje TEXT NOT NULL, estado TEXT NOT NULL, dispositivo TEXT, "
+                         "reserva TEXT, vence REAL, intentos INTEGER NOT NULL DEFAULT 0, resultado TEXT, "
+                         "creada REAL NOT NULL, UNIQUE(actor, clave));"
+                         "CREATE TABLE eventos(secuencia INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, tarea TEXT, "
+                         "actor TEXT, fecha REAL); PRAGMA user_version=1;")
+    assert Almacen(ruta).bd.version('orquestacion') == 2
 
 
 def test_api_sin_cerebro_y_agente_persistente(tmp_path, monkeypatch):
@@ -76,15 +112,16 @@ def test_api_sin_cerebro_y_agente_persistente(tmp_path, monkeypatch):
         'cerebro': {'rol': 'cerebro', 'token': 'test-cerebro'}
     }))
     from backend.main import app
-    from backend.api.orquestacion import almacen as proveedor
     from agente.__main__ import ciclo
-    proveedor.cache_clear()
     with TestClient(app) as cliente:
         assert cliente.get('/api/salud').status_code == 401
+        assert cliente.get('/api/v1/sistema/latido').json()['sidp'] is True
         cliente.headers['Authorization'] = 'Bearer test-admin'
-        assert cliente.get('/api/salud').status_code == 200
-        alumno = cliente.post('/api/alumnos', json={'nombre': 'Prueba', 'apellido_paterno': 'Local'})
+        assert cliente.get('/api/salud').json()['modo_supervivencia'] in ('verde', 'amarillo')
+        assert cliente.get('/api/v1/sistema').json()['modo'] == 'laboratorio'
+        alumno = cliente.post('/api/alumnos', json={'nombre': 'Prueba', 'apellido_paterno': 'Local', 'curp': 'X1'})
         assert alumno.status_code == 200
+        assert cliente.post('/api/alumnos', json={'nombre': 'Otro', 'apellido_paterno': 'L', 'curp': 'X1'}).status_code == 400
         assert cliente.get('/api/alumnos').json()[0]['nombre'] == 'Prueba'
         assert cliente.get('/api/validar-curp/PRUEBA').status_code == 501
         assert cliente.post('/api/v1/tareas', json={'clave': 'manual'}).status_code == 200
@@ -96,8 +133,7 @@ def test_api_sin_cerebro_y_agente_persistente(tmp_path, monkeypatch):
         assert cliente.post('/api/v1/tareas', json={'clave': 'ilegal'}).status_code == 403
         ruta = tmp_path / 'agente.db'
         with sqlite3.connect(ruta) as db:
-            db.execute('CREATE TABLE pendientes(id TEXT PRIMARY KEY,reserva TEXT,mensaje TEXT)')
-            ciclo(cliente, db)
+            assert ciclo(cliente, db) is True
             assert db.execute('SELECT COUNT(*) FROM pendientes').fetchone()[0] == 1
         # Simula reinicio del proceso tras ejecutar y antes de enviar resultado.
         with sqlite3.connect(ruta) as db:
@@ -105,6 +141,7 @@ def test_api_sin_cerebro_y_agente_persistente(tmp_path, monkeypatch):
             ciclo(cliente, db)
         cliente.headers['Authorization'] = 'Bearer test-admin'
         assert all(t['estado'] == 'completada' for t in cliente.get('/api/v1/tareas').json())
+        with sqlite3.connect(tmp_path / 'plataforma.db') as db:
+            assert db.execute("SELECT COUNT(*) FROM auditoria WHERE accion='alumno.registrado'").fetchone()[0] == 1
         monkeypatch.setenv('SIDP_IDENTIDADES', '{}')
         assert cliente.get('/api/v1/tareas').status_code == 503
-    proveedor.cache_clear()
