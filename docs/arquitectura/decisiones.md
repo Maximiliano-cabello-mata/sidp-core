@@ -77,4 +77,4 @@ Aceptada 2026-10-11. Los documentos del alumno deben cumplir validacion real. Se
 
 ## ADR-023 - Dos plataformas sobre un nucleo; el cerebro es un producto aparte
 
-Aceptada 2026-10-11. Plataforma de docentes (evaluaciones, asistencia, reportes, contacto con padres) y de administrativos (expediente, validacion, estadistica, impresion). El sistema administrativo opera completo sin el cerebro. El cerebro se desarrolla en la rama cerebro y se conecta como cliente de la API con identidad y permisos propios, sin que el sistema administrativo dependa de su codigo (invariante 3 de la arquitectura). Ajusta ADR-006 y ADR-009: el rol de cerebro del ejecutable es opcional y esta desactivado por defecto en el perfil administrativo.
+
