@@ -1,11 +1,30 @@
+# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
 venv/
+
+# Compilación del ejecutable
+/build/
+/dist/
+*.exe
+*.spec
+
+# Datos locales y secretos de instalación (NUNCA SUBIR A GIT)
 .env
 *.db
 *.db-*
 datos/
 datos-agente/
+instalacion.json
+credenciales/
+*.pem
 *.log
+
+# Interfaz futura
+node_modules/
+/frontend/build/*
+!/frontend/build/.gitkeep
+/backend/static/*
+!/backend/static/.gitkeep
