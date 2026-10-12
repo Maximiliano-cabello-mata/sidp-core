@@ -1,18 +1,45 @@
 # Contratos v1
 
-Fuente ejecutable: contratos/v1.py. version=1, campos adicionales rechazados. API /api/v1. Respuestas actuales son registros JSON de cola; estabilizar modelos de salida antes de clientes externos.
+Fuente ejecutable: `contratos/v1.py`. Todos los mensajes llevan `version=1`; los campos adicionales y las versiones desconocidas se rechazan con 422. Autenticación: `Authorization: Bearer TOKEN`.
 
-| Ruta | Rol | Efecto |
+## Rutas
+
+| Ruta | Acceso | Efecto |
 |---|---|---|
-| POST /dispositivos/registro | agente | Registra capacidades propias y última conexión |
-| POST /tareas | admin, cerebro | Crear/recuperar por actor+clave |
-| GET /tareas | admin, cerebro | Últimas 100; cerebro solo propias |
-| POST /tareas/reclamar | agente | Tarea con reserva o null |
-| POST /tareas/{id}/resultado | agente | Confirmar con reserva vigente |
+| GET /api/v1/sistema/latido | público | `{"sidp":true}`; confirma que la URL es una plataforma SIDP |
+| GET /api/salud | cualquier identidad aprobada | Base y disco reales: verde o amarillo |
+| GET /api/v1/sistema | admin | Versión, modo, módulos y versión de esquema |
+| POST /api/v1/enrolamiento/solicitud | público + HMAC | `SolicitudIngreso` → `{id, estado}` |
+| GET /api/v1/enrolamiento/estado | token propio, en cualquier estado | `{id, estado}` |
+| GET /api/v1/identidades | admin | Lista sin resúmenes de token |
+| POST /api/v1/identidades/{id}/aprobar \| revocar | admin | Transición auditada |
+| POST /api/v1/invitaciones | admin | `NuevaInvitacion` → código de un solo uso |
+| POST /api/v1/dispositivos/registro | agente | `Dispositivo`: capacidades propias |
+| POST /api/v1/tareas | admin, cerebro | `NuevaTarea`: crea o recupera por actor+clave |
+| GET /api/v1/tareas | admin, cerebro | Últimas 100; el cerebro solo ve las suyas |
+| POST /api/v1/tareas/reclamar | agente | Tarea con reserva, o null |
+| POST /api/v1/tareas/{id}/resultado | agente | `Resultado` con reserva vigente |
+| /api/alumnos | admin | Núcleo escolar heredado |
 
-Authorization: Bearer TOKEN. Nueva tarea: {"version":1,"clave":"plan-001","operacion":"diagnostico.echo","mensaje":"SIDP operativo"}. Registro: {"version":1,"capacidades":["diagnostico.echo"]}. Resultado: {"version":1,"reserva":"valor-servidor","mensaje":"SIDP operativo"}.
+## Mensajes
 
-Idempotencia por actor+clave. Misma clave y otro contenido: 409. Confirmación exige dispositivo, reserva y mensaje esperado. Repetir resultado ya aceptado no crea nuevo evento.
+- **NuevaTarea:** `{"version":1,"clave":"plan-001","operacion":"diagnostico.echo","mensaje":"SIDP operativo"}`
+- **Dispositivo:** `{"version":1,"capacidades":["diagnostico.echo"]}`
+- **Resultado:** `{"version":1,"reserva":"valor-servidor","mensaje":"SIDP operativo"}`
+- **SolicitudIngreso:** `{"version":1,"instalacion":"uuid","equipo":"aula-2","rol":"agente","token_resumen":"sha256 hex","sello":1791690000,"invitacion":null,"prueba":"hmac hex"}`. La `prueba` firma el JSON canónico (claves ordenadas, sin espacios) de todos los campos excepto `prueba`.
+- **NuevaInvitacion:** `{"version":1,"rol":"agente","horas":24}`
+
+## Estados
+
+```mermaid
+stateDiagram-v2
+    [*] --> pendiente: solicitud
+    [*] --> aprobada: invitación válida
+    pendiente --> aprobada: admin
+    pendiente --> revocada: admin
+    aprobada --> revocada: admin
+    revocada --> pendiente: nueva solicitud con nuevo token
+```
 
 ```mermaid
 stateDiagram-v2
@@ -23,4 +50,11 @@ stateDiagram-v2
     ejecutando --> fallida: Intentos agotados
 ```
 
-Reclamo y transición usan BEGIN IMMEDIATE; eventos en la misma transacción. No existe entrega a suscriptores. Pendiente: eventos con ID global, versión, correlación, cursores y confirmación de consumo; modelos públicos de salida; cancelación; renovación y vencimiento total; estado de revisión para efectos inciertos. No habilitar efectos externos sobre este protocolo mínimo.
+Idempotencia por actor+clave. Una misma clave con otro contenido responde 409. Repetir un resultado ya aceptado no crea un evento nuevo.
+
+## Compatibilidad
+
+Agregar campos opcionales o rutas nuevas no cambia de versión. Quitar o cambiar significados exige `v2` en paralelo con `v1` hasta actualizar todos los equipos. Implementados eventos con cursor y contrato público LoteEventos, telemetría, configuración revisada y renovación de reservas; ver comunicacion-y-recursos.md. Pendientes: estabilizar salidas de tareas, cancelación y estado de revisión para efectos inciertos.
+
+
+Contratos adicionales en `contratos/infraestructura.py`; guía de rutas y valores en [comunicación y recursos](comunicacion-y-recursos.md).
