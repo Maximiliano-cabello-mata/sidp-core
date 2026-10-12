@@ -27,3 +27,7 @@ Cerebro coordina, plataforma autoriza. Sin shell genérico ni autoprogramación.
 ## ADR-007 — Documentos fuera de alcance
 
 Por solicitud del usuario, no implementar CURP, actas ni OCR. Conservar simulación histórica sin exponerla como servicio real; ruta devuelve 501.
+
+## ADR-013 - Aprendizaje del cerebro por memoria, retroalimentacion y autonomia graduada
+
+Aceptada 2026-10-11. El cerebro debe mejorar con el uso y adaptarse a la escuela, pero mediante memoria local auditable, correcciones del personal, procedimientos aprobados y niveles de autonomia que suben solo con aciertos medidos y aprobacion humana. No reentrena modelos, no modifica su codigo ni sus permisos, y nunca llega a ejecutar sin confirmacion validaciones de documentos, mensajes a padres ni cambios de datos de alumnos. Detalle en cerebro_aprendizaje.md.
