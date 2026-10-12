@@ -1,58 +1,80 @@
-# Decisiones de arquitectura
+﻿# Decisiones de arquitectura
 
 ## ADR-001 — Dos productos y un agente, un monorepo
-
-Aceptada. Entradas independientes y contratos compartidos; sin imports cruzados de implementación. Facilita desarrollo individual sin acoplar arranques.
+Aceptada. Entradas independientes y contratos compartidos, sin imports cruzados de implementación. Ampliada por ADR-009 (`sidp` como raíz de composición y `comun` como biblioteca).
 
 ## ADR-002 — Monolito modular, ejecución distribuida
-
-Aceptada. No un microservicio por función escolar. Menos despliegues y una autoridad consistente, con trabajadores independientes.
+Aceptada. No se crea un microservicio por función escolar: menos despliegues y una autoridad consistente, con trabajadores independientes. El contrato de módulo está en `docs/arquitectura/modulos.md`.
 
 ## ADR-003 — Servidor escolar local
-
-Objetivo aceptado; instalación pendiente. La LAN funciona sin Internet. Acceso remoto requiere HTTPS y permisos; nube opcional para respaldo/servicios.
+Aceptada. La LAN funciona sin Internet. El acceso remoto requiere HTTPS y permisos. La nube es opcional, solo para respaldo.
 
 ## ADR-004 — SQLite transitorio
-
-Mantener datos existentes y cola separada durante arquitectura. No compartir archivos por SMB. PostgreSQL y migración de datos pendientes antes del despliegue escolar. No hay transacción entre las dos bases actuales.
+Reemplazada por ADR-008.
 
 ## ADR-005 — Repetición tolerable, efectos protegidos
-
-Idempotencia de creación, reserva exclusiva y confirmación deduplicada. No prometer ejecución exactamente una vez. Acciones externas necesitan reconciliación previa al reintento.
+Aceptada. Idempotencia en la creación, reserva exclusiva y confirmación deduplicada. No se promete ejecución exactamente una vez. Las acciones externas necesitan reconciliación antes de reintentarse.
 
 ## ADR-006 — Autonomía mediante políticas
-
-Cerebro coordina, plataforma autoriza. Sin shell genérico ni autoprogramación. IA opcional. Mantenimiento automático solo mediante procedimientos aprobados y reversibles.
+Aceptada. El cerebro coordina y la plataforma autoriza. Sin shell genérico ni autoprogramación. La IA es opcional.
 
 ## ADR-007 — Documentos fuera de alcance
+Sustituida por ADR-022. Antes: los documentos (CURP, actas, OCR) estaban fuera de alcance. La ruta heredada con simulacion RENAPO devuelve 501 hasta que exista el verificador oficial asistido.
 
-Por solicitud del usuario, no implementar CURP, actas ni OCR. Conservar simulación histórica sin exponerla como servicio real; ruta devuelve 501.
+## ADR-008 — SQLite WAL como base de producción, una base por instalación
+Aceptada (2026-10-11). Con tres equipos modestos y unos 140 alumnos, PostgreSQL añade un servicio, memoria y administración sin beneficio medible. Una sola `plataforma.db` en modo WAL, con `synchronous=FULL`, migraciones por módulo y `BEGIN IMMEDIATE`. Permite transacciones atómicas entre el cambio escolar y su auditoría. Se elimina SQLAlchemy/aiosqlite, lo que reduce dependencias y tamaño del ejecutable. Condición de revisión: contención sostenida medida, necesidad de escritores independientes o requisitos de réplica; no un umbral fijo de tamaño. La base nunca se comparte por SMB.
 
-## ADR-008 - Nube como autoridad de datos (reemplaza parcialmente ADR-003 y ADR-004)
+## ADR-009 — Un solo ejecutable con roles
+Aceptada. `sidp.exe` contiene plataforma, agente, cerebro y supervisor; la configuración decide qué corre en cada equipo. Se distribuye y actualiza un solo archivo. Cada rol sigue siendo un proceso con su propia credencial. Paquetes: `sidp` (composición, único que importa todo) y `comun` (sin dependencias internas).
 
-Aceptada 2026-10-11. No hay servidor escolar: las PCs no son confiables como servidor. La autoridad de escritura es una plataforma en la nube con PostgreSQL administrado, HTTPS y respaldos. PCs (.exe) y celulares (PWA) son clientes con cache de lectura y cola de cambios pendientes. Agentes siguen iniciando conexiones salientes. Respaldo mensual exportable a disco escolar para no depender de un proveedor. Privacidad de menores: roles por grupo, auditoria y cifrado son requisito previo a datos reales.
+## ADR-010 — Paquete de instalación y enrolamiento con aprobación
+Aceptada. La instalación se define con un paquete: id, secreto de 256 bits y certificado público. Puede incrustarse en el ejecutable o acompañarlo. Los equipos prueban pertenencia con HMAC, generan su token localmente (el servidor guarda solo su SHA-256) y quedan pendientes hasta que el administrador los aprueba, o entran al instante con una invitación de un solo uso. Alternativas descartadas: tokens en variables de entorno (difícil de instalar y propenso a errores) y mTLS con autoridad certificadora propia (más complejo de operar sin aportar más en una LAN escolar). `SIDP_IDENTIDADES` queda solo para laboratorio y pruebas.
 
-## ADR-009 - Nucleo consolidado y modulos de automatizacion
+## ADR-011 — TLS autofirmado con certificado fijado
+Aceptada. Las IP de la LAN cambian y no hay DNS interno, así que la confianza se basa en el certificado exacto del paquete (sin verificar el nombre del host), no en una CA pública. Clave EC P-256, con 10 años de vigencia. Pendiente: procedimiento de rotación.
 
-Aceptada 2026-10-11. El nucleo ofrece identidad, roles, sincronizacion, documentos, auditoria, cola de tareas y dispositivos. Cada funcion escolar (calificaciones, reportes, planes, anuncios, impresion) es un modulo con contrato propio que usa solo interfaces del nucleo. Prioridad: automatizar trabajo manual repetitivo (boletas, reportes, avisos) sobre una base estable. La IA es modulo opcional, fuera de la ruta critica y sin datos de alumnos por defecto.
+## ADR-012 — Descubrimiento UDP firmado
+Aceptada. Difusión en UDP 47800 y respuesta firmada con HMAC del secreto, lo que evita impostores y mezclar escuelas. Plan B: URL fija (`--url` o `nodo.json`). Se descarta mDNS/zeroconf: más dependencias y comportamiento irregular en Windows.
 
-## ADR-010 - Replicas locales y cuenta Microsoft institucional como transporte y respaldo (ajusta ADR-008)
+## ADR-013 — Supervisor propio en lugar de servicios del sistema
+Aceptada. `sidp iniciar` lanza un proceso hijo por rol y lo reinicia con espera creciente; el código de salida 3 indica un error de credencial. El arranque con el equipo se delega en el programador de tareas o systemd, con una sola línea. Así se evita mantener instaladores de servicios por cada sistema operativo.
 
-Aceptada 2026-10-11, pendiente de validar permisos con el administrador de la cuenta. No hay presupuesto para base de datos ni servidor en la nube; se dispone de una cuenta Microsoft institucional con 100 GB. Se conservan ADR-001, 002, 005, 006, 007 y 009. De ADR-008 se mantiene: sin servidor escolar, clientes con cola offline, privacidad de menores como requisito. Cambia: no hay autoridad central; cada dispositivo guarda su replica en SQLite y OneDrive/SharePoint transporta cambios y respalda.
+## ADR-014 — Módulos estáticos
+Aceptada. Los módulos y capacidades se registran en código y se compilan en el ejecutable. Sin descarga ni carga dinámica: lo que corre es exactamente lo que se probó. Las actualizaciones reemplazan el ejecutable completo (actualización firmada pendiente).
 
-Reglas:
-1. Nunca sincronizar el archivo SQLite con OneDrive (se corrompe). Se sincronizan archivos de diario inmutables.
-2. Cada dispositivo escribe solo su propio diario (append-only, por segmentos); los demas lo leen y lo aplican. Sin escritores concurrentes sobre un mismo archivo.
-3. Cada dato tiene un dueno escritor (docente sobre sus calificaciones). Conflictos restantes se muestran, no se resuelven por reloj del dispositivo; se usa reloj logico hibrido y version esperada.
-4. Un nodo de respaldo (PC del cerebro, cuando este encendida) compacta diarios y genera instantaneas; la nube guarda copias, no es autoridad.
-5. Documentos grandes viven en SharePoint/OneDrive con metadatos y hash en la replica; cada equipo cachea lo que usa. Cuota de 100 GB vigilada con alerta.
-6. Anuncios y foro pueden apoyarse en Teams/SharePoint de la institucion en lugar de construirse, si el administrador lo permite.
-7. Los datos en transito/reposo se cifran con clave de la escuela antes de subir; la cuenta Microsoft no ve expedientes en claro si se puede evitar.
 
-## ADR-011 - Expediente documental como modulo principal (sustituye ADR-007)
+## ADR-015 — Base investigada: comunicación, recursos y SQL
 
-Aceptada 2026-10-11. Por indicacion del usuario, el foro/anuncios queda fuera de alcance y los documentos del alumno (CURP, acta, certificado medico, calificaciones anteriores, carta responsiva y otros) pasan a ser un modulo central. ADR-007 queda sustituido. Validacion en dos niveles: comprobaciones automaticas locales y cotejo humano, que es el unico que marca un documento como validado. Consulta oficial en linea (por ejemplo CURP) es opcion futura por confirmar; la ruta heredada con simulacion RENAPO sigue devolviendo 501.
+Aceptada 2026-10-11 UTC. Ver investigación con fuentes primarias. HTTPS/JSON y pull de tareas, outbox transaccional con inbox del cerebro; autoridad de escritura única. MQTT/gRPC/consenso quedan como alternativas documentadas. SQLite se mantiene sin inventar procedimientos almacenados: servicios transaccionales Python, SQL restringido, vista e integridad mediante trigger. El esquema se exporta desde migraciones.
 
-## ADR-012 - Dos plataformas sobre un nucleo; el cerebro es un producto aparte
+## ADR-016 — Admisión y revisiones
 
-Aceptada 2026-10-11. Plataforma de docentes (evaluaciones, asistencia, reportes, contacto con padres) y plataforma de administrativos (expediente, documentos, estadistica, impresion) sobre un mismo nucleo. El sistema administrativo es completo y opera sin el cerebro. El cerebro es un producto distinto, desarrollado en la rama `cerebro`, que en el futuro se conecta como un cliente mas de la API publica del sistema con identidad y permisos propios. El sistema administrativo no importa codigo del cerebro, no lo necesita para arrancar y solo expone puntos de integracion (API, auditoria, tareas). Ajusta ADR-006.
+Aceptada. Telemetría acotada, política por equipo con revisión esperada y cupos de cola. No elevar recursos por código remoto. Agentes anteriores conservan compatibilidad echo; los nuevos exigen muestra vigente. Las muestras no son atestación de seguridad ni límites duros del SO.
+
+## ADR-017 — Eventos, no event sourcing
+
+Aceptada. Diario append-only a nivel de aplicación, con UUID/cursor y consumo idempotente. No almacena mensajes de tareas en sus metadatos. Tablas de dominio siguen siendo autoridad. Retención y tratamiento de cursores después de una restauración requieren operación explícita. El observador no ejecuta automáticamente acciones administrativas.
+
+## ADR-018 — Transporte y supervisor
+
+Corregir confianza TLS: contexto sin autoridades del sistema; solo certificado del paquete. Rechazar degradación HTTP. Cerebro supervisado usa --servicio; --clave es comando puntual. No reintentos automáticos de cualquier POST; backoff solo en bucles que conocen la semántica.
+
+## ADR-019 - Plataforma unica en una PC administrativa; OneDrive para respaldo
+
+Aceptada 2026-10-11. No hay servidor dedicado ni presupuesto para base de datos o nube de pago; se dispone de una cuenta Microsoft institucional de 100 GB. Se adopta la base tecnica (ADR-003, 008 a 018): una plataforma con SQLite WAL corre en una PC administrativa encendida en horario escolar; su costo medido es de decenas de MB. Los demas equipos y celulares se conectan a ella. La cuenta Microsoft guarda respaldos cifrados automaticos y sirve de recuperacion de emergencia; no es autoridad de datos. Las replicas por dispositivo con escritura multiple quedan como mejora futura por su complejidad. Riesgo aceptado: esa PC es punto unico de falla; mitigar con respaldo diario automatico, copia externa y recuperacion en otro equipo.
+
+## ADR-020 - Acceso remoto de docentes
+
+Aceptada como direccion, pendiente de validar. Algunos docentes necesitan usar el sistema fuera de la escuela. No se abren puertos del router: un tunel saliente desde la PC de la plataforma (por ejemplo Cloudflare Tunnel o Tailscale, con nivel gratuito) publica solo la PWA y la API con HTTPS de certificado publico valido, porque un navegador de celular no acepta el certificado autofirmado fijado de ADR-011, que se mantiene solo para agentes. Requiere login de personal (usuarios, roles, sesion con expiracion, limite de intentos y registro) antes de habilitarse. Sin la PC encendida no hay acceso remoto. Pendiente: elegir tunel, privacidad de menores en transito y aviso de privacidad.
+
+## ADR-021 - Nucleo consolidado y modulos de automatizacion
+
+Aceptada 2026-10-11. El nucleo ofrece identidad, roles de personal, dispositivos, auditoria, documentos, comunicacion y cola de tareas sobre el contrato de modulos de la base tecnica. Cada funcion escolar es un modulo con tablas, migraciones, rutas y permisos propios, sin importar a otros. Ver catalogo_modulos.md.
+
+## ADR-022 - Expediente documental con validacion tecnica (sustituye ADR-007)
+
+Aceptada 2026-10-11. Los documentos del alumno deben cumplir validacion real. Se define una base tecnica de cuatro niveles (integridad y estructura, extraccion y cruce, verificacion oficial asistida, cotejo humano) con evidencia auditable por cada comprobacion. Un documento solo es alidado si cumple las reglas obligatorias de su tipo y una persona lo confirma; ningun proceso automatico lo valida solo. La verificacion oficial (CURP en RENAPO, acta por QR y CEVAR) es asistida hasta confirmar un canal autorizado de API. Ver validacion_documental.md y modulo_expediente.md.
+
+## ADR-023 - Dos plataformas sobre un nucleo; el cerebro es un producto aparte
+
+Aceptada 2026-10-11. Plataforma de docentes (evaluaciones, asistencia, reportes, contacto con padres) y de administrativos (expediente, validacion, estadistica, impresion). El sistema administrativo opera completo sin el cerebro. El cerebro se desarrolla en la rama cerebro y se conecta como cliente de la API con identidad y permisos propios, sin que el sistema administrativo dependa de su codigo (invariante 3 de la arquitectura). Ajusta ADR-006 y ADR-009: el rol de cerebro del ejecutable es opcional y esta desactivado por defecto en el perfil administrativo.
