@@ -5,6 +5,7 @@ import os
 import sqlite3
 import tempfile
 import time
+from contextlib import closing
 from pathlib import Path
 
 
@@ -17,7 +18,7 @@ def crear(bd, destino):
     descriptor, temporal = tempfile.mkstemp(prefix='sidp-respaldo-', suffix='.db', dir=destino.parent)
     os.close(descriptor)
     try:
-        with bd.conexion() as origen, sqlite3.connect(temporal) as copia:
+        with bd.conexion() as origen, closing(sqlite3.connect(temporal)) as copia:
             origen.backup(copia, pages=128, sleep=0.05)
             if copia.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
                 raise RuntimeError('La copia no pasó quick_check')
