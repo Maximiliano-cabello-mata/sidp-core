@@ -13,7 +13,7 @@ Plan único del proyecto. Las fases de [sistema administrativo](arquitectura/sis
 | 3b Base de instalación | Implementada | Ejecutable único, paquete, descubrimiento firmado, TLS fijado, alta con aprobación o invitación, revocación, supervisor, módulos, base WAL |
 | 3c Infraestructura investigada | Implementada | Outbox/inbox, telemetría y políticas, cupos, renovación, `sidp respaldo`, exportación SQL |
 | 3d Conectividad | Implementada | Tareas dirigidas, `sidp prueba-conexion`, `sidp cortafuegos`, ensayo de dos equipos en CI con el `.exe` real |
-| 3e Prueba en la escuela | **Siguiente** | [Prueba con dos computadoras](PRUEBA_DOS_EQUIPOS.md) en los equipos reales; guardar los informes JSON |
+| 3e Prueba en la escuela | Completada | [Prueba con dos computadoras](PRUEBA_DOS_EQUIPOS.md) en los equipos reales; informes JSON validados y documentados en [SESIÓN 2026-10-12](SESION_2026-10-12.md) |
 
 ## B. Producto escolar (sistema administrativo)
 
@@ -49,7 +49,7 @@ Empieza después de la fase 6, cuando existan eventos escolares que observar. Ho
 - [x] Un impostor sin el secreto no responde al descubrimiento ni puede enrolarse; un certificado distinto se rechaza.
 - [x] Sin LAN no se afirma confirmación central.
 - [x] Una tarea creada en un equipo la ejecuta otro y se confirma de vuelta (ensayo con el `.exe` en CI).
-- [ ] Lo mismo, entre dos computadoras reales de la escuela.
+- [x] Lo mismo, entre dos computadoras reales de la escuela (comprobado 2026-10-12, 11/11 OK).
 - [ ] Ediciones escolares concurrentes producen un conflicto visible.
 - [ ] Un respaldo restaura datos y archivos del mismo punto.
 

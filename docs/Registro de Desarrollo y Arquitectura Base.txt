@@ -1,0 +1,52 @@
+1. Filosofía de Diseño: "Supervivencia y Cero Dependencia"
+El sistema SIDP ha sido diseñado arquitectónicamente asumiendo que no existirá un equipo de soporte técnico permanente en la institución. Para garantizar su viabilidad a largo plazo, el sistema rechaza los despliegues tradicionales en la nube o servidores centralizados frágiles, adoptando en su lugar un modelo de nodos distribuidos locales.
+
+Autonomía por Nodo: Cada computadora ejecutará el sistema completo (Frontend, Cerebro/Backend y Base de Datos) empaquetado en un ejecutable binario (.exe).
+
+Aislamiento de Fallos: Si una computadora de la escuela sufre un daño catastrófico, el resto de los equipos (nodos) conservará la operatividad y la información, permitiendo una restauración simple mediante copias del archivo de la base de datos.
+
+Mayoría Viva (Quorum): El Cerebro de SIDP maneja archivos temporales (ej. para OCR) y solo los destruye una vez que confirma que la información ha sido sincronizada en la base de datos local y/o respaldada en los nodos vecinos.
+
+2. Estructura del Repositorio (Monorepositorio Modular)
+Se inicializó un repositorio Git local (sidp-core) aislando las responsabilidades del sistema para facilitar el empaquetado final:
+
+/backend: Contiene el "Cerebro" (FastAPI), el orquestador de tareas, la API interna y el motor de la base de datos.
+
+/frontend: Reservado para la Interfaz de Usuario (React/PWA) que será consumida estáticamente por el backend.
+
+/database: Contiene el esquema original SQL y migraciones futuras.
+
+/docs: Ruta de continuidad técnica y manuales (donde pertenece este documento).
+
+/despliegue: Scripts reservados para compilar el código fuente en un archivo .exe.
+
+Nota de seguridad: Se implementó un archivo .gitignore estricto para evitar subir a control de versiones la base de datos de producción (*.db), archivos temporales y entornos virtuales (venv).
+
+3. Tecnologías Implementadas (Núcleo)
+Para cumplir con los principios de portabilidad y bajo consumo de recursos, se instalaron las siguientes tecnologías base (congeladas en requirements.txt):
+
+FastAPI & Uvicorn: Framework asíncrono y servidor de alto rendimiento. Actúa como el orquestador que levanta la API, comunica los nodos y sirve la interfaz gráfica sin depender de un servidor web externo (como Apache o Nginx).
+
+SQLite: Motor de base de datos serverless. Toda la memoria del nodo vive en un único archivo (sidp_nodo_local.db). Esto permite respaldos mediante un simple copiar y pegar.
+
+SQLAlchemy & aiosqlite: ORM asíncrono. Permite estructurar la base de datos mediante código Python, traduciendo objetos a tablas sin bloquear los procesos de la interfaz.
+
+4. Hitos Técnicos Alcanzados
+Arranque del Orquestador: Se configuró main.py con un ciclo de vida (lifespan) que verifica la integridad del sistema y monta automáticamente la base de datos antes de recibir tráfico.
+
+Rutas de Salud: Se habilitó el endpoint /api/salud para que el sistema y otros nodos puedan diagnosticar el "modo de supervivencia" (Verde, Amarillo, Rojo).
+
+Motor Local Distribuido: Se configuró database.py asegurando que la conexión a SQLite soporte acceso asíncrono y multihilo, indispensable para las tareas en segundo plano del Agente Delfino.
+
+Traducción del Modelo de Datos: Se creó modelos.py implementando las primeras entidades (Alumno y CicloEscolar) bajo las reglas de negocio estrictas:
+
+Identificador inmutable: ID interno permanente ajeno a cambios de CURP.
+
+Baja lógica: Se implementó la columna activo (Boolean) para nunca eliminar registros históricos, protegiendo así la integridad de los expedientes pasados.
+
+5. Siguientes Pasos (Roadmap Inmediato)
+Desarrollar los endpoints de la API (operaciones CRUD) para que el frontend pueda interactuar con la tabla de Alumnos y Ciclos Escolares.
+
+Estructurar el trabajador en segundo plano (Cerebro/Agente Delfino) para monitorear la carpeta de archivos temporales.
+
+Diseñar la lógica de sincronización (P2P básica) para que el nodo local anuncie sus cambios a otros nodos de la red escolar.
