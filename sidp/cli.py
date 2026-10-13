@@ -1,6 +1,7 @@
 """Línea de comandos de sidp.exe. Sin argumentos equivale a "sidp iniciar"."""
 import argparse
 import json
+import os
 import sys
 from comun import configuracion, registros, rutas
 from comun.configuracion import PERFILES, Credencial, Nodo
@@ -10,25 +11,70 @@ from sidp.errores import ErrorInstalacion
 
 AYUDA_INICIAL = """No hay configuración en {hogar}.
 
-  Servidor nuevo:      sidp crear-instalacion --nombre "Primaria Delfino Pando"
-  Equipo adicional:    copie instalacion.json junto a sidp.exe (o use un sidp.exe
-                       compilado con el paquete) y vuelva a ejecutarlo.
+  Con clave de escuela:  sidp iniciar --clave "la clave de la escuela"
+                         (o abra sidp.exe con doble clic y escríbala)
+  Servidor manual:       sidp crear-instalacion --nombre "Primaria Delfino Pando"
+  Equipo adicional:      copie instalacion.json junto a sidp.exe y vuelva a ejecutarlo.
 """
+
+BIENVENIDA = """SIDP - primera vez en esta computadora.
+
+Escriba la clave de escuela. Debe ser la misma en todas las computadoras de la escuela
+(al menos {minimo} caracteres). La primera computadora que la use será el servidor;
+las demás la encontrarán en la red y se unirán solas.
+"""
+
+
+def _interactivo():
+    return bool(sys.stdin and sys.stdin.isatty())
+
+
+def _pedir_clave():
+    from comun.firma import MINIMO_CLAVE
+    print(BIENVENIDA.format(minimo=MINIMO_CLAVE))
+    while True:
+        clave = input('Clave de escuela: ').strip()
+        if len(' '.join(clave.split())) >= MINIMO_CLAVE:
+            return clave
+        print(f'Muy corta: use al menos {MINIMO_CLAVE} caracteres.')
+
+
+def _pausa_final():
+    if rutas.congelado() and _interactivo():
+        input('Presione Enter para cerrar...')  # Doble clic en Windows: que se alcance a leer.
 
 
 def iniciar(args):
     nodo = Nodo.cargar()
     if not nodo:
         paquete = configuracion.cargar_paquete()
-        if not paquete:
+        clave = getattr(args, 'clave', None) or os.environ.get('SIDP_CLAVE')
+        if not paquete and not clave and _interactivo():
+            clave = _pedir_clave()
+        if not paquete and not clave:
             print(AYUDA_INICIAL.format(hogar=rutas.hogar()))
-            if rutas.congelado() and sys.stdin and sys.stdin.isatty():
-                input('Presione Enter para cerrar...')  # Doble clic en Windows: que se alcance a leer.
+            _pausa_final()
             return 2
+        if not paquete:
+            from sidp import automatico
+            try:
+                automatico.preparar(clave, getattr(args, 'nombre', None),
+                                    getattr(args, 'puerto', None) or configuracion.PUERTO_PLATAFORMA,
+                                    url=getattr(args, 'url', None))
+            except (ErrorInstalacion, ValueError) as error:
+                print(f'Error: {error}', file=sys.stderr)
+                _pausa_final()
+                return 1
+            print('\nListo. Deje esta ventana abierta mientras use SIDP.', flush=True)
+            return _arrancar(Nodo.cargar())
         # Primer arranque con paquete: el equipo se une solo y espera aprobación.
         from sidp import instalacion
         instalacion.unirse(paquete, PERFILES.get(paquete.perfil, ['agente']))
         nodo = Nodo.cargar()
+    return _arrancar(nodo)
+
+
+def _arrancar(nodo):
     from sidp import supervisor
     registros.configurar('nodo')
     supervisor.supervisar(nodo.roles)
@@ -142,7 +188,12 @@ def _rol(nombre, *argumentos):
 def construir():
     parser = argparse.ArgumentParser(prog='sidp', description='SIDP: plataforma, agente y cerebro en un ejecutable')
     sub = parser.add_subparsers(dest='orden')
-    sub.add_parser('iniciar', help='Arranca los roles de este equipo (predeterminado)').set_defaults(funcion=iniciar)
+    p = sub.add_parser('iniciar', help='Arranca los roles de este equipo (predeterminado)')
+    p.add_argument('--clave', help='Clave de escuela para el primer arranque (también SIDP_CLAVE)')
+    p.add_argument('--nombre', help='Nombre de la instalación si este equipo resulta ser el servidor')
+    p.add_argument('--puerto', type=int, help='Puerto de la plataforma si este equipo resulta ser el servidor')
+    p.add_argument('--url', help='https://IP:PUERTO del servidor si la red bloquea el descubrimiento')
+    p.set_defaults(funcion=iniciar)
 
     p = sub.add_parser('crear-instalacion', help='Servidor nuevo: crea instalación, certificado y operador')
     p.add_argument('--nombre', required=True)

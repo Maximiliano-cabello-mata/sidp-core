@@ -154,6 +154,7 @@ sequenceDiagram
 - **Cerebro.** `sidp cerebro --clave X` crea un diagnóstico; `sidp cerebro --servicio` observa eventos propios y guarda cursor/inbox. El supervisor usa el modo servicio. La planificación administrativa multietapa sigue pendiente.
 - **Plataforma.** Corre HTTPS en `0.0.0.0:8443` y un hilo de descubrimiento en UDP 47800. Sin paquete, arranca en modo laboratorio en `127.0.0.1:8000`.
 - **Prueba de conectividad.** `sidp prueba-conexion` comprueba descubrimiento, puerto, TLS, reloj y credenciales; en el servidor envía además una tarea dirigida a cada agente remoto y mide la ida y vuelta (ADR-024, [guía](PRUEBA_DOS_EQUIPOS.md)).
+- **Un solo ejecutable.** Con doble clic y una clave de escuela, el primer equipo se vuelve servidor y los demás lo encuentran y se unen solos, sin USB ni invitaciones (ADR-025).
 
 ## 8. Seguridad
 
