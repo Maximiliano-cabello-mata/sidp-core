@@ -34,14 +34,18 @@ def responder(paquete, mensaje):
     return json.dumps({'sidp': 'plataforma', **datos, 'prueba': firma.firmar(paquete.secreto, datos)}).encode()
 
 
-def validar(paquete, reto, mensaje, origen):
-    """URL de la plataforma si la respuesta está firmada por la instalación."""
+def validar(paquete, reto, mensaje, origen, cualquier_esquema=False):
+    """URL de la plataforma si la respuesta está firmada por la instalación.
+
+    cualquier_esquema: el equipo aún no tiene el certificado (alta por clave de escuela).
+    """
     try:
         respuesta = json.loads(mensaje)
         datos = _datos_respuesta(paquete.instalacion, reto, respuesta['esquema'], int(respuesta['puerto']))
     except (ValueError, KeyError, TypeError):
         return None
-    if (datos['esquema'] != paquete.esquema or not 1 <= datos['puerto'] <= 65535
+    if ((datos['esquema'] != paquete.esquema and not cualquier_esquema)
+            or datos['esquema'] not in ('http', 'https') or not 1 <= datos['puerto'] <= 65535
             or respuesta.get('instalacion') != paquete.instalacion
             or respuesta.get('sidp') != 'plataforma'
             or not firma.verificar(paquete.secreto, datos, respuesta.get('prueba'))):
@@ -49,7 +53,7 @@ def validar(paquete, reto, mensaje, origen):
     return f"{datos['esquema']}://{origen}:{datos['puerto']}"
 
 
-def buscar(paquete, espera=3.0, destinos=('255.255.255.255', '127.0.0.1')):
+def buscar(paquete, espera=3.0, destinos=('255.255.255.255', '127.0.0.1'), cualquier_esquema=False):
     reto = secrets.token_hex(16)
     solicitud = json.dumps({'sidp': 'buscar', 'instalacion': paquete.instalacion, 'reto': reto}).encode()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as conexion:
@@ -68,7 +72,7 @@ def buscar(paquete, espera=3.0, destinos=('255.255.255.255', '127.0.0.1')):
                 continue
             except OSError:
                 break
-            url = validar(paquete, reto, mensaje, origen)
+            url = validar(paquete, reto, mensaje, origen, cualquier_esquema)
             if url:
                 return url
     return None

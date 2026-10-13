@@ -6,44 +6,31 @@ Guía para comprobar que dos equipos Windows de la escuela se conectan, se autor
 
 ## Antes de empezar
 
-- **Ejecutable:** `sidp.exe` (artefacto `sidp-windows` del CI) copiado en `C:\SIDP\` en ambos equipos. No hace falta instalar Python.
+- **Ejecutable:** el mismo `sidp.exe` (artefacto `sidp-windows` del CI) copiado en `C:\SIDP\` en ambos equipos. No hace falta instalar Python ni nada más.
+- **Clave de escuela:** una frase de al menos 8 caracteres que solo conozcan los directivos, por ejemplo `primaria delfino 2026`. Es la misma en todas las computadoras. Quien la sepa y esté en la red de la escuela se une sin pedir permiso (ADR-025).
 - **Red:** los dos equipos en la misma red. En Windows debe estar marcada como **Privada** (Configuración > Red e Internet > Propiedades).
 - **Reloj:** la hora de ambos equipos debe estar bien (diferencia menor a 10 minutos).
-- **Consola:** abrir "Símbolo del sistema" o PowerShell en `C:\SIDP`.
 
-## PC1 (servidor)
+## PC1 (será el servidor)
 
-```bat
-sidp.exe crear-instalacion --nombre "Prueba Delfino Pando"
-sidp.exe cortafuegos
-sidp.exe invitacion --rol agente
-sidp.exe
-```
+1. Doble clic en `C:\SIDP\sidp.exe`.
+2. Escribir la clave de escuela y Enter.
+3. Como no hay otra computadora con esa clave, PC1 se vuelve el servidor. Windows pide permiso de administrador para abrir el cortafuegos: elegir **Sí**.
+4. Debe decir `Listo. Deje esta ventana abierta mientras use SIDP.` No cerrar esa ventana.
 
-1. La primera orden crea la instalación en `C:\ProgramData\SIDP`.
-2. `cortafuegos` abre TCP 8443 y UDP 47800 solo en redes privadas. **Requiere consola de administrador.** Si Windows muestra un aviso de cortafuegos al arrancar, elegir "Redes privadas".
-3. `invitacion` muestra un código de un solo uso; anotarlo.
-4. La última orden deja corriendo la plataforma y su agente. No cerrar esa ventana.
+## PC2
 
-Copiar `C:\ProgramData\SIDP\instalacion.json` a una USB. Contiene el secreto de la instalación: no enviarlo por correo ni subirlo a Internet.
+1. Doble clic en `C:\SIDP\sidp.exe`.
+2. Escribir **la misma** clave de escuela y Enter.
+3. Debe mostrar `Plataforma "SIDP" encontrada en https://IP:8443` y `Equipo autorizado.` No cerrar esa ventana.
 
-## PC2 (estación)
+No se copia ningún archivo ni se usan códigos. Las siguientes veces basta el doble clic: ya no pide la clave.
 
-1. Copiar `instalacion.json` de la USB a `C:\SIDP\`, junto a `sidp.exe`.
-2. Ejecutar:
-
-```bat
-sidp.exe unirse --invitacion CODIGO-DE-PC1
-sidp.exe
-```
-
-Debe mostrar `Plataforma "Prueba Delfino Pando" encontrada en https://IP:8443` y `Equipo autorizado.` La segunda orden deja corriendo el agente; no cerrar la ventana.
-
-Sin invitación: `sidp.exe unirse` deja el equipo pendiente. En PC1 se aprueba con `sidp.exe identidades aprobar <nombre>-agente`.
+La instalación manual con `crear-instalacion`, `instalacion.json` e invitaciones sigue disponible para quien la prefiera (`sidp.exe --help`).
 
 ## Prueba de conectividad
 
-En una **segunda consola de PC1**:
+Abrir "Símbolo del sistema", escribir `cd C:\SIDP` y Enter. En esa **segunda consola de PC1**:
 
 ```bat
 sidp.exe prueba-conexion
@@ -78,11 +65,10 @@ El resultado esperado es `RESULTADO: PASA` en los dos equipos. Cada ejecución g
 
 | Mensaje | Qué hacer |
 |---|---|
-| `Descubrimiento UDP` en AVISO | La red bloquea la difusión. No impide operar: usar `sidp.exe unirse --url https://IP-DE-PC1:8443` |
+| `Descubrimiento UDP` en AVISO | La red bloquea la difusión. No impide operar si el equipo ya está unido |
 | `Puerto TCP` en FALLA | PC1 apagado, `sidp.exe` cerrado en PC1, cortafuegos sin abrir o red marcada como Pública |
-| `el certificado no es el de esta instalación` | El `instalacion.json` de PC2 no es el de PC1; copiarlo de nuevo |
+| PC2 dice que esta será el servidor | No encontró a PC1: revisar que PC1 esté abierto, que la clave sea idéntica y que la red sea Privada. Cerrar PC2, borrar `C:\ProgramData\SIDP` en PC2 y volver a abrirlo. Si la red bloquea la difusión, unir PC2 indicando la dirección: `sidp.exe iniciar --clave "la clave" --url https://IP-DE-PC1:8443` |
 | `Reloj` en FALLA | Corregir la hora de Windows (sincronizar con internet) |
-| `Credencial agente: pendiente` | Aprobar en PC1: `sidp.exe identidades aprobar <nombre>-agente` |
 | `Ida y vuelta … sin respuesta` | La ventana de `sidp.exe` en PC2 está cerrada o su agente fue revocado |
 
 IP de PC1: `ipconfig`, línea "Dirección IPv4".

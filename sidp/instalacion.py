@@ -8,8 +8,12 @@ from contratos.v1 import SolicitudIngreso
 from sidp.errores import ErrorInstalacion
 
 
-def crear(nombre, puerto=configuracion.PUERTO_PLATAFORMA, tls=True, con_agente=True, equipo=None):
-    """Primera ejecución en el servidor: paquete, certificado, base, operador y agente local."""
+def crear(nombre, puerto=configuracion.PUERTO_PLATAFORMA, tls=True, con_agente=True, equipo=None, clave=None,
+          puerto_descubrimiento=configuracion.PUERTO_DESCUBRIMIENTO):
+    """Primera ejecución en el servidor: paquete, certificado, base, operador y agente local.
+
+    Con clave de escuela (ADR-025) el identificador y el secreto salen de la clave, no del azar.
+    """
     from backend.main import preparar
     from backend.modulos.identidad import servicio
     from sidp import certificados
@@ -18,8 +22,10 @@ def crear(nombre, puerto=configuracion.PUERTO_PLATAFORMA, tls=True, con_agente=T
         raise ErrorInstalacion(f'Ya existe una instalación en {rutas.hogar()}; no se sobrescribe')
     equipo = equipo or configuracion.nombre_equipo()
     certificado = certificados.generar(rutas.datos_plataforma() / 'tls', nombre) if tls else None
-    paquete = Paquete(instalacion=str(uuid.uuid4()), nombre=nombre, secreto=firma.nuevo_secreto(),
-                      certificado=certificado, puerto=puerto)
+    identificador, secreto = firma.derivar_clave(clave) if clave else (str(uuid.uuid4()), firma.nuevo_secreto())
+    paquete = Paquete(instalacion=identificador, nombre=nombre, secreto=secreto,
+                      certificado=certificado, puerto=puerto, por_clave=bool(clave),
+                      puerto_descubrimiento=puerto_descubrimiento)
     ctx = preparar(paquete=paquete)
     url_local = f'{paquete.esquema}://127.0.0.1:{puerto}'
     token_operador = firma.nuevo_token()

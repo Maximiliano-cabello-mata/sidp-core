@@ -87,3 +87,9 @@ Ambas usan la misma plataforma, base y permisos (ADR-019, ADR-021); se distingue
 ## ADR-024 - Tareas dirigidas y prueba de conectividad
 
 Aceptada 2026-10-13. Una tarea puede llevar `destino` (identidad de un agente); solo ese agente la reclama. Se usa para comprobar un equipo concreto y, en el futuro, para perifericos conectados a una PC (impresion). `sidp prueba-conexion` verifica descubrimiento, puerto, TLS fijado, reloj, credenciales y, desde el servidor, una ida y vuelta con cada agente remoto; guarda un informe JSON como evidencia. CI ejecuta el mismo flujo con el `.exe` real simulando dos equipos (`despliegue/ensayo_dos_equipos.py`). No sustituye la prueba en las computadoras de la escuela (`docs/PRUEBA_DOS_EQUIPOS.md`).
+
+## ADR-025 - Un solo sidp.exe con clave de escuela
+
+Aceptada 2026-10-13. El mismo `sidp.exe` sirve para todas las computadoras y se configura solo con doble clic. La primera vez pide una clave de escuela, igual en todos los equipos. De la clave salen, con PBKDF2, el identificador y el secreto de la instalación, así que dos equipos con la misma clave pertenecen a la misma escuela sin copiar `instalacion.json`. El equipo busca por UDP una plataforma de esa instalación (respuesta firmada con el secreto); si la encuentra, descarga los datos públicos del paquete (certificado incluido), comprueba que vienen firmados con el secreto y se une como agente aprobado al instante. Si no hay ninguna, crea la instalación, queda como servidor y pide permiso de administrador para abrir el cortafuegos.
+
+Se descartó entregar el paquete sin clave a cualquier equipo de la red: cualquiera conectado a la LAN tendría los datos de la escuela. Con la clave, saberla equivale a estar autorizado, por eso conviene una clave larga que solo conozcan los directivos; quien la sepa y esté en la red se une sin aprobación. La instalación manual (`crear-instalacion`, invitaciones, aprobación) sigue disponible y no cambia.

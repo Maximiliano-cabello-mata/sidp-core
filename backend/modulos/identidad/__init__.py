@@ -1,9 +1,11 @@
 """Módulo identidad: alta de equipos (enrolamiento), aprobación y revocación."""
+from dataclasses import asdict
 from fastapi import APIRouter, Depends, Header, HTTPException
 from backend.contexto import contexto
 from backend.modulos import Modulo
 from backend.modulos.identidad import servicio
 from backend.seguridad import administrador, buscar
+from comun import firma
 from contratos.v1 import NuevaInvitacion, SolicitudIngreso
 
 MIGRACIONES = (
@@ -32,6 +34,19 @@ def ejecutar(funcion, *args):
 def solicitar(datos: SolicitudIngreso, ctx=Depends(contexto)):
     """Público: la autenticidad la da la prueba HMAC del paquete de instalación."""
     return ejecutar(servicio.solicitar, ctx.bd, ctx.paquete, datos)
+
+
+@rutas.get("/enrolamiento/paquete")
+def paquete_publico(ctx=Depends(contexto)):
+    """Instalación por clave (ADR-025): datos públicos del paquete, sin el secreto, firmados con él.
+
+    El equipo nuevo, que derivó el secreto de la clave de escuela, comprueba la firma y así
+    confía en el certificado sin haber recibido instalacion.json.
+    """
+    if not ctx.paquete or not getattr(ctx.paquete, "por_clave", False):
+        raise HTTPException(404, "Instalación sin clave de escuela: use instalacion.json o una invitación")
+    datos = {k: v for k, v in asdict(ctx.paquete).items() if k not in ("secreto", "url")}
+    return {**datos, "prueba": firma.firmar(ctx.paquete.secreto, datos)}
 
 
 @rutas.get("/enrolamiento/estado")

@@ -49,6 +49,8 @@ class Paquete:
     puerto_descubrimiento: int = PUERTO_DESCUBRIMIENTO
     url: str | None = None
     perfil: str = 'estacion'
+    # ADR-025: instalación y secreto derivados de la clave de escuela; quien la conoce se une aprobado.
+    por_clave: bool = False
     formato: int = FORMATO
 
     @property

@@ -10,6 +10,7 @@ import os
 import socket
 import ssl
 import subprocess
+import sys
 import time
 import uuid
 from datetime import datetime
@@ -198,3 +199,23 @@ def abrir_cortafuegos(paquete, aviso=print):
             aviso(f'No se pudo crear "{nombre}": ejecute la consola como administrador. {resultado.stdout.strip()}')
     aviso('La red de la escuela debe estar marcada como "Privada" en Windows (Configuración > Red).')
     return codigo
+
+
+def abrir_cortafuegos_automatico(paquete, aviso=print):
+    """Primer arranque del servidor: abre el cortafuegos, pidiendo permiso de administrador si hace falta."""
+    if os.name != 'nt':
+        return 0
+    import ctypes
+    if ctypes.windll.shell32.IsUserAnAdmin():
+        return abrir_cortafuegos(paquete, aviso)
+    if not rutas.congelado():
+        aviso('Ejecute "sidp cortafuegos" en una consola de administrador para abrir el cortafuegos.')
+        return 1
+    aviso('Windows pedirá permiso de administrador para abrir el cortafuegos: elija "Sí".')
+    # ShellExecute "runas" muestra el aviso de Control de cuentas de usuario; > 32 significa que se lanzó.
+    lanzado = ctypes.windll.shell32.ShellExecuteW(None, 'runas', sys.executable, 'cortafuegos', None, 0)
+    if lanzado <= 32:
+        aviso('Sin permiso de administrador: las demás computadoras quizá no encuentren a esta. '
+              'Puede repetirlo con "sidp cortafuegos" como administrador.')
+        return 1
+    return 0

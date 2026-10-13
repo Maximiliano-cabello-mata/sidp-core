@@ -34,7 +34,7 @@ def crear_directa(bd, equipo, rol, token, actor="instalador", identificador=None
 
 
 def solicitar(bd, paquete, solicitud):
-    """Registra una solicitud firmada. Con invitación válida queda aprobada al instante."""
+    """Registra una solicitud firmada. Con invitación válida o clave de escuela queda aprobada al instante."""
     if not paquete:
         raise Rechazo(503, "Plataforma en modo laboratorio: sin enrolamiento")
     if solicitud.instalacion != paquete.instalacion:
@@ -53,8 +53,10 @@ def solicitar(bd, paquete, solicitud):
             raise Rechazo(409, "La identidad ya existe; revóquela antes de reinstalar el equipo")
         if db.execute("SELECT COUNT(*) FROM identidades WHERE estado='pendiente'").fetchone()[0] >= MAXIMO_PENDIENTES:
             raise Rechazo(429, "Demasiadas solicitudes pendientes")
-        estado = "pendiente"
-        if solicitud.invitacion:
+        # Clave de escuela (ADR-025): conocerla, ya demostrado por la prueba HMAC, basta para quedar aprobado.
+        por_clave = getattr(paquete, "por_clave", False)
+        estado = "aprobada" if por_clave else "pendiente"
+        if solicitud.invitacion and not por_clave:
             invitacion = db.execute(
                 "SELECT * FROM invitaciones WHERE codigo_resumen=? AND usada IS NULL AND vence>? AND rol=?",
                 (firma.resumen_token(solicitud.invitacion), ahora, solicitud.rol)).fetchone()

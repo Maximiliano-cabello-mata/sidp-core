@@ -2,8 +2,9 @@
 
     python despliegue/ensayo_dos_equipos.py dist/sidp.exe
 
-PC1 crea la instalación y arranca plataforma + agente. PC2 recibe solo instalacion.json,
-se une con una invitación (descubriendo al servidor por UDP) y arranca su agente.
+Igual que en la escuela (ADR-025): los dos equipos solo reciben el mismo sidp.exe y la
+misma clave de escuela. PC1 no encuentra a nadie y se vuelve servidor; PC2 lo descubre
+por UDP, recibe el certificado firmado y se une aprobado, sin archivos ni invitaciones.
 Luego `sidp prueba-conexion` debe pasar en ambos, incluida la ida y vuelta PC1 -> PC2.
 Sale con 0 si todo pasa. No sustituye la prueba en dos computadoras reales
 (ver docs/PRUEBA_DOS_EQUIPOS.md), pero valida el binario antes de repartirlo.
@@ -11,7 +12,6 @@ Sale con 0 si todo pasa. No sustituye la prueba en dos computadoras reales
 import argparse
 import locale
 import os
-import re
 import shutil
 import socket
 import subprocess
@@ -41,9 +41,12 @@ def correr(ejecutable, argumentos, hogar, tiempo=180):
     return resultado
 
 
-def arrancar(ejecutable, hogar):
+def arrancar(ejecutable, hogar, argumentos):
+    """Como el doble clic: el primer arranque configura el equipo y deja el nodo corriendo."""
+    print(f'\n$ sidp {" ".join(argumentos)}   (SIDP_HOME={hogar.name}, en segundo plano)', flush=True)
     registro = open(hogar.parent / f'{hogar.name}-nodo.log', 'w', encoding='utf-8')
-    return subprocess.Popen([str(ejecutable), 'iniciar'], env=entorno(hogar), stdout=registro, stderr=subprocess.STDOUT)
+    return subprocess.Popen([str(ejecutable), *argumentos], env=entorno(hogar), stdout=registro,
+                            stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
 
 
 def detener(proceso):
@@ -57,6 +60,15 @@ def detener(proceso):
         proceso.wait(15)
     except subprocess.TimeoutExpired:
         proceso.kill()
+
+
+def esperar_archivo(ruta, limite=90):
+    fin = time.monotonic() + limite
+    while time.monotonic() < fin:
+        if ruta.exists():
+            return True
+        time.sleep(0.5)
+    return False
 
 
 def esperar_puerto(puerto, limite=60):
@@ -81,26 +93,19 @@ def main():
     base = Path(tempfile.mkdtemp(prefix='sidp-ensayo-'))
     pc1, pc2 = base / 'pc1', base / 'pc2'
     puerto = puerto_libre()
+    CLAVE = 'ensayo escuela 2026'
     procesos, fallos, completo = [], [], False
     try:
-        if correr(ejecutable, ['crear-instalacion', '--nombre', 'Ensayo dos equipos', '--equipo', 'pc1',
-                               '--puerto', str(puerto)], pc1).returncode:
-            raise SystemExit('No se pudo crear la instalación')
-        procesos.append(arrancar(ejecutable, pc1))
+        procesos.append(arrancar(ejecutable, pc1, ['iniciar', '--clave', CLAVE, '--nombre', 'Ensayo dos equipos',
+                                                   '--puerto', str(puerto)]))
         if not esperar_puerto(puerto):
-            raise SystemExit('La plataforma de PC1 no abrió su puerto')
+            raise SystemExit('PC1 no se volvió servidor (la plataforma no abrió su puerto)')
+        procesos.append(arrancar(ejecutable, pc2, ['iniciar', '--clave', CLAVE]))
+        if not esperar_archivo(pc2 / 'nodo.json'):
+            raise SystemExit('PC2 no se unió solo (descubrimiento o enrolamiento por clave)')
+        time.sleep(5)  # Que el agente de PC2 arranque y se registre en la plataforma.
 
-        salida = correr(ejecutable, ['invitacion', '--rol', 'agente'], pc1).stdout
-        codigo = re.search(r'([0-9A-F]{4}(?:-[0-9A-F]{4}){3})', salida)
-        if not codigo:
-            raise SystemExit('No se obtuvo código de invitación')
-        pc2.mkdir(parents=True)
-        shutil.copy(pc1 / 'instalacion.json', pc2 / 'instalacion.json')  # Lo único que viaja a PC2.
-        if correr(ejecutable, ['unirse', '--equipo', 'pc2', '--invitacion', codigo.group(1)], pc2).returncode:
-            raise SystemExit('PC2 no pudo unirse (descubrimiento o enrolamiento)')
-        procesos.append(arrancar(ejecutable, pc2))
-
-        if correr(ejecutable, ['prueba-conexion', '--equipo', 'pc2-agente'], pc1).returncode:
+        if correr(ejecutable, ['prueba-conexion'], pc1).returncode:
             fallos.append('prueba-conexion en PC1 (ida y vuelta hacia PC2)')
         if correr(ejecutable, ['prueba-conexion'], pc2).returncode:
             fallos.append('prueba-conexion en PC2')
