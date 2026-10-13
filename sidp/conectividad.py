@@ -74,7 +74,7 @@ def ida_y_vuelta(cliente, destino, espera):
     return None, f'sin respuesta en {espera} s (¿agente encendido y aprobado?)'
 
 
-def ejecutar(url=None, equipos=None, espera=90, aviso=None):
+def ejecutar(url=None, equipos=None, espera=90, aviso=None, reparto=0):
     informe = Informe(aviso)
     paquete = configuracion.cargar_paquete()
     nodo = Nodo.cargar()
@@ -151,6 +151,8 @@ def ejecutar(url=None, equipos=None, espera=90, aviso=None):
         if admin:
             cliente.headers['Authorization'] = f'Bearer {admin.token}'
             _probar_equipos(informe, cliente, credenciales['agente'], equipos, espera)
+            if reparto:
+                probar_reparto(informe, cliente, reparto, espera)
         elif credenciales['agente']:
             cliente.headers['Authorization'] = f'Bearer {credenciales["agente"].token}'
             if cliente.get('/api/v1/dispositivos/politica').status_code == 200:
@@ -219,3 +221,37 @@ def abrir_cortafuegos_automatico(paquete, aviso=print):
               'Puede repetirlo con "sidp cortafuegos" como administrador.')
         return 1
     return 0
+
+
+def probar_reparto(informe, cliente, cantidad, espera):
+    """Varias tareas sin destino: la plataforma debe repartirlas entre los equipos en línea (ADR-026)."""
+    ahora = time.time()
+    en_linea = [d['id'] for d in cliente.get('/api/v1/dispositivos').json() if ahora - d['ultimo'] < EN_LINEA_S]
+    lote = uuid.uuid4().hex[:8]
+    identificadores = []
+    for numero in range(cantidad):
+        respuesta = cliente.post('/api/v1/tareas', json={'clave': f'reparto-{lote}-{numero}', 'mensaje': f'reparto {numero}'})
+        respuesta.raise_for_status()
+        identificadores.append(respuesta.json()['id'])
+    inicio, ejecutores = time.monotonic(), {}
+    while time.monotonic() - inicio < espera and len(ejecutores) < cantidad:
+        for identificador in identificadores:
+            if identificador not in ejecutores:
+                tarea = cliente.get(f'/api/v1/tareas/{identificador}').json()
+                if tarea['estado'] in ('completada', 'fallida'):
+                    ejecutores[identificador] = tarea['dispositivo'] if tarea['estado'] == 'completada' else None
+        time.sleep(1)
+    cuenta = {}
+    for dispositivo in ejecutores.values():
+        if dispositivo:
+            cuenta[dispositivo] = cuenta.get(dispositivo, 0) + 1
+    detalle = ', '.join(f'{equipo}: {n}' for equipo, n in sorted(cuenta.items())) or 'ninguna'
+    hechas = sum(cuenta.values())
+    if hechas < cantidad:
+        informe.agregar('Reparto de tareas', 'falla', f'{hechas} de {cantidad} confirmadas en {espera} s ({detalle})')
+    elif len(en_linea) > 1 and len(cuenta) < 2:
+        informe.agregar('Reparto de tareas', 'falla', f'un solo equipo hizo todo con {len(en_linea)} en línea ({detalle})')
+    else:
+        estado = 'ok' if len(cuenta) >= len(en_linea) else 'aviso'
+        informe.agregar('Reparto de tareas', estado, f'{cantidad} tareas en {time.monotonic() - inicio:.0f} s '
+                        f'entre {len(cuenta)} de {len(en_linea)} equipos ({detalle})')

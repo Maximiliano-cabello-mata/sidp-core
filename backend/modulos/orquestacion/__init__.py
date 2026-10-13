@@ -73,6 +73,12 @@ def politica(actor=Depends(requiere('agente')), cola=Depends(obtener_almacen)):
     return cola.politica_nodo(actor['id'])
 
 
+@rutas.get('/equipos')
+def equipos(actor=Depends(requiere('admin')), cola=Depends(obtener_almacen)):
+    """Equipos unidos con sus recursos y el trabajo que han hecho (ADR-026)."""
+    return cola.equipos()
+
+
 @rutas.get('/dispositivos')
 def dispositivos(actor=Depends(requiere('admin')), cola=Depends(obtener_almacen)):
     with cola.bd.conexion() as db:

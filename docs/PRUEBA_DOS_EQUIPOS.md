@@ -24,6 +24,10 @@ Guía para comprobar que dos equipos Windows de la escuela se conectan, se autor
 2. Escribir **la misma** clave de escuela y Enter.
 3. Debe mostrar `Plataforma "SIDP" encontrada en https://IP:8443` y `Equipo autorizado.` No cerrar esa ventana.
 
+Si PC2 no encuentra a PC1, **pregunta** antes de hacer algo: escriba la IP de PC1 (en PC1, `ipconfig`, "Dirección IPv4") o presione Enter para buscar otra vez. Solo en la primera computadora se contesta `S`.
+
+Más computadoras (PC3, PC4...): el mismo doble clic y la misma clave. Todas reparten el trabajo.
+
 No se copia ningún archivo ni se usan códigos. Las siguientes veces basta el doble clic: ya no pide la clave.
 
 La instalación manual con `crear-instalacion`, `instalacion.json` e invitaciones sigue disponible para quien la prefiera (`sidp.exe --help`).
@@ -51,6 +55,15 @@ sidp.exe prueba-conexion
 | Credencial … | Identidades de este equipo aprobadas |
 | Equipo … (solo PC1) | Último contacto de cada agente |
 | Ida y vuelta … (solo PC1) | Tarea creada en PC1, ejecutada por PC2 y confirmada en PC1, con su tiempo |
+| Reparto de tareas (solo PC1, con `--reparto 9`) | Varias tareas repartidas entre todos los equipos en línea |
+
+Para ver en PC1 qué computadoras están unidas y qué aporta cada una (núcleos, memoria, disco y tareas hechas):
+
+```bat
+sidp.exe equipos
+```
+
+En PC1 también se puede probar el reparto: `sidp.exe prueba-conexion --reparto 9`.
 
 El resultado esperado es `RESULTADO: PASA` en los dos equipos. Cada ejecución guarda un informe JSON en `C:\ProgramData\SIDP\registros\conectividad-*.json`. Esos dos archivos son la evidencia de la prueba.
 
@@ -66,6 +79,7 @@ El resultado esperado es `RESULTADO: PASA` en los dos equipos. Cada ejecución g
 | Mensaje | Qué hacer |
 |---|---|
 | `Descubrimiento UDP` en AVISO | La red bloquea la difusión. No impide operar si el equipo ya está unido |
+| PC2 pregunta si es la primera computadora | No encontró a PC1: el módem puede aislar los equipos Wi-Fi, o hay un adaptador virtual. Escriba la IP de PC1 |
 | `Puerto TCP` en FALLA | PC1 apagado, `sidp.exe` cerrado en PC1, cortafuegos sin abrir o red marcada como Pública |
 | PC2 dice que esta será el servidor | No encontró a PC1: revisar que PC1 esté abierto, que la clave sea idéntica y que la red sea Privada. Cerrar PC2, borrar `C:\ProgramData\SIDP` en PC2 y volver a abrirlo. Si la red bloquea la difusión, unir PC2 indicando la dirección: `sidp.exe iniciar --clave "la clave" --url https://IP-DE-PC1:8443` |
 | `Reloj` en FALLA | Corregir la hora de Windows (sincronizar con internet) |

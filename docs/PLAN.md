@@ -13,7 +13,9 @@ Plan único del proyecto. Las fases de [sistema administrativo](arquitectura/sis
 | 3b Base de instalación | Implementada | Ejecutable único, paquete, descubrimiento firmado, TLS fijado, alta con aprobación o invitación, revocación, supervisor, módulos, base WAL |
 | 3c Infraestructura investigada | Implementada | Outbox/inbox, telemetría y políticas, cupos, renovación, `sidp respaldo`, exportación SQL |
 | 3d Conectividad | Implementada | Tareas dirigidas, `sidp prueba-conexion`, `sidp cortafuegos`, ensayo de dos equipos en CI con el `.exe` real |
-| 3e Prueba en la escuela | Completada | [Prueba con dos computadoras](PRUEBA_DOS_EQUIPOS.md) en los equipos reales; informes JSON validados y documentados en [SESIÓN 2026-10-12](SESION_2026-10-12.md) |
+| 3e Prueba con equipos reales | En curso | Dos PCs reales en una red Wi-Fi de casa: 11/11 OK ([SESIÓN 2026-10-12](SESION_2026-10-12.md)). Falta repetirla en la red de la escuela ([guía](PRUEBA_DOS_EQUIPOS.md)) |
+| 3f Recursos compartidos | Implementada | Un solo `sidp.exe` con clave de escuela (ADR-025), búsqueda por cada red, reparto de tareas entre equipos y `sidp equipos` (ADR-026); ensayo de 3 equipos en CI |
+| 3g Almacenamiento repartido | Siguiente | Cada documento en dos equipos distintos; el disco de todas las PCs suma, y una PC caída no pierde datos |
 
 ## B. Producto escolar (sistema administrativo)
 
@@ -33,10 +35,11 @@ Empieza después de la fase 6, cuando existan eventos escolares que observar. Ho
 
 ## Próximo incremento
 
-1. Prueba con dos computadoras de la escuela (3e).
-2. Login del personal (fase 4) como módulo, sobre el contrato de módulos.
-3. Migrar `alumnos` a UUID y versión antes de cargar datos reales.
-4. Rotación de secreto y certificado, expiración de tokens y respaldo programado.
+1. Prueba en la red de la escuela con el `sidp.exe` nuevo (3e).
+2. Almacenamiento repartido entre los equipos (3g), base para los documentos que subirán los padres.
+3. Login del personal (fase 4) como módulo, sobre el contrato de módulos.
+4. Migrar `alumnos` a UUID y versión antes de cargar datos reales.
+5. Rotación de secreto y certificado, expiración de tokens y respaldo programado.
 
 ## Aceptación objetivo
 
@@ -49,7 +52,9 @@ Empieza después de la fase 6, cuando existan eventos escolares que observar. Ho
 - [x] Un impostor sin el secreto no responde al descubrimiento ni puede enrolarse; un certificado distinto se rechaza.
 - [x] Sin LAN no se afirma confirmación central.
 - [x] Una tarea creada en un equipo la ejecuta otro y se confirma de vuelta (ensayo con el `.exe` en CI).
-- [x] Lo mismo, entre dos computadoras reales de la escuela (comprobado 2026-10-12, 11/11 OK).
+- [x] Lo mismo, entre dos computadoras reales en una red de casa (2026-10-12, 11/11 OK).
+- [ ] Lo mismo, en la red de la escuela.
+- [x] El trabajo se reparte entre tres o más equipos (ensayo en CI).
 - [ ] Ediciones escolares concurrentes producen un conflicto visible.
 - [ ] Un respaldo restaura datos y archivos del mismo punto.
 
