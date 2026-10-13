@@ -8,6 +8,9 @@ class Telemetria(Contrato):
     cpu_porcentaje: float = Field(ge=0, le=100, allow_inf_nan=False)
     memoria_disponible_mb: int = Field(ge=0)
     disco_libre_mb: int = Field(ge=0)
+    # Capacidad total del equipo: la plataforma muestra qué ofrece cada PC (ADR-026).
+    nucleos: int | None = Field(default=None, ge=1, le=4096)
+    memoria_total_mb: int | None = Field(default=None, ge=0)
 
 
 class PoliticaNodo(Contrato):

@@ -19,8 +19,19 @@ NOMBRE_PREDETERMINADO = 'SIDP'
 RONDAS = 2  # Dos búsquedas separadas al azar: dos equipos encendidos a la vez no crean dos instalaciones.
 
 
+def url_servidor(texto):
+    """'192.168.1.20' -> 'https://192.168.1.20:8443'; respeta esquema y puerto si se escriben."""
+    texto = texto.strip().rstrip('/')
+    if '://' not in texto:
+        texto = 'https://' + texto
+    esquema, resto = texto.split('://', 1)
+    if ':' not in resto:
+        resto += f':{configuracion.PUERTO_PLATAFORMA}'
+    return f'{esquema}://{resto}'
+
+
 def buscar(clave, espera=3.0, rondas=RONDAS, puerto_descubrimiento=configuracion.PUERTO_DESCUBRIMIENTO,
-           destinos=('255.255.255.255', '127.0.0.1')):
+           destinos=None):
     identificador, secreto = firma.derivar_clave(clave)
     provisional = Paquete(instalacion=identificador, nombre='', secreto=secreto, por_clave=True,
                           puerto_descubrimiento=puerto_descubrimiento)
@@ -36,8 +47,11 @@ def buscar(clave, espera=3.0, rondas=RONDAS, puerto_descubrimiento=configuracion
 def descargar_paquete(url, provisional):
     """Datos públicos firmados con el secreto: sin la clave correcta no hay paquete válido."""
     # Sin verificar TLS en esta única petición: aún no hay certificado; la confianza la da la firma.
-    with httpx.Client(base_url=url, verify=False, timeout=10, trust_env=False, follow_redirects=False) as cliente:
-        respuesta = cliente.get('/api/v1/enrolamiento/paquete')
+    try:
+        with httpx.Client(base_url=url, verify=False, timeout=10, trust_env=False, follow_redirects=False) as cliente:
+            respuesta = cliente.get('/api/v1/enrolamiento/paquete')
+    except (httpx.HTTPError, ValueError) as error:
+        raise ErrorInstalacion(f'{url} no responde ({type(error).__name__}). Revise la IP y que el servidor esté abierto')
     if respuesta.status_code != 200:
         raise ErrorInstalacion(f'La plataforma en {url} no acepta clave de escuela ({respuesta.status_code})')
     datos = respuesta.json()
@@ -48,24 +62,39 @@ def descargar_paquete(url, provisional):
 
 
 def preparar(clave, nombre=None, puerto=configuracion.PUERTO_PLATAFORMA, aviso=None, espera=3.0, rondas=RONDAS,
-             puerto_descubrimiento=configuracion.PUERTO_DESCUBRIMIENTO, destinos=('255.255.255.255', '127.0.0.1'),
-             cortafuegos=True, url=None):
+             puerto_descubrimiento=configuracion.PUERTO_DESCUBRIMIENTO, destinos=None,
+             cortafuegos=True, url=None, decidir=None):
     """Deja el equipo configurado y devuelve 'servidor' o 'estacion'.
 
     url: dirección del servidor cuando la red bloquea la difusión UDP; entonces no se busca ni se crea nada.
+    decidir: si no aparece nadie, pregunta qué hacer antes de crear otra instalación. Devuelve
+    'servidor', 'buscar' o la URL del servidor. Sin ella (modo no interactivo) se crea.
     """
     aviso = aviso or (lambda texto: print(texto, flush=True))
-    if url:
-        url, provisional = url, buscar(clave, rondas=0)[1]
-    else:
-        aviso('Buscando otras computadoras de la escuela en la red...')
-        url, provisional = buscar(clave, espera, rondas, puerto_descubrimiento, destinos)
-    if url:
-        paquete = descargar_paquete(url, provisional)
+    provisional = buscar(clave, rondas=0)[1]
+    while True:
+        if not url:
+            aviso('Buscando otras computadoras de la escuela en la red...')
+            url, provisional = buscar(clave, espera, rondas, puerto_descubrimiento, destinos)
+        if not url:
+            respuesta = decidir() if decidir else 'servidor'
+            if respuesta == 'servidor':
+                break
+            url = None if respuesta == 'buscar' else respuesta
+            if not url:
+                continue
+        try:
+            paquete = descargar_paquete(url, provisional)
+        except ErrorInstalacion as error:
+            if not decidir:
+                raise
+            aviso(f'No se pudo unir: {error}')
+            url = None
+            continue
         paquete.guardar(configuracion.ruta_paquete())
         instalacion.unirse(paquete, ['agente'], url=url, aviso=aviso)
         return 'estacion'
-    aviso('No hay otra computadora con esta clave: esta será el servidor de la escuela.')
+    aviso('Esta computadora será el servidor de la escuela.')
     resultado = instalacion.crear(nombre or NOMBRE_PREDETERMINADO, puerto, clave=clave,
                                   puerto_descubrimiento=puerto_descubrimiento)
     aviso(f'Instalación "{resultado["paquete"].nombre}" creada. Las demás computadoras se unirán con la misma clave.')

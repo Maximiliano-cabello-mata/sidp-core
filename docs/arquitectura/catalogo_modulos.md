@@ -1,6 +1,6 @@
 # Modulos, plataformas y nucleo
 
-Fecha: 2026-10-11, revisado 2026-10-13. Desarrolla ADR-021 y ADR-023. Las reglas tecnicas para escribir un modulo estan en `modulos.md`. El cerebro no forma parte de este catalogo: es un producto aparte (`cerebro_aprendizaje.md`). Foro y anuncios quedan fuera de alcance.
+Fecha: 2026-10-11, revisado 2026-10-13. Desarrolla ADR-021 y ADR-023. Las reglas tecnicas para escribir un modulo estan en `modulos.md`. El cerebro no forma parte de este catalogo: es un producto aparte (`cerebro_aprendizaje.md`). Foro y anuncios quedan fuera de alcance. El alcance cerrado del producto, con los módulos añadidos el 2026-10-13 (asistencia de profesores, exámenes diagnósticos, inventario, catálogo de formatos, escaneo y buzón de padres), está en [VISION.md](../VISION.md).
 
 ## Dos plataformas sobre un mismo nucleo
 

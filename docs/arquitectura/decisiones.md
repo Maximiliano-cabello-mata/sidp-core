@@ -93,3 +93,21 @@ Aceptada 2026-10-13. Una tarea puede llevar `destino` (identidad de un agente); 
 Aceptada 2026-10-13. El mismo `sidp.exe` sirve para todas las computadoras y se configura solo con doble clic. La primera vez pide una clave de escuela, igual en todos los equipos. De la clave salen, con PBKDF2, el identificador y el secreto de la instalación, así que dos equipos con la misma clave pertenecen a la misma escuela sin copiar `instalacion.json`. El equipo busca por UDP una plataforma de esa instalación (respuesta firmada con el secreto); si la encuentra, descarga los datos públicos del paquete (certificado incluido), comprueba que vienen firmados con el secreto y se une como agente aprobado al instante. Si no hay ninguna, crea la instalación, queda como servidor y pide permiso de administrador para abrir el cortafuegos.
 
 Se descartó entregar el paquete sin clave a cualquier equipo de la red: cualquiera conectado a la LAN tendría los datos de la escuela. Con la clave, saberla equivale a estar autorizado, por eso conviene una clave larga que solo conozcan los directivos; quien la sepa y esté en la red se une sin aprobación. La instalación manual (`crear-instalacion`, invitaciones, aprobación) sigue disponible y no cambia.
+
+## ADR-026 - Recursos compartidos entre equipos
+
+Aceptada 2026-10-13. Todas las PCs que alojan la plataforma ponen su poder de trabajo: cada agente informa en su latido CPU, núcleos, memoria y disco, y la plataforma reparte las tareas sin destino. El reparto sigue siendo por reclamo (cada agente pide trabajo), pero un agente cede su turno si otro equipo disponible (en línea, libre, sin pausa ni sobrecarga y con la capacidad) reclamó menos tareas en los últimos 2 minutos; así el agente del servidor, el más cercano, no se queda con todo. `sidp equipos` muestra en el servidor qué PCs están unidas, qué ofrecen y cuánto trabajo hizo cada una. El cerebro no participa: corre en una computadora dedicada.
+
+La búsqueda del servidor sale por cada red del equipo (difusión dirigida x.y.z.255 además de 255.255.255.255), porque Windows manda la difusión general por una sola tarjeta y un adaptador virtual la desviaba. Si un equipo no encuentra a nadie y hay alguien frente a la pantalla, pregunta antes de volverse servidor: ser el primero, escribir la IP del servidor o buscar de nuevo.
+
+No se suma la memoria ni el procesador en una sola máquina virtual: se reparten tareas. El siguiente paso, ajustado por ADR-027, son copias automáticas en otra PC y en disco externo.
+
+## ADR-027 - Un servidor con copias, no almacenamiento repartido
+
+Aceptada 2026-10-13. Ajusta el siguiente paso de ADR-026. La plataforma vive completa en un solo servidor (ADR-019) y las demás PCs unidas con `sidp.exe` guardan una copia de la base y de los archivos, además de ayudar con tareas pesadas. Cada noche se copia también a un disco externo. No se reparte cada documento entre equipos ni se suma el disco de todas las PCs.
+
+Motivo: los expedientes de la escuela caben en un disco normal (unos 75 GB en el peor caso con 500 alumnos sin comprimir), y la carga de trabajo la atiende una PC de oficina. Partir los datos entre PCs que se apagan, se reinician o se formatean volvería el sistema frágil y difícil de reparar sin técnico. Las copias protegen los datos y permiten, más adelante, que otra PC tome el lugar del servidor. El servidor puede seguir usándose para trabajo administrativo si no se apaga en horario escolar y SIDP arranca con Windows sin ventana.
+
+## ADR-028 - Buzón de padres en la nube
+
+Propuesta 2026-10-13, por confirmar quién paga el hosting. Los padres no entran a la red de la escuela: suben documentos a un buzón en internet. El servidor se conecta al buzón (conexión saliente, sin abrir el módem ni IP pública), descarga lo nuevo, lo guarda con sus copias y avisa al buzón para que lo borre. El buzón no tiene datos de otras familias, no decide si un documento se acepta y no se conecta al cerebro. Se descartó alojar el portal en las PCs de la escuela: exigiría equipos encendidos día y noche, IP pública y exponer la red escolar. Requiere aviso de privacidad antes de abrirse.

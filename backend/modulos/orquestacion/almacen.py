@@ -9,6 +9,9 @@ from contratos.infraestructura import PoliticaNodo, Telemetria, motivo_bloqueo
 
 RESERVA_SEGUNDOS = 60
 INTENTOS_MAXIMOS = 3
+# Reparto (ADR-026): un agente cede una tarea sin destino si otro equipo disponible lleva menos.
+EN_LINEA_S = 45
+VENTANA_REPARTO_S = 120
 
 MIGRACIONES = (
     """CREATE TABLE IF NOT EXISTS dispositivos (
@@ -125,6 +128,8 @@ class Almacen:
                                (*capacidades, actor)).fetchone()
             if not tarea:
                 return None
+            if not tarea['destino'] and self._turno_de_otro(db, actor, tarea['operacion'], ahora):
+                return None
             db.execute("UPDATE tareas SET estado='ejecutando',dispositivo=?,reserva=?,vence=?,iniciada=?,intentos=intentos+1 WHERE id=?",
                        (actor, str(uuid.uuid4()), ahora + self.politica.reserva_s, ahora, tarea['id']))
             self.evento(db, "tarea.reclamada", tarea['id'], actor)
@@ -144,6 +149,50 @@ class Almacen:
             db.execute("UPDATE tareas SET estado='completada',resultado=? WHERE id=?", (resultado.mensaje, identificador))
             self.evento(db, "tarea.completada", identificador, actor)
             return dict(db.execute("SELECT * FROM tareas WHERE id=?", (identificador,)).fetchone())
+
+    def _disponible(self, db, dispositivo, operacion, ahora):
+        """Equipo en línea, libre, sin pausa ni sobrecarga y capaz de ejecutar la operación."""
+        if ahora - dispositivo['ultimo'] > EN_LINEA_S or operacion not in json.loads(dispositivo['capacidades']):
+            return False
+        if db.execute("SELECT 1 FROM tareas WHERE estado='ejecutando' AND dispositivo=?", (dispositivo['id'],)).fetchone():
+            return False
+        politica = self._politica(db, dispositivo['id'])['politica']
+        if politica.pausado:
+            return False
+        muestra = db.execute('SELECT * FROM telemetria WHERE dispositivo=?', (dispositivo['id'],)).fetchone()
+        if dispositivo['recursos'] and (not muestra or ahora - muestra['recibida'] > self.politica.telemetria_vigente_s):
+            return False
+        return not (muestra and motivo_bloqueo(Telemetria.model_validate_json(muestra['datos']), politica))
+
+    def _turno_de_otro(self, db, actor, operacion, ahora):
+        """Reparto justo: el equipo más cercano al servidor no se queda con todo el trabajo."""
+        desde = ahora - VENTANA_REPARTO_S
+
+        def recientes(dispositivo):
+            return db.execute("SELECT COUNT(*) FROM eventos WHERE tipo='tarea.reclamada' AND actor=? AND fecha>=?",
+                              (dispositivo, desde)).fetchone()[0]
+        propias = recientes(actor)
+        if not propias:
+            return False
+        otros = db.execute('SELECT * FROM dispositivos WHERE id<>?', (actor,)).fetchall()
+        return any(recientes(otro['id']) < propias for otro in otros if self._disponible(db, otro, operacion, ahora))
+
+    def equipos(self):
+        """Qué equipos están unidos, si están en línea, qué ofrecen y cuánto trabajo hicieron."""
+        ahora = time.time()
+        with self.bd.conexion() as db:
+            filas = db.execute('SELECT d.*, t.datos AS telemetria FROM dispositivos d '
+                               'LEFT JOIN telemetria t ON t.dispositivo=d.id ORDER BY d.id').fetchall()
+            resultado = []
+            for fila in filas:
+                hechas = db.execute("SELECT COUNT(*) FROM eventos WHERE tipo='tarea.completada' AND actor=?",
+                                    (fila['id'],)).fetchone()[0]
+                resultado.append({'id': fila['id'], 'en_linea': ahora - fila['ultimo'] <= EN_LINEA_S,
+                                  'hace_s': int(ahora - fila['ultimo']), 'capacidades': json.loads(fila['capacidades']),
+                                  'recursos': json.loads(fila['telemetria']) if fila['telemetria'] else None,
+                                  'pausado': self._politica(db, fila['id'])['politica'].pausado,
+                                  'tareas_completadas': hechas})
+            return resultado
 
     @staticmethod
     def _politica(db, actor):

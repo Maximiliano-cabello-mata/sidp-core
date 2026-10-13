@@ -13,30 +13,37 @@ Plan único del proyecto. Las fases de [sistema administrativo](arquitectura/sis
 | 3b Base de instalación | Implementada | Ejecutable único, paquete, descubrimiento firmado, TLS fijado, alta con aprobación o invitación, revocación, supervisor, módulos, base WAL |
 | 3c Infraestructura investigada | Implementada | Outbox/inbox, telemetría y políticas, cupos, renovación, `sidp respaldo`, exportación SQL |
 | 3d Conectividad | Implementada | Tareas dirigidas, `sidp prueba-conexion`, `sidp cortafuegos`, ensayo de dos equipos en CI con el `.exe` real |
-| 3e Prueba en la escuela | Completada | [Prueba con dos computadoras](PRUEBA_DOS_EQUIPOS.md) en los equipos reales; informes JSON validados y documentados en [SESIÓN 2026-10-12](SESION_2026-10-12.md) |
+| 3e Prueba con equipos reales | En curso | Dos PCs reales en una red Wi-Fi de casa: 11/11 OK ([SESIÓN 2026-10-12](SESION_2026-10-12.md)). Falta repetirla en la red de la escuela ([guía](PRUEBA_DOS_EQUIPOS.md)) |
+| 3f Recursos compartidos | Implementada | Un solo `sidp.exe` con clave de escuela (ADR-025), búsqueda por cada red, reparto de tareas entre equipos y `sidp equipos` (ADR-026); ensayo de 3 equipos en CI |
+| 3g Copias automáticas | Siguiente | La base y cada archivo se copian a otra PC unida y cada noche a un disco externo; una PC nueva recibe su copia solo con instalar el `.exe` (ADR-027). Incluye cambio de clave de escuela y arranque con Windows sin ventana |
 
-## B. Producto escolar (sistema administrativo)
+## B. Producto escolar
 
-| Fase | Estado | Entregable |
-|---|---|---|
-| 4 Identidad del personal | Pendiente | Módulo `personal`: usuarios, roles escolares por ámbito, sesiones con expiración, límite de intentos y auditoría |
-| 5 Interfaz y operación | Pendiente | Interfaz web desde `backend/static`: inicio de sesión, equipos, aprobaciones, tareas y salud; respaldo diario programado |
-| 6 Expediente | Pendiente | Alumnos con UUID y versión, ciclo, catálogo de documentos, requisitos, recepción y faltantes ([módulo](arquitectura/modulo_expediente.md)) |
-| 7 Validación documental | Pendiente | Niveles 1 a 4 en ese orden ([validación](arquitectura/validacion_documental.md)) |
-| 8 Docentes | Pendiente | Decisión de certificado (ADR-020), PWA: asistencia, evaluaciones, reportes; acceso remoto |
-| 9 Estadística e impresión | Pendiente | Gráficas, estudios de población, impresión por tarea dirigida |
-| 10 Piloto | Pendiente | Datos de prueba en los tres equipos; medir recursos, bloqueo SQL y recuperación |
+Ruta acordada el 2026-10-13. Alcance cerrado en [VISION.md](VISION.md). Cada fase deja algo usable y no se empieza la siguiente hasta que la anterior funciona en la escuela.
 
-## C. Cerebro (producto aparte)
+| Fase | Estado | Entregable | Lista cuando |
+|---|---|---|---|
+| 4 Cuentas del personal | Pendiente | Módulo `personal`: usuarios, roles (dirección, secretaría, docente, administrativo), sesiones con expiración, límite de intentos, bitácora de cambios | Cada persona entra con su usuario |
+| 5 Pantallas y operación | Pendiente | Interfaz web desde `backend/static`: inicio de sesión, equipos, pantalla de salud, respaldo diario programado y su prueba de restauración | Se usa desde el navegador sin consola |
+| 6 Expedientes | Pendiente | Alumno y tutor con UUID y versión, ciclos, documentos, fotos y PDF, búsqueda, faltantes, carga inicial desde Excel, exportar todo ([módulo](arquitectura/modulo_expediente.md)) | Secretaría arma el expediente de un grupo |
+| 7 Docentes y dirección | Pendiente | Decisión de certificado (ADR-020), PWA: asistencia de alumnos, calificaciones, exámenes diagnósticos; asistencia de profesores e inventario | Un grupo los usa un mes |
+| 8 Formatos y documentos | Pendiente | Catálogo de formatos llenados con datos de la escuela, boletas y constancias, PDF básico, escaneo a carpeta, impresión por tarea dirigida, estadística | Una constancia sale con un clic |
+| 9 Piloto | Pendiente | Escuela completa con datos de prueba; cierre de ciclo; medir recursos, bloqueos y recuperación | Una semana sin perder datos ni detener el trabajo |
 
-Empieza después de la fase 6, cuando existan eventos escolares que observar. Hoy solo existe el observador de eventos (`sidp cerebro --servicio`). Fases de memoria, propuestas y autonomía en su documento.
+## C. Buzón de padres (ADR-028)
+
+Después del piloto. Página en internet para crear cuenta, subir documentos y ver su estado; el servidor descarga lo nuevo. Requiere aviso de privacidad y confirmar quién paga el hosting.
+
+## D. Cerebro (producto aparte, PC 4)
+
+Empieza cuando existan expedientes reales. Hoy solo existe el observador de eventos (`sidp cerebro --servicio`). Orden: validación documental en cuatro niveles ([validación](arquitectura/validacion_documental.md)), propuesta de campos de formatos, redacción con plantillas, análisis. Fases de memoria y propuestas en [cerebro_aprendizaje.md](arquitectura/cerebro_aprendizaje.md).
 
 ## Próximo incremento
 
-1. Prueba con dos computadoras de la escuela (3e).
-2. Login del personal (fase 4) como módulo, sobre el contrato de módulos.
-3. Migrar `alumnos` a UUID y versión antes de cargar datos reales.
-4. Rotación de secreto y certificado, expiración de tokens y respaldo programado.
+1. Prueba en la red de la escuela con el `sidp.exe` nuevo (3e). Al mismo tiempo, reunir una copia de cada formato que usan los administrativos (sin código).
+2. Copias automáticas, cambio de clave y arranque con Windows (3g).
+3. Cuentas del personal (fase 4).
+4. Migrar `alumnos` a UUID y versión antes de cargar datos reales.
 
 ## Aceptación objetivo
 
@@ -49,7 +56,9 @@ Empieza después de la fase 6, cuando existan eventos escolares que observar. Ho
 - [x] Un impostor sin el secreto no responde al descubrimiento ni puede enrolarse; un certificado distinto se rechaza.
 - [x] Sin LAN no se afirma confirmación central.
 - [x] Una tarea creada en un equipo la ejecuta otro y se confirma de vuelta (ensayo con el `.exe` en CI).
-- [x] Lo mismo, entre dos computadoras reales de la escuela (comprobado 2026-10-12, 11/11 OK).
+- [x] Lo mismo, entre dos computadoras reales en una red de casa (2026-10-12, 11/11 OK).
+- [ ] Lo mismo, en la red de la escuela.
+- [x] El trabajo se reparte entre tres o más equipos (ensayo en CI).
 - [ ] Ediciones escolares concurrentes producen un conflicto visible.
 - [ ] Un respaldo restaura datos y archivos del mismo punto.
 

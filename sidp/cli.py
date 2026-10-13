@@ -39,9 +39,36 @@ def _pedir_clave():
         print(f'Muy corta: use al menos {MINIMO_CLAVE} caracteres.')
 
 
+PREGUNTA_SERVIDOR = """
+No encontré otra computadora con esta clave en la red.
+  - Si esta es la PRIMERA computadora de la escuela, escriba S y Enter.
+  - Si ya hay un servidor, escriba su dirección IP (por ejemplo 192.168.1.20) y Enter.
+    La IP se ve en el servidor con el comando ipconfig ("Dirección IPv4").
+  - Para buscar otra vez, solo presione Enter.
+"""
+
+
+def _decidir():
+    from sidp import automatico
+    print(PREGUNTA_SERVIDOR)
+    try:
+        respuesta = input('Respuesta: ').strip()
+    except EOFError:  # Sin nadie al teclado (en Windows, NUL también parece una terminal).
+        print('S (sin respuesta: esta computadora será el servidor)')
+        return 'servidor'
+    if not respuesta:
+        return 'buscar'
+    if respuesta.lower() in ('s', 'si', 'sí'):
+        return 'servidor'
+    return automatico.url_servidor(respuesta)
+
+
 def _pausa_final():
     if rutas.congelado() and _interactivo():
-        input('Presione Enter para cerrar...')  # Doble clic en Windows: que se alcance a leer.
+        try:
+            input('Presione Enter para cerrar...')  # Doble clic en Windows: que se alcance a leer.
+        except EOFError:
+            pass
 
 
 def iniciar(args):
@@ -60,7 +87,8 @@ def iniciar(args):
             try:
                 automatico.preparar(clave, getattr(args, 'nombre', None),
                                     getattr(args, 'puerto', None) or configuracion.PUERTO_PLATAFORMA,
-                                    url=getattr(args, 'url', None))
+                                    url=getattr(args, 'url', None) and automatico.url_servidor(args.url),
+                                    decidir=_decidir if _interactivo() else None)
             except (ErrorInstalacion, ValueError) as error:
                 print(f'Error: {error}', file=sys.stderr)
                 _pausa_final()
@@ -161,6 +189,36 @@ def invitacion(args):
     return 0
 
 
+def equipos(args):
+    from backend.modulos.orquestacion.almacen import Almacen
+    lista = Almacen(_local().bd).equipos()
+    if args.json:
+        print(json.dumps(lista, indent=2, ensure_ascii=False))
+        return 0
+    if not lista:
+        print('Todavía no hay equipos registrados.')
+        return 0
+    total_nucleos = total_memoria = total_disco = 0
+    print(f"{'Equipo':<28} {'Estado':<16} {'CPU':>5} {'Núcleos':>7} {'Memoria libre/total':>20} {'Disco libre':>12} {'Tareas':>7}")
+    for equipo in lista:
+        recursos = equipo['recursos'] or {}
+        estado = 'en línea' if equipo['en_linea'] else f"sin contacto {equipo['hace_s']} s"
+        if equipo['pausado']:
+            estado = 'en pausa'
+        memoria = f"{recursos.get('memoria_disponible_mb', 0)}/{recursos.get('memoria_total_mb') or '?'} MB"
+        print(f"{equipo['id']:<28} {estado:<16} {recursos.get('cpu_porcentaje', 0):>4.0f}% "
+              f"{recursos.get('nucleos') or '?':>7} {memoria:>20} {recursos.get('disco_libre_mb', 0):>9} MB "
+              f"{equipo['tareas_completadas']:>7}")
+        if equipo['en_linea']:
+            total_nucleos += recursos.get('nucleos') or 0
+            total_memoria += recursos.get('memoria_disponible_mb', 0)
+            total_disco += recursos.get('disco_libre_mb', 0)
+    en_linea = sum(e['en_linea'] for e in lista)
+    print(f"\n{en_linea} de {len(lista)} equipos en línea. Juntos ofrecen {total_nucleos} núcleos, "
+          f"{total_memoria} MB de memoria libre y {total_disco} MB de disco libre.")
+    return 0
+
+
 def respaldo(args):
     from backend.respaldos import crear
     print(json.dumps(crear(_local().bd, args.destino), indent=2))
@@ -169,7 +227,7 @@ def respaldo(args):
 
 def prueba_conexion(args):
     from sidp import conectividad
-    return conectividad.ejecutar(args.url, args.equipo, args.espera).cerrar()
+    return conectividad.ejecutar(args.url, args.equipo, args.espera, reparto=args.reparto).cerrar()
 
 
 def cortafuegos(args):
@@ -224,6 +282,10 @@ def construir():
     p.add_argument('--horas', type=int, default=24)
     p.set_defaults(funcion=invitacion)
 
+    p = sub.add_parser('equipos', help='Servidor: equipos unidos, sus recursos y el trabajo que hicieron')
+    p.add_argument('--json', action='store_true')
+    p.set_defaults(funcion=equipos)
+
     p = sub.add_parser('respaldo', help='Servidor: snapshot SQLite consistente y manifiesto')
     p.add_argument('--destino', required=True, help='Archivo nuevo, preferentemente en medio externo')
     p.set_defaults(funcion=respaldo)
@@ -232,6 +294,7 @@ def construir():
     p.add_argument('--url', help='https://IP:PUERTO de la plataforma (si no, la guardada o la descubierta)')
     p.add_argument('--equipo', action='append', help='Agente a probar (repetible); por omisión todos los remotos en línea')
     p.add_argument('--espera', type=int, default=90, help='Segundos máximos por ida y vuelta')
+    p.add_argument('--reparto', type=int, default=0, help='Servidor: enviar N tareas sin destino y ver cómo se reparten')
     p.set_defaults(funcion=prueba_conexion)
 
     sub.add_parser('cortafuegos', help='Servidor Windows: abrir TCP de la plataforma y UDP de descubrimiento '

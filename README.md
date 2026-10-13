@@ -27,13 +27,14 @@ Equipos adicionales: abrir `sidp.exe` con el paquete de la escuela, incrustado c
 ## Documentación
 
 **Empezar aquí**
-- [Plan y estado](docs/PLAN.md): plan único del proyecto
+- [Visión y alcance](docs/VISION.md): qué es SIDP, qué hace y qué no
+- [Plan y estado](docs/PLAN.md): ruta por fases
 - [Prueba con dos computadoras](docs/PRUEBA_DOS_EQUIPOS.md)
 - [Manual de laboratorio](docs/manual_usuario.md)
 
 **Base técnica**
 - [Arquitectura](docs/arquitectura.md): documento rector
-- [Decisiones (ADR-001 a 024)](docs/arquitectura/decisiones.md): prevalecen sobre cualquier otro documento
+- [Decisiones (ADR-001 a 028)](docs/arquitectura/decisiones.md): prevalecen sobre cualquier otro documento
 - [Instalación y alta de equipos](docs/arquitectura/instalacion.md)
 - [Contrato de módulos](docs/arquitectura/modulos.md)
 - [Contratos v1](docs/arquitectura/contratos.md)
