@@ -19,7 +19,7 @@ Plan único del proyecto. Las fases de [sistema administrativo](arquitectura/sis
 
 ## B. Producto escolar
 
-Ruta acordada el 2026-10-13. Alcance cerrado en [VISION.md](VISION.md). Cada fase deja algo usable y no se empieza la siguiente hasta que la anterior funciona en la escuela.
+Ruta acordada el 2026-10-13. Alcance cerrado en [VISION.md](VISION.md); tablas y defensas de cada fase en [base_de_datos.md](arquitectura/base_de_datos.md). Cada fase deja algo usable y no se empieza la siguiente hasta que la anterior funciona en la escuela.
 
 | Fase | Estado | Entregable | Lista cuando |
 |---|---|---|---|

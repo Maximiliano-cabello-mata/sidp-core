@@ -42,11 +42,13 @@ Equipos adicionales: abrir `sidp.exe` con el paquete de la escuela, incrustado c
 - [SQL y operaciones transaccionales](docs/arquitectura/sql-y-procedimientos.md) · [esquema generado](database/esquema_actual.sql)
 - [Operación y recuperación](docs/arquitectura/operacion.md)
 - [Investigación: modelos y fuentes](docs/investigacion/fundamentos-distribuidos.md)
+- [Investigación: sistemas escolares en México (SEP, MIGE, SAID)](docs/investigacion/sistemas-escolares-mexico.md)
 - [Evidencia y límites de validación](docs/VALIDACION_INFRAESTRUCTURA.md)
 
 **Producto escolar (diseño)**
 - [Sistema administrativo](docs/arquitectura/sistema_administrativo.md)
 - [Catálogo de módulos y plataformas](docs/arquitectura/catalogo_modulos.md)
+- [Base de datos integral](docs/arquitectura/base_de_datos.md) · [esquema de diseño](database/diseno_integral.sql)
 - [Módulo de expediente](docs/arquitectura/modulo_expediente.md)
 - [Validación documental](docs/arquitectura/validacion_documental.md)
 - [Cerebro que aprende](docs/arquitectura/cerebro_aprendizaje.md)
