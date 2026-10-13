@@ -22,6 +22,8 @@ class NuevaTarea(Contrato):
     clave: str = Field(min_length=1, max_length=120)
     operacion: Capacidad = "diagnostico.echo"
     mensaje: str = Field(default="SIDP operativo", max_length=500)
+    # Identidad del agente que debe ejecutarla; None = cualquiera con la capacidad.
+    destino: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
 class Resultado(Contrato):

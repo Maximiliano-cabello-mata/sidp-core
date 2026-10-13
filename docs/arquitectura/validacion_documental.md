@@ -1,6 +1,6 @@
 # Base tecnica de validacion documental
 
-Fecha: 2026-10-11. Rama `sistema-administrativo`. Ver ADR-022 y modulo_expediente.md. Los documentos del alumno deben **cumplir validacion real**, no solo almacenarse. Este documento define la base tecnica; el modulo de expediente la usa.
+Fecha: 2026-10-11. Diseno, sin codigo todavia. Ver ADR-022 y modulo_expediente.md. Los documentos del alumno deben **cumplir validacion real**, no solo almacenarse. Este documento define la base tecnica; el modulo de expediente la usa.
 
 ## Principio
 

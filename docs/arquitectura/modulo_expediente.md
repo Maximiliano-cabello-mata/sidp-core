@@ -1,6 +1,6 @@
 # Modulo: inscripcion y expediente documental
 
-Fecha: 2026-10-11. Ver ADR-011. Primer modulo funcional; automatiza el trabajo manual de cada inicio de ciclo.
+Fecha: 2026-10-11, revisado 2026-10-13. Ver ADR-022 y validacion_documental.md. Primer modulo funcional; automatiza el trabajo manual de cada inicio de ciclo.
 
 ## Problema
 
@@ -53,12 +53,12 @@ Documento: `pendiente -> recibido -> en_revision -> validado | rechazado(motivo)
 Requisito: `pendiente`, `cumplido`, `en_prorroga`, `vencido`, `no_aplica`.
 Inscripcion: `incompleta -> completa` cuando todos los requisitos obligatorios estan cumplidos o en prorroga vigente. Una prorroga vencida regresa el requisito a pendiente y se marca para seguimiento.
 
-## Validacion en dos niveles
+## Validacion (resumen)
 
 1. **Automatica (local, sin costo):** formato de CURP y digito verificador, coincidencia de CURP/nombre/fecha con el alumno, archivo legible y de tamano razonable, duplicado por hash, fecha dentro de vigencia. Solo produce advertencias.
 2. **Humana:** el administrativo coteja contra el original y marca validado o rechazado con motivo. Ningun proceso automatico, incluido OCR o IA, puede marcar un documento como validado.
 
-Una consulta oficial en linea queda como opcion futura por confirmar; no se afirma validez oficial desde el sistema.
+El detalle en cuatro niveles (integridad, extraccion, verificacion oficial asistida y cotejo humano) esta en `validacion_documental.md`, que prevalece sobre este resumen. No se afirma validez oficial desde el sistema.
 
 ## Automatizaciones que ahorran trabajo
 
@@ -69,12 +69,12 @@ Una consulta oficial en linea queda como opcion futura por confirmar; no se afir
 - Carga por lote (escaneo multiple) y por foto desde celular; asignacion rapida al alumno.
 - Boleta del ciclo anterior generada por el modulo de calificaciones, sin volver a pedirla.
 
-## Almacenamiento y sincronizacion (ADR-010)
+## Almacenamiento (ADR-019)
 
-- Metadatos en la replica SQLite de cada dispositivo; archivos como PDF/imagen comprimidos, con hash.
-- Estimacion: unos 140 alumnos x 8-10 documentos x 1-2 MB = de 1 a 3 GB por ciclo, viable dentro de 100 GB si se conservan pocos ciclos en linea y se archiva el resto fuera.
-- Cada revision tiene un dueno (quien valida); las altas de documentos se agregan sin sobrescribir; versiones nuevas no reemplazan, se agregan.
-- Cifrado antes de subir a la cuenta institucional y copia externa periodica.
+- Metadatos en la base de la plataforma; archivos como PDF/imagen comprimidos en `%ProgramData%\SIDP`, con hash.
+- Estimacion: unos 140 alumnos x 8-10 documentos x 1-2 MB = de 1 a 3 GB por ciclo, viable dentro de 100 GB de respaldo si se conservan pocos ciclos en linea y se archiva el resto fuera.
+- Las versiones nuevas de un documento se agregan, no reemplazan; cada revision tiene un dueno (quien valida).
+- Respaldo cifrado en la cuenta institucional y copia externa periodica; el respaldo de archivos debe corresponder al mismo punto que el de la base.
 
 ## Permisos
 

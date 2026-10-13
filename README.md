@@ -1,13 +1,15 @@
 # SIDP — Sistema Integral Delfino Pando
 
-Sistema modular de gestión escolar para una primaria, pensado para **tres computadoras modestas en LAN**. Un solo ejecutable (`sidp.exe`) contiene todos los roles. En un equipo nuevo basta con abrirlo: encuentra la plataforma, pide autorización y arranca. Etapa de laboratorio: todavía no está listo para expedientes reales.
+Sistema modular de gestión escolar para una primaria, pensado para **tres computadoras modestas en LAN**, sin servidor dedicado: la plataforma corre en la PC administrativa (ADR-019). Un solo ejecutable (`sidp.exe`) contiene todos los roles. En un equipo nuevo basta con abrirlo: encuentra la plataforma, pide autorización y arranca.
+
+**Estado:** la base técnica está construida y probada; el producto escolar está diseñado pero aún sin código. Todavía no está listo para expedientes reales.
 
 | Componente | Responsabilidad |
 |---|---|
-| `sidp` | Lanzador único: instalación, alta de equipos, supervisor y roles |
+| `sidp` | Lanzador único: instalación, alta de equipos, supervisor, roles y prueba de conectividad |
 | Plataforma (`backend/`) | Autoridad de datos y permisos; monolito modular sobre SQLite WAL |
 | Agente (`agente/`) | Ejecuta capacidades autorizadas y guarda resultados antes de enviarlos |
-| Cerebro (`cerebro/`) | Coordinador; planes técnicos de un paso y observador durable de eventos |
+| Cerebro (`cerebro/`) | Producto aparte; hoy crea planes de un paso y observa eventos |
 | `comun/`, `contratos/` | Biblioteca compartida (TLS, descubrimiento, configuración) y mensajes versionados |
 
 ## Inicio rápido
@@ -17,45 +19,48 @@ python -m pip install -r requirements-dev.txt && python -m pytest -q
 python -m sidp crear-instalacion --nombre "Primaria Delfino Pando"   # servidor, una vez
 python -m sidp                                                       # arranca el nodo
 python -m sidp identidades aprobar <equipo>-agente                   # autorizar equipos nuevos
+python -m sidp prueba-conexion                                       # diagnóstico de red e ida y vuelta
 ```
 
-Equipos adicionales: abrir `sidp.exe` con el paquete de la escuela (incrustado con `despliegue/compilar.py --paquete` o `instalacion.json` al lado del ejecutable).
+Equipos adicionales: abrir `sidp.exe` con el paquete de la escuela, incrustado con `despliegue/compilar.py --paquete` o con `instalacion.json` al lado del ejecutable. El `.exe` genérico para Windows se descarga del CI (artefacto `sidp-windows`).
 
 ## Documentación
 
-- [Investigación: modelos, teorías y fuentes primarias](docs/investigacion/fundamentos-distribuidos.md)
-- [Comunicación y recursos](docs/arquitectura/comunicacion-y-recursos.md)
-- [SQL y operaciones transaccionales](docs/arquitectura/sql-y-procedimientos.md)
-- [Esquema SQL generado](database/esquema_actual.sql)
+**Empezar aquí**
+- [Plan y estado](docs/PLAN.md): plan único del proyecto
+- [Prueba con dos computadoras](docs/PRUEBA_DOS_EQUIPOS.md)
+- [Manual de laboratorio](docs/manual_usuario.md)
 
-
+**Base técnica**
 - [Arquitectura](docs/arquitectura.md): documento rector
+- [Decisiones (ADR-001 a 024)](docs/arquitectura/decisiones.md): prevalecen sobre cualquier otro documento
 - [Instalación y alta de equipos](docs/arquitectura/instalacion.md)
 - [Contrato de módulos](docs/arquitectura/modulos.md)
 - [Contratos v1](docs/arquitectura/contratos.md)
-- [Decisiones (ADR)](docs/arquitectura/decisiones.md)
+- [Comunicación y recursos](docs/arquitectura/comunicacion-y-recursos.md)
+- [SQL y operaciones transaccionales](docs/arquitectura/sql-y-procedimientos.md) · [esquema generado](database/esquema_actual.sql)
 - [Operación y recuperación](docs/arquitectura/operacion.md)
-- [Plan y aceptación](docs/PLAN.md)
-- [Manual de laboratorio](docs/manual_usuario.md)
+- [Investigación: modelos y fuentes](docs/investigacion/fundamentos-distribuidos.md)
+- [Evidencia y límites de validación](docs/VALIDACION_INFRAESTRUCTURA.md)
 
-[Evidencia y límites de validación](docs/VALIDACION_INFRAESTRUCTURA.md).
+**Producto escolar (diseño)**
+- [Sistema administrativo](docs/arquitectura/sistema_administrativo.md)
+- [Catálogo de módulos y plataformas](docs/arquitectura/catalogo_modulos.md)
+- [Módulo de expediente](docs/arquitectura/modulo_expediente.md)
+- [Validación documental](docs/arquitectura/validacion_documental.md)
+- [Cerebro que aprende](docs/arquitectura/cerebro_aprendizaje.md)
+- [Registro de la sesión de diseño 2026-10-11](docs/SESION_2026-10-11.md)
 
 ## Estado real
 
 **Implementado:**
 
-- ejecutable único con supervisor por equipo;
-- paquete de instalación;
-- descubrimiento UDP firmado;
-- TLS con certificado fijado;
-- enrolamiento con aprobación o invitación, y revocación;
-- módulos estáticos con migraciones propias en una sola base WAL;
-- auditoría transaccional;
-- cola durable con idempotencia, reservas de 60 s y tres intentos;
-- agente con espera adaptativa y redescubrimiento;
-- salud real de base y disco.
+- **Instalación y equipos:** ejecutable único con supervisor por equipo y paquete de instalación. Los equipos se dan de alta con aprobación o invitación, y se pueden revocar.
+- **Conexión:** descubrimiento UDP firmado y TLS con certificado fijado. `sidp prueba-conexion` comprueba la conexión y hace una ida y vuelta entre equipos; CI la ensaya con el `.exe`.
+- **Datos:** módulos estáticos con migraciones propias en una sola base WAL, auditoría transaccional y outbox/inbox de eventos con cursor.
+- **Cola de tareas:** idempotencia, tareas dirigidas, reservas renovables y límites por equipo según telemetría y política.
+- **Operación:** copia SQLite en caliente bajo comando y exportación SQL.
 
-**Añadido:** outbox/inbox con cursor, política por equipo con revisión, telemetría, límites de admisión, renovación de reservas, copia SQLite en caliente bajo comando local y exportación SQL.
+**Diseñado, sin código:** login del personal, interfaz, expediente, validación documental en cuatro niveles, plataforma docente (PWA), estadística, impresión y cerebro que aprende.
 
-**Pendiente:** login del personal, interfaz, programación/retención de copias, rotación de secretos, planes multietapa, actualizaciones firmadas, periféricos y sincronización escolar sin conexión. No hay IA ni autoprogramación. Las validaciones documentales están fuera de alcance (la ruta heredada responde 501).
-
+**Pendiente técnico:** respaldo programado, rotación de secretos, actualizaciones firmadas, certificado para navegadores y celulares (ADR-020) y medición en las computadoras de la escuela. La ruta heredada de CURP responde 501 hasta que exista la validación documental (ADR-022).

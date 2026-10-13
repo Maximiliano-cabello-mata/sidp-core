@@ -38,6 +38,8 @@ MIGRACIONES = (
     CREATE TRIGGER tarea_terminal_inmutable BEFORE UPDATE OF estado ON tareas
       WHEN OLD.estado IN ('completada','fallida') AND NEW.estado<>OLD.estado
       BEGIN SELECT RAISE(ABORT, 'Una tarea terminal no vuelve a ejecutarse'); END;""",
+    # Tareas dirigidas a un agente concreto (pruebas de conectividad, periféricos locales).
+    """ALTER TABLE tareas ADD COLUMN destino TEXT;""",
 )
 
 
@@ -77,14 +79,17 @@ class Almacen:
         with self.bd.transaccion() as db:
             anterior = db.execute("SELECT * FROM tareas WHERE actor=? AND clave=?", (actor, solicitud.clave)).fetchone()
             if anterior:
-                if anterior['mensaje'] != solicitud.mensaje or anterior['operacion'] != solicitud.operacion:
+                if (anterior['mensaje'], anterior['operacion'], anterior['destino']) != (
+                        solicitud.mensaje, solicitud.operacion, solicitud.destino):
                     raise Conflicto("Clave reutilizada con contenido diferente")
                 return dict(anterior)
             if db.execute("SELECT COUNT(*) FROM tareas WHERE estado='pendiente'").fetchone()[0] >= self.politica.pendientes_maximos:
                 raise Saturada('Cola llena; reintentar la misma clave más tarde')
             identificador = str(uuid.uuid4())
-            db.execute("INSERT INTO tareas(id,actor,clave,operacion,mensaje,estado,creada) VALUES(?,?,?,?,?,'pendiente',?)",
-                       (identificador, actor, solicitud.clave, solicitud.operacion, solicitud.mensaje, time.time()))
+            db.execute("INSERT INTO tareas(id,actor,clave,operacion,mensaje,estado,creada,destino) "
+                       "VALUES(?,?,?,?,?,'pendiente',?,?)",
+                       (identificador, actor, solicitud.clave, solicitud.operacion, solicitud.mensaje, time.time(),
+                        solicitud.destino))
             self.evento(db, "tarea.creada", identificador, actor)
             return dict(db.execute("SELECT * FROM tareas WHERE id=?", (identificador,)).fetchone())
 
@@ -116,7 +121,8 @@ class Almacen:
             capacidades = json.loads(dispositivo['capacidades'])
             marcas = ",".join("?" * len(capacidades))
             tarea = db.execute(f"SELECT * FROM tareas WHERE estado='pendiente' AND operacion IN ({marcas}) "
-                               "ORDER BY creada,id LIMIT 1", capacidades).fetchone()
+                               "AND (destino IS NULL OR destino=?) ORDER BY creada,id LIMIT 1",
+                               (*capacidades, actor)).fetchone()
             if not tarea:
                 return None
             db.execute("UPDATE tareas SET estado='ejecutando',dispositivo=?,reserva=?,vence=?,iniciada=?,intentos=intentos+1 WHERE id=?",
@@ -184,6 +190,13 @@ class Almacen:
             vence = min(ahora + self.politica.reserva_s, limite)
             db.execute('UPDATE tareas SET vence=? WHERE id=?', (vence, identificador))
             return {'vence': vence, 'reserva': reserva}
+
+    def consultar(self, actor, identificador):
+        with self.bd.conexion() as db:
+            tarea = db.execute("SELECT * FROM tareas WHERE id=?", (identificador,)).fetchone()
+        if not tarea or (actor['rol'] != 'admin' and tarea['actor'] != actor['id']):
+            raise Conflicto("Tarea inexistente o ajena")
+        return dict(tarea)
 
     def listar(self, actor):
         with self.bd.conexion() as db:

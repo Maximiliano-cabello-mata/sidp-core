@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.base_datos import BaseDatos
 from backend.modulos import Modulo, ordenar
-from backend.modulos.orquestacion.almacen import Almacen, Conflicto
+from backend.modulos.orquestacion.almacen import MIGRACIONES, Almacen, Conflicto
 from contratos.v1 import NuevaTarea, Resultado
 
 
@@ -101,7 +101,7 @@ def test_adopta_cola_de_laboratorio(tmp_path):
                          "creada REAL NOT NULL, UNIQUE(actor, clave));"
                          "CREATE TABLE eventos(secuencia INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, tarea TEXT, "
                          "actor TEXT, fecha REAL); PRAGMA user_version=1;")
-    assert Almacen(ruta).bd.version('orquestacion') == 3
+    assert Almacen(ruta).bd.version("orquestacion") == len(MIGRACIONES)
 
 
 def test_api_sin_cerebro_y_agente_persistente(tmp_path, monkeypatch):

@@ -42,6 +42,8 @@ curl --cacert /tmp/sidp/servidor/plataforma/tls/certificado.pem -k -H "Authoriza
 
 Revocar: `SIDP_HOME=/tmp/sidp/servidor python -m sidp identidades revocar aula-2-agente`. El agente del aula sale con código 3 y su supervisor espera 60 s antes de reintentar.
 
+Prueba de conectividad en cualquier carpeta: `python -m sidp prueba-conexion`. En el servidor incluye la ida y vuelta con cada agente remoto. Ensayo completo de dos equipos con el ejecutable compilado: `python despliegue/ensayo_dos_equipos.py dist/sidp`. Con dos computadoras reales: [guía](PRUEBA_DOS_EQUIPOS.md).
+
 ## Modo laboratorio mínimo (sin instalación)
 
 Sin paquete, la plataforma escucha en `127.0.0.1:8000` por HTTP y acepta identidades de `SIDP_IDENTIDADES`:

@@ -38,7 +38,7 @@ CREATE TABLE tareas (
      operacion TEXT NOT NULL, mensaje TEXT NOT NULL,
      estado TEXT NOT NULL CHECK(estado IN ('pendiente','ejecutando','completada','fallida')),
      dispositivo TEXT, reserva TEXT, vence REAL, intentos INTEGER NOT NULL DEFAULT 0,
-     resultado TEXT, creada REAL NOT NULL, iniciada REAL, UNIQUE(actor, clave));
+     resultado TEXT, creada REAL NOT NULL, iniciada REAL, destino TEXT, UNIQUE(actor, clave));
 CREATE TABLE telemetria (
       dispositivo TEXT PRIMARY KEY REFERENCES dispositivos(id), recibida REAL NOT NULL,
       datos TEXT NOT NULL CHECK(json_valid(datos)));
@@ -54,6 +54,6 @@ CREATE TRIGGER tarea_terminal_inmutable BEFORE UPDATE OF estado ON tareas
 INSERT INTO esquema VALUES('escolar',1);
 INSERT INTO esquema VALUES('identidad',1);
 INSERT INTO esquema VALUES('mensajeria',1);
-INSERT INTO esquema VALUES('orquestacion',3);
+INSERT INTO esquema VALUES('orquestacion',4);
 INSERT INTO esquema VALUES('sistema',1);
 COMMIT;

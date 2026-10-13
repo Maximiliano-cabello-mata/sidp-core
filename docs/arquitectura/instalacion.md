@@ -66,7 +66,7 @@ El nodo es un proceso de consola. Para que arranque con el equipo:
 - **Windows:** `schtasks /Create /TN SIDP /SC ONSTART /RU SYSTEM /TR "\"C:\SIDP\sidp.exe\" iniciar"`. Con `/RU SYSTEM`, `SIDP_HOME` sigue siendo `C:\ProgramData\SIDP`.
 - **Linux:** una unidad systemd con `ExecStart=/opt/sidp/sidp iniciar`, `Restart=always` y `Environment=SIDP_HOME=/var/lib/sidp`.
 
-Cortafuegos del servidor: permitir TCP 8443 y UDP 47800 **solo en la red privada**.
+Cortafuegos del servidor: permitir TCP 8443 y UDP 47800 **solo en la red privada**. En Windows lo hace `sidp cortafuegos` (consola de administrador). Para comprobar todo: `sidp prueba-conexion` ([guía con dos computadoras](../PRUEBA_DOS_EQUIPOS.md)).
 
 ## 5. Reinstalar, retirar o mover equipos
 

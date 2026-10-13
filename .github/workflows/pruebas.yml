@@ -6,12 +6,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        # 3.12 es la versión de referencia; 3.14 es la que usan los equipos de desarrollo.
+        python: ['3.12', '3.14']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
 
@@ -27,7 +29,12 @@ jobs:
       - run: python -m pip install -r requirements-build.txt
       - run: python despliegue/compilar.py
       - run: dist/sidp.exe --help
+      # Dos equipos simulados con el .exe real: alta, descubrimiento, TLS e ida y vuelta.
+      - run: python despliegue/ensayo_dos_equipos.py dist/sidp.exe
+      - run: Copy-Item docs/PRUEBA_DOS_EQUIPOS.md dist/
       - uses: actions/upload-artifact@v4
         with:
           name: sidp-windows
-          path: dist/sidp.exe
+          path: |
+            dist/sidp.exe
+            dist/PRUEBA_DOS_EQUIPOS.md
