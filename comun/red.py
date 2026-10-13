@@ -43,7 +43,9 @@ def causa(error):
         return ('el certificado del servidor no es el que guardó este equipo; '
                 'si el servidor se reinstaló, vuelva a unir este equipo')
     if isinstance(error, httpx.TimeoutException):
-        return f'el servidor no contesta ({texto}): revise que esté encendido, el cortafuegos y que la red sea Privada'
+        # En Windows una conexión rechazada también tarda: puede ser que SIDP-Servidor no esté abierto.
+        return (f'el servidor no contesta ({texto}): revise que esté encendido con SIDP-Servidor abierto, '
+                'el cortafuegos y que la red sea Privada')
     if any(clave in texto.lower() for clave in ('refused', 'rechaz', '10061', '[errno 111]')):
         return f'el servidor rechazó la conexión ({texto}): SIDP-Servidor no está abierto en esa dirección'
     return texto

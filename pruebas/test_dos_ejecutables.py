@@ -134,9 +134,8 @@ def test_el_agente_dice_por_que_no_llega_al_servidor():
     """En la prueba real PC2 solo decía "Plataforma no disponible", sin la causa."""
     import httpx
     from comun import red
-    with pytest.raises(httpx.TransportError) as cerrado:
-        httpx.get(f'http://127.0.0.1:{puerto_libre()}/', timeout=2)
-    assert 'rechazó la conexión' in red.causa(cerrado.value)
+    for rechazo in ('[Errno 111] Connection refused', '[WinError 10061] No se puede establecer una conexión'):
+        assert 'rechazó la conexión' in red.causa(httpx.ConnectError(rechazo))
     tls = httpx.ConnectError('[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:1000)')
     assert 'certificado del servidor no es el que guardó' in red.causa(tls)
     assert 'no contesta' in red.causa(httpx.ConnectTimeout('timed out'))
