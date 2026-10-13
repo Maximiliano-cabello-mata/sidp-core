@@ -77,6 +77,10 @@ def main():
     registros.configurar('agente')
     paquete = configuracion.cargar_paquete()
     url, token = red.resolver('agente', paquete)
+    if not paquete and url.startswith('https://'):  # Sin certificado guardado no hay forma de confiar en el servidor.
+        registro.error('Falta %s: cierre esta ventana y vuelva a abrir SIDP-Equipo.exe para unirse de nuevo',
+                       configuracion.ruta_paquete())
+        sys.exit(SALIDA_CONFIGURACION)
     politica_red = Transporte.cargar()
     fallos, espera = 0, politica_red.espera_minima_s
     with sqlite3.connect(rutas.datos_agente() / 'pendientes.db') as db:

@@ -139,3 +139,19 @@ def test_el_agente_dice_por_que_no_llega_al_servidor():
     tls = httpx.ConnectError('[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:1000)')
     assert 'certificado del servidor no es el que guardó' in red.causa(tls)
     assert 'no contesta' in red.causa(httpx.ConnectTimeout('timed out'))
+
+
+def test_estacion_sin_instalacion_json_se_vuelve_a_unir(servidor_en_red, tmp_path, monkeypatch, opciones):
+    """En PC2 quedó nodo.json sin instalacion.json: el agente decía "no disponible" sin fin."""
+    import argparse
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'pc2'))
+    assert automatico.preparar(CLAVE, modo='equipo', **opciones) == 'estacion'
+    configuracion.ruta_paquete().unlink()
+    arrancado = []
+    monkeypatch.setattr(cli, '_arrancar', lambda nodo: arrancado.append(nodo) or 0)
+    monkeypatch.setattr(cli, '_interactivo', lambda: False)
+    args = argparse.Namespace(modo='equipo', clave=CLAVE, nombre=None, puerto=None,
+                              url=f'https://127.0.0.1:{servidor_en_red.puerto}')
+    assert cli.iniciar(args) == 0
+    assert configuracion.cargar_paquete().instalacion == servidor_en_red.instalacion
+    assert arrancado and arrancado[0].roles == ['agente']
