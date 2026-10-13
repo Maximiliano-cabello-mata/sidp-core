@@ -112,3 +112,19 @@ def test_el_ejecutable_fija_el_modo_del_doble_clic(monkeypatch):
         with pytest.raises(SystemExit):
             cli.main(argumentos, modo=modo)
         assert vistos.pop() == esperado
+
+
+def test_puerto_ocupado_se_dice_claro_y_no_arranca(tmp_path, monkeypatch, opciones, capsys):
+    """Un sidp.exe viejo abierto ocupaba el 8443: el nuevo debe decirlo, no reintentar cada minuto."""
+    from sidp import puertos, supervisor
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'pc1'))
+    automatico.preparar(CLAVE, 'Escuela', puerto_libre(), modo='servidor', **opciones)
+    paquete = configuracion.cargar_paquete()
+    assert not puertos.ocupado(paquete.puerto)
+    monkeypatch.setattr(supervisor, 'supervisar', lambda roles: pytest.fail('no debía arrancar'))
+    with socket.socket() as viejo:
+        viejo.bind(('0.0.0.0', paquete.puerto))
+        viejo.listen()
+        assert puertos.ocupado(paquete.puerto)
+        assert cli._arrancar(Nodo.cargar()) == 1
+    assert f'el puerto {paquete.puerto} de esta computadora ya está en uso' in capsys.readouterr().err

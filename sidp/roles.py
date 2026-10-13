@@ -1,6 +1,7 @@
 """Arranque de cada rol como proceso independiente."""
 import logging
 import os
+import sys
 import uvicorn
 from comun import configuracion, descubrimiento, registros, rutas
 
@@ -24,6 +25,10 @@ def plataforma(anfitrion=None, puerto=None):
     else:
         registro.warning('Sin instalación: modo laboratorio en loopback, identidades por SIDP_IDENTIDADES')
         anfitrion, puerto = anfitrion or '127.0.0.1', puerto or 8000
+    from sidp import puertos
+    if paquete and puertos.ocupado(puerto, anfitrion):  # Otro programa lo tomó: el supervisor espera y reintenta.
+        registro.error(puertos.mensaje(puerto).replace('\n', ' '))
+        sys.exit(3)
     from backend.main import app
     # Un solo proceso, sin recarga ni extras: huella mínima en equipos modestos.
     uvicorn.run(app, host=anfitrion, port=puerto, workers=1, access_log=False,

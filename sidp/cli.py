@@ -171,7 +171,12 @@ def _avisar_papel(nodo, modo):
 
 
 def _arrancar(nodo):
-    from sidp import supervisor
+    from sidp import puertos, supervisor
+    paquete = configuracion.cargar_paquete()
+    if 'plataforma' in nodo.roles and paquete and puertos.ocupado(paquete.puerto):
+        print(f'Error: {puertos.mensaje(paquete.puerto)}', file=sys.stderr)
+        _pausa_final()
+        return 1
     registros.configurar('nodo')
     supervisor.supervisar(nodo.roles)
     return 0
