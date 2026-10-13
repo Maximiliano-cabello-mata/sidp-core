@@ -1,43 +1,45 @@
 # Sistema administrativo - diseno
 
-Fecha: 2026-10-11. Rama `sistema-administrativo`. Producto independiente del cerebro (ADR-012): opera completo sin el. Ver tambien modulos.md y modulo_expediente.md.
+Fecha: 2026-10-11, revisado 2026-10-13. Producto independiente del cerebro (ADR-023): opera completo sin el. Arquitectura de datos y despliegue: ADR-019 (una plataforma en una PC administrativa, OneDrive solo para respaldo). Ver tambien catalogo_modulos.md, modulo_expediente.md y validacion_documental.md.
 
 ## Alcance
 
-Una primaria de unos 140 alumnos, personal administrativo pequeno, docentes con celular, sin servidor y con una cuenta Microsoft institucional de 100 GB. Objetivo: quitar trabajo manual repetitivo del personal, empezando por inscripcion y expediente, y dar a docentes una forma rapida de capturar evaluaciones, asistencia y reportes.
+Una primaria de unos 140 alumnos, personal administrativo pequeno, docentes con celular, sin servidor dedicado y con una cuenta Microsoft institucional de 100 GB. Objetivo: quitar trabajo manual repetitivo del personal, empezando por inscripcion y expediente, y dar a docentes una forma rapida de capturar evaluaciones, asistencia y reportes.
 
 ## Principios
 
-1. Funciona sin servidor ni cerebro; cada equipo con el .exe es util aun sin Internet.
-2. Local primero: cada dispositivo tiene su replica SQLite; la cuenta Microsoft transporta y respalda (ADR-010).
+1. Funciona sin cerebro y sin Internet: basta la LAN de la escuela y la PC administrativa encendida.
+2. Una sola autoridad de datos: la plataforma en la PC administrativa (ADR-019). Los demas equipos y celulares se conectan a ella; la cuenta Microsoft solo guarda respaldos cifrados.
 3. El software ayuda con reglas deterministas (validar formatos, calcular faltantes, generar listas); una persona confirma lo importante.
-4. Instalar y usar: un instalador, asistente de primer arranque, sin consola ni variables de entorno.
+4. Instalar y usar: un solo ejecutable (ADR-009). Hoy el alta se hace con ordenes de consola (`sidp crear-instalacion`, `sidp unirse`); el asistente grafico de primer arranque esta pendiente.
 5. Datos de menores: roles por grupo, auditoria y cifrado desde el inicio.
 
 ## Piezas del producto
 
 ```mermaid
 flowchart TB
-    subgraph PC[PC administrativa .exe]
-        UI[Interfaz de escritorio local] --> N[Nucleo: identidad, datos, auditoria]
-        N --> R[(Replica SQLite)]
-        N --> F[Archivos del expediente]
-        N --> S[Sincronizador]
-        N --> I[Agente de impresion]
+    subgraph PC[PC administrativa: sidp.exe]
+        PLA[Plataforma: nucleo, modulos, API] --> R[(plataforma.db SQLite WAL)]
+        PLA --> F[Archivos del expediente]
+        UI[Interfaz web del administrativo] --> PLA
+        AG[Agente]
     end
-    subgraph CEL[Celular docente PWA]
-        PWA[Captura: asistencia, evaluaciones, reportes] --> C[(Cache y cola local)]
+    subgraph OTRAS[Otras PC: sidp.exe]
+        AG2[Agente: impresion, OCR, tareas pesadas]
+        NAV[Navegador del personal]
     end
-    S <--> OD[(Cuenta Microsoft 100 GB)]
-    C <--> OD
-    I --> P[Impresoras WiFi]
-    API[API de integracion versionada] -.opcional.-> X[Clientes externos, p. ej. cerebro]
-    N --> API
+    CEL[Celular docente: PWA] -->|HTTPS LAN o tunel ADR-020| PLA
+    AG2 -->|HTTPS, certificado fijado| PLA
+    NAV --> PLA
+    PLA -->|respaldo cifrado diario| OD[(Cuenta Microsoft 100 GB)]
+    AG2 --> P[Impresoras WiFi]
+    CER[Cerebro: producto aparte] -.API con identidad propia.-> PLA
 ```
 
-- **Aplicacion de escritorio**: un solo ejecutable que arranca el nucleo local y abre la interfaz en una ventana propia. Las rutas de datos van en `%ProgramData%\SIDP` o en el perfil del usuario, nunca junto al ejecutable.
-- **PWA docente**: sin instalacion de tienda; se anade a la pantalla de inicio. Trabaja sin conexion.
-- **Sincronizador**: diario por dispositivo, nunca el archivo SQLite compartido.
+- **Plataforma**: corre en la PC administrativa con el mismo ejecutable que los demas equipos (ADR-009). Guarda datos en `%ProgramData%\SIDP`, nunca junto al ejecutable.
+- **Interfaz del personal**: paginas web servidas por la plataforma (`backend/static`); se abren en el navegador de cualquier PC de la LAN. Pendiente.
+- **PWA docente**: se anade a la pantalla de inicio del celular. Puede consultar lo ya cargado sin conexion, pero solo afirma que un cambio quedo guardado cuando la plataforma lo confirma. Pendiente, junto con la decision de certificado de ADR-020.
+- **Agentes**: las otras PC aportan ejecucion (impresion, OCR, generacion de PDF) por la cola de tareas.
 - **API de integracion**: la misma que usa la interfaz, versionada, para que otros productos (el cerebro) puedan conectarse con identidad propia. No es necesaria para operar.
 
 ## Usuarios y permisos
@@ -69,15 +71,15 @@ Inicio con pendientes del dia; Alumnos (busqueda y expediente); Inscripcion (cic
 
 ## Datos
 
-UUID como identificador de todo, `version` y `actualizado_en` asignados localmente con reloj logico hibrido, dueno escritor por registro. Entidades iniciales: alumno, tutor, ciclo_escolar, grupo, inscripcion, tipo_documento, requisito, documento, revision, prorroga, evaluacion, asistencia, reporte_alumno, mensaje_padres, usuario, dispositivo, auditoria. El esquema actual con IDs enteros y create_all sera reemplazado por migraciones versionadas.
+UUID como identificador de las entidades nuevas y columna `version` para control de concurrencia optimista: quien guarda envia la version que leyo y, si otro cambio entro antes, recibe un conflicto visible en lugar de sobrescribir. Un dueno escritor por registro cuando sea posible (el docente de sus evaluaciones). Entidades iniciales: alumno, tutor, ciclo_escolar, grupo, inscripcion, tipo_documento, requisito, documento, revision, prorroga, evaluacion, asistencia, reporte_alumno, mensaje_padres, usuario, dispositivo, auditoria. Las migraciones por modulo ya existen (ADR-008); la tabla heredada `alumnos` usa IDs enteros y debe migrarse a UUID antes de cargar datos reales.
 
 ## Respaldo y recuperacion
 
-Instantanea diaria cifrada en la cuenta institucional, copia mensual a un disco externo de la escuela, prueba de restauracion documentada. Cuota de 100 GB vigilada con alerta; ciclos antiguos se archivan fuera de linea.
+`sidp respaldo` ya genera una copia consistente con manifiesto (ver `sql-y-procedimientos.md`). Pendiente: programarla a diario, cifrarla y subirla a la cuenta institucional, copia mensual a un disco externo y prueba de restauracion documentada. Cuota de 100 GB vigilada con alerta; ciclos antiguos se archivan fuera de linea.
 
 ## Instalacion
 
-Instalador para Windows (PyInstaller o equivalente con instalador firmado cuando sea posible); asistente de primer arranque: crear usuario de direccion, elegir carpeta de datos, conectar la cuenta Microsoft, enrolar el equipo. Actualizaciones con respaldo previo y reversion.
+Ya existe: un solo ejecutable, alta de equipos con aprobacion o invitacion, conexion cifrada y prueba de conectividad (`instalacion.md`, `docs/PRUEBA_DOS_EQUIPOS.md`). Pendiente: asistente grafico de primer arranque (crear usuario de direccion, conectar la cuenta Microsoft, enrolar el equipo), instalador firmado y actualizaciones con respaldo previo y reversion.
 
 ## Riesgos y decisiones abiertas
 
@@ -86,15 +88,18 @@ Instalador para Windows (PyInstaller o equivalente con instalador firmado cuando
 3. Escaner o fotografia con celular para los documentos.
 4. Aviso de privacidad y retencion de documentos de menores.
 5. Lista oficial de documentos requeridos, confirmada con direccion y supervision.
-6. Sincronizacion eventual: definir que ve el usuario mientras se sincroniza y como se muestran los conflictos.
+6. Certificado para navegadores y celulares en la LAN (ADR-020).
+7. La PC administrativa es punto unico de falla (ADR-019): respaldo diario y recuperacion en otro equipo ensayada.
 
 ## Fases
 
+El orden general del proyecto esta en `docs/PLAN.md`; estas fases detallan el producto administrativo.
+
 | Fase | Contenido |
 |---|---|
-| 1 Nucleo | Identidad, roles, replica local con migraciones, UUID/versiones, auditoria |
+| 1 Nucleo | Identidad y roles del personal, sesiones, UUID/versiones, auditoria (sobre la base tecnica existente) |
 | 2 Expediente | Alumnos, ciclo, catalogo de documentos, requisitos, recepcion, validacion, faltantes |
-| 3 Empaquetado | Instalador, asistente de primer arranque, rutas de datos, respaldo local |
-| 4 Sincronizacion | Diarios por dispositivo, carpeta Microsoft, conflictos visibles |
-| 5 Docentes | PWA: asistencia, evaluaciones, reportes, contacto con padres |
-| 6 Estadistica e impresion | Graficas, estudios de poblacion, impresoras WiFi |
+| 3 Empaquetado | Interfaz web, asistente de primer arranque, respaldo diario programado |
+| 4 Docentes | PWA: asistencia, evaluaciones, reportes, contacto con padres; acceso remoto (ADR-020) |
+| 5 Estadistica e impresion | Graficas, estudios de poblacion, impresoras WiFi por agente |
+| Futuro | Replicas por dispositivo con escritura sin conexion, solo si la operacion lo exige (ADR-019) |

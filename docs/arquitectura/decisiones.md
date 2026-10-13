@@ -1,4 +1,4 @@
-﻿# Decisiones de arquitectura
+# Decisiones de arquitectura
 
 ## ADR-001 — Dos productos y un agente, un monorepo
 Aceptada. Entradas independientes y contratos compartidos, sin imports cruzados de implementación. Ampliada por ADR-009 (`sidp` como raíz de composición y `comun` como biblioteca).
@@ -65,7 +65,7 @@ Aceptada 2026-10-11. No hay servidor dedicado ni presupuesto para base de datos 
 
 ## ADR-020 - Acceso remoto de docentes
 
-Aceptada como direccion, pendiente de validar. Algunos docentes necesitan usar el sistema fuera de la escuela. No se abren puertos del router: un tunel saliente desde la PC de la plataforma (por ejemplo Cloudflare Tunnel o Tailscale, con nivel gratuito) publica solo la PWA y la API con HTTPS de certificado publico valido, porque un navegador de celular no acepta el certificado autofirmado fijado de ADR-011, que se mantiene solo para agentes. Requiere login de personal (usuarios, roles, sesion con expiracion, limite de intentos y registro) antes de habilitarse. Sin la PC encendida no hay acceso remoto. Pendiente: elegir tunel, privacidad de menores en transito y aviso de privacidad.
+Aceptada como direccion, pendiente de validar. Algunos docentes necesitan usar el sistema fuera de la escuela. No se abren puertos del router: un tunel saliente desde la PC de la plataforma (por ejemplo Cloudflare Tunnel o Tailscale, con nivel gratuito) publica solo la PWA y la API con HTTPS de certificado publico valido, porque un navegador de celular no acepta el certificado autofirmado fijado de ADR-011, que se mantiene solo para agentes. Requiere login de personal (usuarios, roles, sesion con expiracion, limite de intentos y registro) antes de habilitarse. Sin la PC encendida no hay acceso remoto. Pendiente: elegir tunel, privacidad de menores en transito y aviso de privacidad. El mismo problema de certificado existe dentro de la LAN: un celular conectado al WiFi de la escuela tampoco acepta el certificado autofirmado. Antes de la PWA docente hay que decidir como llega el navegador a la plataforma en la LAN (opciones a evaluar: usar siempre el tunel, nombre de dominio con certificado publico, o instalar una autoridad propia en cada celular).
 
 ## ADR-021 - Nucleo consolidado y modulos de automatizacion
 
@@ -77,4 +77,13 @@ Aceptada 2026-10-11. Los documentos del alumno deben cumplir validacion real. Se
 
 ## ADR-023 - Dos plataformas sobre un nucleo; el cerebro es un producto aparte
 
+Aceptada 2026-10-11. El producto escolar se organiza en dos plataformas sobre un mismo nucleo:
 
+- **Docentes:** celular (PWA) y PC. Evaluaciones, asistencia, reportes de alumno y contacto con padres.
+- **Administrativos:** PC. Inscripcion y expediente, validacion de documentos, estadistica e impresion.
+
+Ambas usan la misma plataforma, base y permisos (ADR-019, ADR-021); se distinguen por interfaz y rol, no por servidor. El cerebro que aprende (`cerebro_aprendizaje.md`) es un producto aparte: el sistema administrativo opera completo sin el, y el cerebro solo accede por la API con identidad propia (ADR-006). Nada del sistema administrativo importa codigo del cerebro. Foro y anuncios quedan fuera de alcance.
+
+## ADR-024 - Tareas dirigidas y prueba de conectividad
+
+Aceptada 2026-10-13. Una tarea puede llevar `destino` (identidad de un agente); solo ese agente la reclama. Se usa para comprobar un equipo concreto y, en el futuro, para perifericos conectados a una PC (impresion). `sidp prueba-conexion` verifica descubrimiento, puerto, TLS fijado, reloj, credenciales y, desde el servidor, una ida y vuelta con cada agente remoto; guarda un informe JSON como evidencia. CI ejecuta el mismo flujo con el `.exe` real simulando dos equipos (`despliegue/ensayo_dos_equipos.py`). No sustituye la prueba en las computadoras de la escuela (`docs/PRUEBA_DOS_EQUIPOS.md`).

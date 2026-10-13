@@ -17,13 +17,16 @@ Fuente ejecutable: `contratos/v1.py`. Todos los mensajes llevan `version=1`; los
 | POST /api/v1/dispositivos/registro | agente | `Dispositivo`: capacidades propias |
 | POST /api/v1/tareas | admin, cerebro | `NuevaTarea`: crea o recupera por actor+clave |
 | GET /api/v1/tareas | admin, cerebro | Últimas 100; el cerebro solo ve las suyas |
+| GET /api/v1/tareas/{id} | admin, cerebro (propias) | Estado de una tarea; 404 si no existe o es ajena |
 | POST /api/v1/tareas/reclamar | agente | Tarea con reserva, o null |
 | POST /api/v1/tareas/{id}/resultado | agente | `Resultado` con reserva vigente |
 | /api/alumnos | admin | Núcleo escolar heredado |
 
+Rutas de telemetría, política por equipo, renovación de reservas y diario de eventos: ver [comunicación y recursos](comunicacion-y-recursos.md).
+
 ## Mensajes
 
-- **NuevaTarea:** `{"version":1,"clave":"plan-001","operacion":"diagnostico.echo","mensaje":"SIDP operativo"}`
+- **NuevaTarea:** `{"version":1,"clave":"plan-001","operacion":"diagnostico.echo","mensaje":"SIDP operativo"}`. Campo opcional `destino` (identidad de agente, p. ej. `"aula-2-agente"`): solo ese agente la reclama. La misma clave con otro destino responde 409.
 - **Dispositivo:** `{"version":1,"capacidades":["diagnostico.echo"]}`
 - **Resultado:** `{"version":1,"reserva":"valor-servidor","mensaje":"SIDP operativo"}`
 - **SolicitudIngreso:** `{"version":1,"instalacion":"uuid","equipo":"aula-2","rol":"agente","token_resumen":"sha256 hex","sello":1791690000,"invitacion":null,"prueba":"hmac hex"}`. La `prueba` firma el JSON canónico (claves ordenadas, sin espacios) de todos los campos excepto `prueba`.

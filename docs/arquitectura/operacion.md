@@ -4,6 +4,10 @@
 
 La instalación del servidor y el alta de equipos están en [instalacion.md](instalacion.md). Diagnóstico de cualquier equipo: `sidp estado` muestra la carpeta, la instalación, los roles y el estado de cada credencial.
 
+## Prueba de conectividad
+
+`sidp prueba-conexion` en cualquier equipo: descubrimiento, puerto, TLS, reloj y credenciales. En el servidor añade el último contacto de cada agente y una ida y vuelta con cada agente remoto. Sale con código 0 si no hay fallas y guarda `registros/conectividad-*.json`. Abrir el cortafuegos del servidor (Windows, consola de administrador): `sidp cortafuegos`. Guía paso a paso: [PRUEBA_DOS_EQUIPOS.md](../PRUEBA_DOS_EQUIPOS.md).
+
 ## Salud
 
 - `GET /api/salud` (cualquier identidad aprobada): comprueba que la base responde y el espacio libre en disco. Devuelve **verde**, o **amarillo** con menos de 200 MB libres. Si la base falla, responde 503: nunca un falso "vivo".
@@ -55,7 +59,7 @@ Pendiente: actualización firmada distribuida por la plataforma, con verificaci�
 
 | Síntoma | Causa probable | Acción |
 |---|---|---|
-| "No se encontró la plataforma en la red" | Servidor apagado, cortafuegos o difusión bloqueada | Encender el servidor, abrir TCP 8443/UDP 47800 en la red privada, o `sidp unirse --url https://IP:8443` |
+| "No se encontró la plataforma en la red" | Servidor apagado, cortafuegos o difusión bloqueada | Encender el servidor, `sidp cortafuegos` en él, red marcada como Privada, o `sidp unirse --url https://IP:8443`. Diagnóstico: `sidp prueba-conexion` |
 | `CERTIFICATE_VERIFY_FAILED` | El paquete no corresponde a este servidor | Usar el `instalacion.json` del servidor actual |
 | Agente reinicia cada 60 s, registro "Credencial rechazada" | Identidad pendiente o revocada | `sidp identidades listar` / `aprobar` |
 | 409 "La identidad ya existe" con `--equipo` | Reinstalación con nombre fijo | Revocar la identidad anterior y repetir |

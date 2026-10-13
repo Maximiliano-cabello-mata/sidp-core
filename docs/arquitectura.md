@@ -1,7 +1,6 @@
-<!-- Documento rector: la investigación y el protocolo enlazados abajo detallan la base ampliada. -->
 # Arquitectura SIDP
 
-Versión 0.2 · 2026-10-11. Documento rector. Describe la arquitectura objetivo y lo que ya está construido y probado. Lo pendiente se marca como tal.
+Versión 0.3 · 2026-10-13. Documento rector de la **base técnica**: describe lo construido y probado; lo pendiente se marca como tal. El producto escolar que se construye encima (dos plataformas, expediente, validación documental) está en [sistema administrativo](arquitectura/sistema_administrativo.md) y el cerebro que aprende en [cerebro](arquitectura/cerebro_aprendizaje.md). Si un documento contradice a las [decisiones](arquitectura/decisiones.md), prevalecen las decisiones.
 
 ## 1. Contexto y objetivos
 
@@ -15,7 +14,7 @@ Por eso la arquitectura persigue, en este orden:
 4. **Modularidad.** Cada función escolar futura es un módulo con tablas, migraciones, rutas y capacidades propias.
 5. **Seguridad por defecto.** Acceso cerrado sin configuración, TLS con certificado fijado, identidades revocables por equipo y ningún código recibido por red.
 
-Fuera de alcance por ahora: funciones escolares nuevas, IA, validaciones documentales (ADR-007).
+Las funciones escolares (expediente, validación documental, docentes) están diseñadas (ADR-019 a ADR-023) pero aún sin código; se construyen como módulos sobre esta base después del login del personal ([plan](PLAN.md)).
 
 ## 2. Invariantes
 
@@ -31,9 +30,11 @@ Fuera de alcance por ahora: funciones escolares nuevas, IA, validaciones documen
 
 ## 3. Vista de despliegue: tres computadoras
 
+Por ADR-019 el servidor es la **PC administrativa**: no hay equipo dedicado. Debe estar encendida en horario escolar; las demás PC y los celulares se conectan a ella.
+
 ```mermaid
 flowchart LR
-    subgraph S[PC-1 · Servidor  perfil servidor]
+    subgraph S[PC administrativa · perfil servidor]
       SUP1[sidp iniciar · supervisor] --> PLA[plataforma :8443 HTTPS<br/>+ descubrimiento UDP :47800]
       SUP1 --> AG1[agente]
       PLA --> DB[(plataforma.db<br/>SQLite WAL)]
@@ -152,6 +153,7 @@ sequenceDiagram
 - **Agente.** Entrega primero los resultados pendientes, que guarda en disco antes de enviarlos. Luego reclama, ejecuta y guarda. Cuando no hay trabajo, espera de 2 s hasta 15 s. Si pierde a la plataforma cinco veces seguidas, la busca de nuevo y actualiza `nodo.json` (la IP del servidor puede cambiar). Con 401 o 403 termina con código 3.
 - **Cerebro.** `sidp cerebro --clave X` crea un diagnóstico; `sidp cerebro --servicio` observa eventos propios y guarda cursor/inbox. El supervisor usa el modo servicio. La planificación administrativa multietapa sigue pendiente.
 - **Plataforma.** Corre HTTPS en `0.0.0.0:8443` y un hilo de descubrimiento en UDP 47800. Sin paquete, arranca en modo laboratorio en `127.0.0.1:8000`.
+- **Prueba de conectividad.** `sidp prueba-conexion` comprueba descubrimiento, puerto, TLS, reloj y credenciales; en el servidor envía además una tarea dirigida a cada agente remoto y mide la ida y vuelta (ADR-024, [guía](PRUEBA_DOS_EQUIPOS.md)).
 
 ## 8. Seguridad
 
@@ -169,7 +171,7 @@ Riesgo aceptado: un `sidp.exe` con paquete incrustado contiene el secreto. Quien
 
 ## 9. Presupuesto de recursos
 
-Medido en Linux con el ejecutable PyInstaller de una sola pieza (memoria residente):
+Medido una vez en un laboratorio Linux con el ejecutable PyInstaller de una sola pieza (memoria residente). **No son mediciones en las computadoras de la escuela** ni límites garantizados; se repetirán en el piloto ([validación](VALIDACION_INFRAESTRUCTURA.md)).
 
 | Proceso | RAM aprox. | CPU en reposo | Disco |
 |---|---|---|---|
@@ -204,17 +206,18 @@ No se promete ejecución exactamente una vez (ADR-005).
 ```
 contratos/   mensajes v1 y catálogo de capacidades
 comun/       rutas, configuración, registros, firma, red TLS, descubrimiento
-backend/     plataforma: base_datos, seguridad, auditoria, main, modulos/{sistema,identidad,orquestacion,escolar}
-agente/      bucle y capacidades
-cerebro/     coordinador
-sidp/        cli, instalacion, certificados, supervisor, roles
-despliegue/  compilar.py (PyInstaller) y guía
-pruebas/     contratos, concurrencia, persistencia, permisos, enrolamiento, TLS, descubrimiento
-docs/        arquitectura, decisiones, contratos, módulos, instalación, operación, plan
+backend/     plataforma: base_datos, seguridad, auditoria, respaldos, main, modulos/{sistema,identidad,mensajeria,orquestacion,escolar}
+agente/      bucle, capacidades y medición de recursos
+cerebro/     coordinador: plan de un paso y observador de eventos
+sidp/        cli, instalacion, certificados, supervisor, roles, conectividad
+despliegue/  compilar.py (PyInstaller), ensayo_dos_equipos.py y guía
+herramientas/ exportar_esquema.py (database/esquema_actual.sql)
+pruebas/     contratos, concurrencia, persistencia, permisos, enrolamiento, TLS, descubrimiento, conectividad
+docs/        arquitectura, decisiones, producto, investigación, operación, plan y guía de prueba
 frontend/    interfaz futura (se servirá desde backend/static)
 ```
 
-Documentos relacionados: [decisiones](arquitectura/decisiones.md) · [contratos](arquitectura/contratos.md) · [módulos](arquitectura/modulos.md) · [instalación](arquitectura/instalacion.md) · [operación](arquitectura/operacion.md) · [plan](PLAN.md).
+El índice completo de documentos está en el [README](../README.md#documentación).
 
 
 ## Base ampliada: fundamentos y garantías

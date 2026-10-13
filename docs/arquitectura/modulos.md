@@ -1,5 +1,7 @@
 # Contrato de módulos
 
+Reglas técnicas para escribir un módulo. El catálogo de módulos escolares previstos está en [catalogo_modulos.md](catalogo_modulos.md).
+
 Un módulo es la unidad de crecimiento de SIDP. Cada función escolar futura entra como módulo de plataforma y, si necesita ejecutar algo en un equipo, como capacidad de agente.
 
 ## Módulo de plataforma

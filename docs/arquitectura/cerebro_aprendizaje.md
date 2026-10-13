@@ -1,6 +1,6 @@
 # Cerebro que aprende
 
-Fecha: 2026-10-11. Ver ADR-012 y ADR-013. Objetivo: que el cerebro sea tan util como un administrativo y mejore con el uso, adaptandose a esta escuela.
+Fecha: 2026-10-11, revisado 2026-10-13. Ver ADR-006 y ADR-023. Producto aparte del sistema administrativo; se conecta por la API con identidad propia. Lo implementado hoy es el observador de eventos (`sidp cerebro --servicio`); este documento es diseno. Objetivo: que el cerebro sea tan util como un administrativo y mejore con el uso, adaptandose a esta escuela.
 
 ## Principio
 
