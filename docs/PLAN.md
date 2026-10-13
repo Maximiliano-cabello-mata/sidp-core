@@ -13,7 +13,7 @@ Plan único del proyecto. Las fases de [sistema administrativo](arquitectura/sis
 | 3b Base de instalación | Implementada | Ejecutable único, paquete, descubrimiento firmado, TLS fijado, alta con aprobación o invitación, revocación, supervisor, módulos, base WAL |
 | 3c Infraestructura investigada | Implementada | Outbox/inbox, telemetría y políticas, cupos, renovación, `sidp respaldo`, exportación SQL |
 | 3d Conectividad | Implementada | Tareas dirigidas, `sidp prueba-conexion`, `sidp cortafuegos`, ensayo de dos equipos en CI con el `.exe` real |
-| 3e Prueba con equipos reales | En curso | Dos PCs reales en una red Wi-Fi de casa: 11/11 OK ([SESIÓN 2026-10-12](SESION_2026-10-12.md)). Falta repetirla en la red de la escuela ([guía](PRUEBA_DOS_EQUIPOS.md)) |
+| 3e Prueba con equipos reales | En curso | Dos PCs reales en una red Wi-Fi de casa: 11/11 OK ([SESIÓN 2026-10-12](SESION_2026-10-12.md)). Repetida con los dos ejecutables: PC2 unida ([SESIÓN 2026-10-13](SESION_2026-10-13.md)). Falta repetirla en la red de la escuela ([guía](PRUEBA_DOS_EQUIPOS.md)) |
 | 3f Recursos compartidos | Implementada | Un solo `sidp.exe` con clave de escuela (ADR-025), búsqueda por cada red, reparto de tareas entre equipos y `sidp equipos` (ADR-026); ensayo de 3 equipos en CI |
 | 3f2 Dos ejecutables | Implementada | `SIDP-Servidor.exe` y `SIDP-Equipo.exe` (ADR-029): el equipo nunca se vuelve servidor, el servidor se niega si ya hay otro, la clave se confirma y cada `.exe` muestra su fecha; ensayo en CI con los dos |
 | 3g Copias automáticas | Siguiente | La base y cada archivo se copian a otra PC unida y cada noche a un disco externo; una PC nueva recibe su copia solo con instalar el `.exe` (ADR-027). Incluye cambio de clave de escuela y arranque con Windows sin ventana |

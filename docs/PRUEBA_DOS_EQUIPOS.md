@@ -11,6 +11,12 @@ Guía para comprobar que dos equipos Windows de la escuela se conectan, se autor
 - **Red:** los dos equipos en la misma red. En Windows debe estar marcada como **Privada** (Configuración > Red e Internet > Propiedades).
 - **Reloj:** la hora de ambos equipos debe estar bien (diferencia menor a 10 minutos).
 
+## Si ya hubo una prueba antes
+
+Cierre todas las ventanas de SIDP (y en el Administrador de tareas > Detalles, finalice `sidp.exe`, `SIDP-Servidor.exe` o `SIDP-Equipo.exe` si aparecen). **Solo después** borre `C:\ProgramData\SIDP`. Si se borra con SIDP abierto, la configuración queda a medias ([bitácora 2026-10-13](SESION_2026-10-13.md)).
+
+Para abrir una consola en la carpeta del .exe: en el Explorador, abra esa carpeta, escriba `cmd` en la barra de dirección y Enter.
+
 ## PC1 (será el servidor)
 
 1. Doble clic en `C:\SIDP\SIDP-Servidor.exe`.
