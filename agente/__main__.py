@@ -100,10 +100,10 @@ def main():
                     trabajo = ciclo(cliente, db) or trabajo
                 fallos = 0
                 espera = politica_red.espera_minima_s if trabajo else min(max(espera, politica_red.espera_minima_s) * 2, politica_red.espera_maxima_s)
-            except httpx.TransportError:
+            except httpx.TransportError as error:
                 fallos += 1
                 espera = espera_reintento(fallos, politica_red)
-                registro.warning('Plataforma no disponible; pendientes conservados')
+                registro.warning('Plataforma %s no disponible: %s; pendientes conservados', url, red.causa(error))
                 if fallos % 5 == 0 and (nueva := redescubrir(paquete)) and nueva != url:
                     cliente.close()
                     url, cliente = nueva, red.cliente(nueva, token, paquete)

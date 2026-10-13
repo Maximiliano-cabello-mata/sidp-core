@@ -128,3 +128,15 @@ def test_puerto_ocupado_se_dice_claro_y_no_arranca(tmp_path, monkeypatch, opcion
         assert puertos.ocupado(paquete.puerto)
         assert cli._arrancar(Nodo.cargar()) == 1
     assert f'el puerto {paquete.puerto} de esta computadora ya está en uso' in capsys.readouterr().err
+
+
+def test_el_agente_dice_por_que_no_llega_al_servidor():
+    """En la prueba real PC2 solo decía "Plataforma no disponible", sin la causa."""
+    import httpx
+    from comun import red
+    with pytest.raises(httpx.TransportError) as cerrado:
+        httpx.get(f'http://127.0.0.1:{puerto_libre()}/', timeout=2)
+    assert 'rechazó la conexión' in red.causa(cerrado.value)
+    tls = httpx.ConnectError('[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:1000)')
+    assert 'certificado del servidor no es el que guardó' in red.causa(tls)
+    assert 'no contesta' in red.causa(httpx.ConnectTimeout('timed out'))
