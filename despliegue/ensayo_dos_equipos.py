@@ -9,6 +9,7 @@ Sale con 0 si todo pasa. No sustituye la prueba en dos computadoras reales
 (ver docs/PRUEBA_DOS_EQUIPOS.md), pero valida el binario antes de repartirlo.
 """
 import argparse
+import locale
 import os
 import re
 import shutil
@@ -28,13 +29,14 @@ def puerto_libre():
 
 def entorno(hogar):
     variables = {k: v for k, v in os.environ.items() if not k.startswith('SIDP_')}
-    return {**variables, 'SIDP_HOME': str(hogar), 'PYTHONIOENCODING': 'utf-8'}
+    return {**variables, 'SIDP_HOME': str(hogar)}
 
 
 def correr(ejecutable, argumentos, hogar, tiempo=180):
     print(f'\n$ sidp {" ".join(argumentos)}   (SIDP_HOME={hogar.name})', flush=True)
-    resultado = subprocess.run([str(ejecutable), *argumentos], env=entorno(hogar), capture_output=True,
-                               text=True, encoding='utf-8', errors='replace', timeout=tiempo)
+    # El .exe ignora PYTHONIOENCODING: en una tubería escribe con la codificación local (cp1252 en Windows).
+    resultado = subprocess.run([str(ejecutable), *argumentos], env=entorno(hogar), capture_output=True, text=True,
+                               encoding=locale.getpreferredencoding(False), errors='replace', timeout=tiempo)
     print(resultado.stdout + resultado.stderr, flush=True)
     return resultado
 
@@ -69,6 +71,8 @@ def esperar_puerto(puerto, limite=60):
 
 
 def main():
+    for flujo in (sys.stdout, sys.stderr):
+        flujo.reconfigure(errors='replace')  # Nunca abortar el ensayo por un carácter no imprimible.
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('ejecutable')
     parser.add_argument('--conservar', action='store_true', help='No borrar las carpetas de ensayo')

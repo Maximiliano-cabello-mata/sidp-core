@@ -196,6 +196,9 @@ def construir():
 
 
 def main(argumentos=None):
+    for flujo in (sys.stdout, sys.stderr):
+        if flujo and hasattr(flujo, 'reconfigure'):
+            flujo.reconfigure(errors='replace')  # Consola o tubería con otra codificación: no fallar.
     argumentos = sys.argv[1:] if argumentos is None else argumentos
     parser = construir()
     if argumentos and argumentos[0] == 'cerebro':  # Sus opciones las interpreta el propio rol.
