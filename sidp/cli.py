@@ -51,7 +51,11 @@ No encontré otra computadora con esta clave en la red.
 def _decidir():
     from sidp import automatico
     print(PREGUNTA_SERVIDOR)
-    respuesta = input('Respuesta: ').strip()
+    try:
+        respuesta = input('Respuesta: ').strip()
+    except EOFError:  # Sin nadie al teclado (en Windows, NUL también parece una terminal).
+        print('S (sin respuesta: esta computadora será el servidor)')
+        return 'servidor'
     if not respuesta:
         return 'buscar'
     if respuesta.lower() in ('s', 'si', 'sí'):
@@ -61,7 +65,10 @@ def _decidir():
 
 def _pausa_final():
     if rutas.congelado() and _interactivo():
-        input('Presione Enter para cerrar...')  # Doble clic en Windows: que se alcance a leer.
+        try:
+            input('Presione Enter para cerrar...')  # Doble clic en Windows: que se alcance a leer.
+        except EOFError:
+            pass
 
 
 def iniciar(args):
