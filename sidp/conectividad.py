@@ -54,6 +54,14 @@ def _estado_credencial(cliente, token):
     return respuesta.json().get('estado', 'desconocida') if respuesta.status_code == 200 else 'desconocida'
 
 
+def _consultar(cliente, identificador):
+    """Estado de una tarea; None si la plataforma tardó en contestar (se vuelve a preguntar en el siguiente turno)."""
+    try:
+        return cliente.get(f'/api/v1/tareas/{identificador}').json()
+    except httpx.TransportError:
+        return None
+
+
 def ida_y_vuelta(cliente, destino, espera):
     """Tarea dirigida a un agente concreto; devuelve segundos hasta confirmarse o un error."""
     mensaje = f'conectividad {destino} {uuid.uuid4()}'
@@ -63,7 +71,9 @@ def ida_y_vuelta(cliente, destino, espera):
     respuesta.raise_for_status()
     identificador = respuesta.json()['id']
     while time.monotonic() - inicio < espera:
-        estado = cliente.get(f'/api/v1/tareas/{identificador}').json()
+        estado = _consultar(cliente, identificador)
+        if estado is None:
+            continue
         if estado['estado'] == 'completada':
             if estado['resultado'] != mensaje:
                 return None, 'el resultado no coincide con lo enviado'
@@ -237,8 +247,8 @@ def probar_reparto(informe, cliente, cantidad, espera):
     while time.monotonic() - inicio < espera and len(ejecutores) < cantidad:
         for identificador in identificadores:
             if identificador not in ejecutores:
-                tarea = cliente.get(f'/api/v1/tareas/{identificador}').json()
-                if tarea['estado'] in ('completada', 'fallida'):
+                tarea = _consultar(cliente, identificador)
+                if tarea and tarea['estado'] in ('completada', 'fallida'):
                     ejecutores[identificador] = tarea['dispositivo'] if tarea['estado'] == 'completada' else None
         time.sleep(1)
     cuenta = {}

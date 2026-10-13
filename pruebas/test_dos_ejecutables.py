@@ -155,3 +155,26 @@ def test_estacion_sin_instalacion_json_se_vuelve_a_unir(servidor_en_red, tmp_pat
     assert cli.iniciar(args) == 0
     assert configuracion.cargar_paquete().instalacion == servidor_en_red.instalacion
     assert arrancado and arrancado[0].roles == ['agente']
+
+
+def test_ida_y_vuelta_aguanta_una_respuesta_lenta():
+    """En CI una consulta tardó más de 5 s y prueba-conexion terminaba con un error de Python."""
+    import httpx
+    from sidp import conectividad
+
+    class Cliente:
+        def __init__(self):
+            self.consultas = 0
+
+        def post(self, ruta, json):
+            self.mensaje = json['mensaje']
+            return httpx.Response(200, json={'id': 't1'}, request=httpx.Request('POST', ruta))
+
+        def get(self, ruta):
+            self.consultas += 1
+            if self.consultas == 1:
+                raise httpx.ReadTimeout('The read operation timed out')
+            return httpx.Response(200, json={'estado': 'completada', 'resultado': self.mensaje})
+
+    segundos, error = conectividad.ida_y_vuelta(Cliente(), 'pc2-agente', espera=30)
+    assert error is None and segundos is not None
