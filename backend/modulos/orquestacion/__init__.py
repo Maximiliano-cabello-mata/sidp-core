@@ -38,6 +38,21 @@ def listar(actor=Depends(requiere("admin", "cerebro")), cola=Depends(obtener_alm
     return cola.listar(actor)
 
 
+@rutas.get("/tareas/resumen")
+def resumen(actor=Depends(requiere('admin')), cola=Depends(obtener_almacen)):
+    with cola.bd.conexion() as db:
+        return {'estados': [dict(f) for f in db.execute('SELECT * FROM resumen_cola')],
+                'limites': cola.politica.model_dump()}
+
+
+@rutas.get("/tareas/{identificador}")
+def consultar(identificador: str, actor=Depends(requiere("admin", "cerebro")), cola=Depends(obtener_almacen)):
+    try:
+        return cola.consultar(actor, identificador)
+    except Conflicto as error:
+        raise HTTPException(404, str(error)) from error
+
+
 @rutas.post("/tareas/reclamar")
 def reclamar(actor=Depends(requiere("agente")), cola=Depends(obtener_almacen)):
     return ejecutar(cola.reclamar, actor['id'])
@@ -63,13 +78,6 @@ def dispositivos(actor=Depends(requiere('admin')), cola=Depends(obtener_almacen)
     with cola.bd.conexion() as db:
         equipos = db.execute('SELECT id,ultimo,recursos FROM dispositivos ORDER BY id').fetchall()
         return [{**dict(equipo), **cola._politica(db, equipo['id'])} for equipo in equipos]
-
-
-@rutas.get('/tareas/resumen')
-def resumen(actor=Depends(requiere('admin')), cola=Depends(obtener_almacen)):
-    with cola.bd.conexion() as db:
-        return {'estados': [dict(f) for f in db.execute('SELECT * FROM resumen_cola')],
-                'limites': cola.politica.model_dump()}
 
 
 @rutas.put('/dispositivos/{dispositivo}/politica')

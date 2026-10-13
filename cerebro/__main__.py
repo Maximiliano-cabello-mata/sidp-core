@@ -39,7 +39,7 @@ def main(argumentos=None):
                 except httpx.TransportError:
                     fallos += 1
                     time.sleep(espera_reintento(fallos))
-        respuesta = cliente.post('/api/v1/tareas', json=NuevaTarea(clave=args.clave).model_dump())
+        respuesta = cliente.post('/api/v1/tareas', json=NuevaTarea(clave=args.clave).model_dump(exclude_none=True))
         respuesta.raise_for_status()
         print(json.dumps(respuesta.json(), ensure_ascii=False, indent=2))
 

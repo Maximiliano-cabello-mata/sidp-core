@@ -121,6 +121,19 @@ def respaldo(args):
     return 0
 
 
+def prueba_conexion(args):
+    from sidp import conectividad
+    return conectividad.ejecutar(args.url, args.equipo, args.espera).cerrar()
+
+
+def cortafuegos(args):
+    from sidp import conectividad
+    paquete = configuracion.cargar_paquete()
+    if not paquete:
+        raise SystemExit('Sin instalación en este equipo')
+    return conectividad.abrir_cortafuegos(paquete)
+
+
 def _rol(nombre, *argumentos):
     from sidp import roles
     return getattr(roles, nombre)(*argumentos)
@@ -163,6 +176,15 @@ def construir():
     p = sub.add_parser('respaldo', help='Servidor: snapshot SQLite consistente y manifiesto')
     p.add_argument('--destino', required=True, help='Archivo nuevo, preferentemente en medio externo')
     p.set_defaults(funcion=respaldo)
+
+    p = sub.add_parser('prueba-conexion', help='Red, TLS, reloj, credenciales e ida y vuelta con otros equipos')
+    p.add_argument('--url', help='https://IP:PUERTO de la plataforma (si no, la guardada o la descubierta)')
+    p.add_argument('--equipo', action='append', help='Agente a probar (repetible); por omisión todos los remotos en línea')
+    p.add_argument('--espera', type=int, default=90, help='Segundos máximos por ida y vuelta')
+    p.set_defaults(funcion=prueba_conexion)
+
+    sub.add_parser('cortafuegos', help='Servidor Windows: abrir TCP de la plataforma y UDP de descubrimiento '
+                   'en redes privadas (consola de administrador)').set_defaults(funcion=cortafuegos)
 
     p = sub.add_parser('plataforma', help='Rol plataforma (lo usa el supervisor)')
     p.add_argument('--anfitrion')

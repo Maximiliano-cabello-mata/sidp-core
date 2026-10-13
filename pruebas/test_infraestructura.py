@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.base_datos import BaseDatos
 from backend.main import crear_app
-from backend.modulos.orquestacion.almacen import Almacen, Conflicto, Saturada
+from backend.modulos.orquestacion.almacen import MIGRACIONES, Almacen, Conflicto, Saturada
 from backend.modulos.mensajeria import leer, publicar
 from backend.respaldos import crear as respaldar
 from cerebro.observador import Observador
@@ -123,7 +123,7 @@ def test_respaldo_restaura_cola_y_esquema(cola, tmp_path):
     manifiesto = respaldar(cola.bd, destino)
     restaurada = Almacen(destino)
     assert restaurada.crear('operador', NuevaTarea(clave='1'))['id'] == tarea['id']
-    assert manifiesto['esquemas']['orquestacion'] == 3
+    assert manifiesto['esquemas']['orquestacion'] == len(MIGRACIONES)
     assert destino.with_suffix('.db.json').exists()
     with pytest.raises(ValueError):
         respaldar(cola.bd, destino)
@@ -153,7 +153,7 @@ def test_sql_exportado_se_puede_instalar(tmp_path):
     sql = generar()
     with sqlite3.connect(tmp_path / 'nuevo.db') as db:
         db.executescript(sql)
-        assert db.execute("SELECT version FROM esquema WHERE modulo='orquestacion'").fetchone()[0] == 3
+        assert db.execute("SELECT version FROM esquema WHERE modulo='orquestacion'").fetchone()[0] == len(MIGRACIONES)
         assert db.execute('SELECT * FROM resumen_cola').fetchall() == []
 
 
