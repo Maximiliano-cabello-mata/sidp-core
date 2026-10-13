@@ -112,3 +112,69 @@ def test_el_ejecutable_fija_el_modo_del_doble_clic(monkeypatch):
         with pytest.raises(SystemExit):
             cli.main(argumentos, modo=modo)
         assert vistos.pop() == esperado
+
+
+def test_puerto_ocupado_se_dice_claro_y_no_arranca(tmp_path, monkeypatch, opciones, capsys):
+    """Un sidp.exe viejo abierto ocupaba el 8443: el nuevo debe decirlo, no reintentar cada minuto."""
+    from sidp import puertos, supervisor
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'pc1'))
+    automatico.preparar(CLAVE, 'Escuela', puerto_libre(), modo='servidor', **opciones)
+    paquete = configuracion.cargar_paquete()
+    assert not puertos.ocupado(paquete.puerto)
+    monkeypatch.setattr(supervisor, 'supervisar', lambda roles: pytest.fail('no debía arrancar'))
+    with socket.socket() as viejo:
+        viejo.bind(('0.0.0.0', paquete.puerto))
+        viejo.listen()
+        assert puertos.ocupado(paquete.puerto)
+        assert cli._arrancar(Nodo.cargar()) == 1
+    assert f'el puerto {paquete.puerto} de esta computadora ya está en uso' in capsys.readouterr().err
+
+
+def test_el_agente_dice_por_que_no_llega_al_servidor():
+    """En la prueba real PC2 solo decía "Plataforma no disponible", sin la causa."""
+    import httpx
+    from comun import red
+    for rechazo in ('[Errno 111] Connection refused', '[WinError 10061] No se puede establecer una conexión'):
+        assert 'rechazó la conexión' in red.causa(httpx.ConnectError(rechazo))
+    tls = httpx.ConnectError('[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:1000)')
+    assert 'certificado del servidor no es el que guardó' in red.causa(tls)
+    assert 'no contesta' in red.causa(httpx.ConnectTimeout('timed out'))
+
+
+def test_estacion_sin_instalacion_json_se_vuelve_a_unir(servidor_en_red, tmp_path, monkeypatch, opciones):
+    """En PC2 quedó nodo.json sin instalacion.json: el agente decía "no disponible" sin fin."""
+    import argparse
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'pc2'))
+    assert automatico.preparar(CLAVE, modo='equipo', **opciones) == 'estacion'
+    configuracion.ruta_paquete().unlink()
+    arrancado = []
+    monkeypatch.setattr(cli, '_arrancar', lambda nodo: arrancado.append(nodo) or 0)
+    monkeypatch.setattr(cli, '_interactivo', lambda: False)
+    args = argparse.Namespace(modo='equipo', clave=CLAVE, nombre=None, puerto=None,
+                              url=f'https://127.0.0.1:{servidor_en_red.puerto}')
+    assert cli.iniciar(args) == 0
+    assert configuracion.cargar_paquete().instalacion == servidor_en_red.instalacion
+    assert arrancado and arrancado[0].roles == ['agente']
+
+
+def test_ida_y_vuelta_aguanta_una_respuesta_lenta():
+    """En CI una consulta tardó más de 5 s y prueba-conexion terminaba con un error de Python."""
+    import httpx
+    from sidp import conectividad
+
+    class Cliente:
+        def __init__(self):
+            self.consultas = 0
+
+        def post(self, ruta, json):
+            self.mensaje = json['mensaje']
+            return httpx.Response(200, json={'id': 't1'}, request=httpx.Request('POST', ruta))
+
+        def get(self, ruta):
+            self.consultas += 1
+            if self.consultas == 1:
+                raise httpx.ReadTimeout('The read operation timed out')
+            return httpx.Response(200, json={'estado': 'completada', 'resultado': self.mensaje})
+
+    segundos, error = conectividad.ida_y_vuelta(Cliente(), 'pc2-agente', espera=30)
+    assert error is None and segundos is not None

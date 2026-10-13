@@ -129,6 +129,7 @@ def iniciar(args):
     nodo = Nodo.cargar()
     if nodo:
         _avisar_papel(nodo, modo)
+        nodo = _revisar_estacion(nodo)
     if not nodo:
         paquete = configuracion.cargar_paquete()
         clave = getattr(args, 'clave', None) or os.environ.get('SIDP_CLAVE')
@@ -170,8 +171,24 @@ def _avisar_papel(nodo, modo):
         print('Esta computadora es el servidor de la escuela; arranca como servidor.', flush=True)
 
 
+def _revisar_estacion(nodo):
+    """Estación sin instalacion.json (p. ej. se borró la carpeta con SIDP abierto): volver a unirse.
+
+    Sin el paquete el agente no puede comprobar el certificado del servidor y solo diría "no disponible".
+    """
+    if 'plataforma' in nodo.roles or configuracion.cargar_paquete():
+        return nodo
+    print(f'A esta computadora le falta {configuracion.ruta_paquete()}: se volverá a unir al servidor.', flush=True)
+    return None
+
+
 def _arrancar(nodo):
-    from sidp import supervisor
+    from sidp import puertos, supervisor
+    paquete = configuracion.cargar_paquete()
+    if 'plataforma' in nodo.roles and paquete and puertos.ocupado(paquete.puerto):
+        print(f'Error: {puertos.mensaje(paquete.puerto)}', file=sys.stderr)
+        _pausa_final()
+        return 1
     registros.configurar('nodo')
     supervisor.supervisar(nodo.roles)
     return 0

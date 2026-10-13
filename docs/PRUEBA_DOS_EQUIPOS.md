@@ -11,6 +11,12 @@ Guía para comprobar que dos equipos Windows de la escuela se conectan, se autor
 - **Red:** los dos equipos en la misma red. En Windows debe estar marcada como **Privada** (Configuración > Red e Internet > Propiedades).
 - **Reloj:** la hora de ambos equipos debe estar bien (diferencia menor a 10 minutos).
 
+## Si ya hubo una prueba antes
+
+Cierre todas las ventanas de SIDP (y en el Administrador de tareas > Detalles, finalice `sidp.exe`, `SIDP-Servidor.exe` o `SIDP-Equipo.exe` si aparecen). **Solo después** borre `C:\ProgramData\SIDP`. Si se borra con SIDP abierto, la configuración queda a medias ([bitácora 2026-10-13](SESION_2026-10-13.md)).
+
+Para abrir una consola en la carpeta del .exe: en el Explorador, abra esa carpeta, escriba `cmd` en la barra de dirección y Enter.
+
 ## PC1 (será el servidor)
 
 1. Doble clic en `C:\SIDP\SIDP-Servidor.exe`.
@@ -83,6 +89,8 @@ El resultado esperado es `RESULTADO: PASA` en los dos equipos. Cada ejecución g
 | `Descubrimiento UDP` en AVISO | La red bloquea la difusión. No impide operar si el equipo ya está unido |
 | PC2 dice `No encontré el servidor de la escuela` | El módem puede aislar los equipos Wi-Fi, o hay un adaptador virtual. Revise que PC1 esté abierto y la clave sea idéntica, y escriba la IP de PC1 |
 | `Puerto TCP` en FALLA | PC1 apagado, `SIDP-Servidor.exe` cerrado en PC1, cortafuegos sin abrir o red marcada como Pública |
+| `el puerto 8443 de esta computadora ya está en uso por ...` | Sigue abierto otro SIDP, casi siempre un `sidp.exe` viejo. Administrador de tareas > Detalles > clic derecho en el programa que indica > Finalizar árbol de procesos; o reiniciar la PC |
+| PC2 dice `le falta ...instalacion.json` | Se borró parte de la carpeta con SIDP abierto. Escriba la clave cuando la pida: se vuelve a unir solo |
 | `Ya hay un servidor de esta escuela` | Se abrió `SIDP-Servidor.exe` en una segunda PC. En esa PC use `SIDP-Equipo.exe` |
 | `No coinciden` al escribir la clave | En el servidor la clave se escribe dos veces igual; vuelva a escribirla con calma |
 | `Reloj` en FALLA | Corregir la hora de Windows (sincronizar con internet) |
