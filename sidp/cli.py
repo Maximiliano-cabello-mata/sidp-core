@@ -17,26 +17,61 @@ AYUDA_INICIAL = """No hay configuración en {hogar}.
   Equipo adicional:      copie instalacion.json junto a sidp.exe y vuelva a ejecutarlo.
 """
 
-BIENVENIDA = """SIDP - primera vez en esta computadora.
+TITULOS = {'auto': 'SIDP', 'servidor': 'SIDP-Servidor', 'equipo': 'SIDP-Equipo'}
+
+BIENVENIDA = {
+    'auto': """Primera vez en esta computadora.
 
 Escriba la clave de escuela. Debe ser la misma en todas las computadoras de la escuela
 (al menos {minimo} caracteres). La primera computadora que la use será el servidor;
 las demás la encontrarán en la red y se unirán solas.
-"""
+""",
+    'servidor': """Primera vez: esta computadora será el SERVIDOR de la escuela.
+
+Invente una clave de escuela de al menos {minimo} caracteres, por ejemplo una frase.
+Solo deben conocerla los directivos. En las demás computadoras se abre SIDP-Equipo.exe
+con la misma clave.
+""",
+    'equipo': """Primera vez: esta computadora se unirá al servidor de la escuela.
+
+Escriba la clave de escuela, la misma que se usó en el servidor (al menos {minimo} caracteres).
+""",
+}
+
+
+def _version():
+    """Fecha y versión de compilación incrustadas por despliegue/compilar.py: evita usar un .exe viejo."""
+    archivo = rutas.recurso_empaquetado('compilacion.txt')
+    return archivo.read_text(encoding='utf-8').strip() if archivo else 'versión de desarrollo'
 
 
 def _interactivo():
     return bool(sys.stdin and sys.stdin.isatty())
 
 
-def _pedir_clave():
+def _leer(pregunta):
+    try:
+        return input(pregunta).strip()
+    except EOFError:  # Sin nadie al teclado (en Windows, NUL también parece una terminal).
+        return None
+
+
+def _pedir_clave(modo='auto'):
     from comun.firma import MINIMO_CLAVE
-    print(BIENVENIDA.format(minimo=MINIMO_CLAVE))
+    print(BIENVENIDA[modo].format(minimo=MINIMO_CLAVE))
     while True:
-        clave = input('Clave de escuela: ').strip()
-        if len(' '.join(clave.split())) >= MINIMO_CLAVE:
+        clave = _leer('Clave de escuela: ')
+        if clave is None:
+            return None
+        if len(' '.join(clave.split())) < MINIMO_CLAVE:
+            print(f'Muy corta: use al menos {MINIMO_CLAVE} caracteres.')
+            continue
+        if modo != 'servidor':
             return clave
-        print(f'Muy corta: use al menos {MINIMO_CLAVE} caracteres.')
+        # En el servidor la clave se inventa: un error de dedo dejaría fuera a todas las demás computadoras.
+        if ' '.join((_leer('Escríbala otra vez: ') or '').split()).lower() == ' '.join(clave.split()).lower():
+            return clave
+        print('No coinciden. Escríbala de nuevo.')
 
 
 PREGUNTA_SERVIDOR = """
@@ -47,13 +82,20 @@ No encontré otra computadora con esta clave en la red.
   - Para buscar otra vez, solo presione Enter.
 """
 
+PREGUNTA_EQUIPO = """
+No encontré el servidor de la escuela en la red.
+  - Revise que SIDP-Servidor esté abierto en el servidor y que la clave sea la misma.
+  - Si la red no deja buscar, escriba la dirección IP del servidor (por ejemplo 192.168.1.20) y Enter.
+    La IP se ve en el servidor con el comando ipconfig ("Dirección IPv4").
+  - Para buscar otra vez, solo presione Enter.
+"""
+
 
 def _decidir():
     from sidp import automatico
     print(PREGUNTA_SERVIDOR)
-    try:
-        respuesta = input('Respuesta: ').strip()
-    except EOFError:  # Sin nadie al teclado (en Windows, NUL también parece una terminal).
+    respuesta = _leer('Respuesta: ')
+    if respuesta is None:
         print('S (sin respuesta: esta computadora será el servidor)')
         return 'servidor'
     if not respuesta:
@@ -61,6 +103,16 @@ def _decidir():
     if respuesta.lower() in ('s', 'si', 'sí'):
         return 'servidor'
     return automatico.url_servidor(respuesta)
+
+
+def _decidir_equipo():
+    """Como _decidir, pero un equipo nunca se vuelve servidor: solo buscar otra vez o escribir la IP."""
+    from sidp import automatico
+    print(PREGUNTA_EQUIPO)
+    respuesta = _leer('IP del servidor (o Enter para buscar otra vez): ')
+    if respuesta is None:
+        return None
+    return automatico.url_servidor(respuesta) if respuesta else 'buscar'
 
 
 def _pausa_final():
@@ -72,12 +124,16 @@ def _pausa_final():
 
 
 def iniciar(args):
+    modo = getattr(args, 'modo', None) or 'auto'
+    print(f'{TITULOS[modo]} · {_version()}', flush=True)
     nodo = Nodo.cargar()
+    if nodo:
+        _avisar_papel(nodo, modo)
     if not nodo:
         paquete = configuracion.cargar_paquete()
         clave = getattr(args, 'clave', None) or os.environ.get('SIDP_CLAVE')
         if not paquete and not clave and _interactivo():
-            clave = _pedir_clave()
+            clave = _pedir_clave(modo)
         if not paquete and not clave:
             print(AYUDA_INICIAL.format(hogar=rutas.hogar()))
             _pausa_final()
@@ -88,7 +144,7 @@ def iniciar(args):
                 automatico.preparar(clave, getattr(args, 'nombre', None),
                                     getattr(args, 'puerto', None) or configuracion.PUERTO_PLATAFORMA,
                                     url=getattr(args, 'url', None) and automatico.url_servidor(args.url),
-                                    decidir=_decidir if _interactivo() else None)
+                                    decidir=_DECIDIR.get(modo) if _interactivo() else None, modo=modo)
             except (ErrorInstalacion, ValueError) as error:
                 print(f'Error: {error}', file=sys.stderr)
                 _pausa_final()
@@ -100,6 +156,18 @@ def iniciar(args):
         instalacion.unirse(paquete, PERFILES.get(paquete.perfil, ['agente']))
         nodo = Nodo.cargar()
     return _arrancar(nodo)
+
+
+_DECIDIR = {'auto': _decidir, 'equipo': _decidir_equipo}
+
+
+def _avisar_papel(nodo, modo):
+    """Ya configurado: el papel lo decide la configuración guardada, no el ejecutable que se abrió."""
+    servidor = 'plataforma' in nodo.roles
+    if modo == 'servidor' and not servidor:
+        print('Esta computadora ya está unida como equipo de la escuela; arranca como equipo.', flush=True)
+    elif modo == 'equipo' and servidor:
+        print('Esta computadora es el servidor de la escuela; arranca como servidor.', flush=True)
 
 
 def _arrancar(nodo):
@@ -251,6 +319,8 @@ def construir():
     p.add_argument('--nombre', help='Nombre de la instalación si este equipo resulta ser el servidor')
     p.add_argument('--puerto', type=int, help='Puerto de la plataforma si este equipo resulta ser el servidor')
     p.add_argument('--url', help='https://IP:PUERTO del servidor si la red bloquea el descubrimiento')
+    p.add_argument('--modo', choices=['auto', 'servidor', 'equipo'],
+                   help='Papel en el primer arranque (SIDP-Servidor.exe y SIDP-Equipo.exe lo traen fijo)')
     p.set_defaults(funcion=iniciar)
 
     p = sub.add_parser('crear-instalacion', help='Servidor nuevo: crea instalación, certificado y operador')
@@ -309,7 +379,8 @@ def construir():
     return parser
 
 
-def main(argumentos=None):
+def main(argumentos=None, modo=None):
+    """modo: papel fijo de SIDP-Servidor.exe o SIDP-Equipo.exe para "iniciar" (doble clic)."""
     for flujo in (sys.stdout, sys.stderr):
         if flujo and hasattr(flujo, 'reconfigure'):
             flujo.reconfigure(errors='replace')  # Consola o tubería con otra codificación: no fallar.
@@ -318,6 +389,8 @@ def main(argumentos=None):
     if argumentos and argumentos[0] == 'cerebro':  # Sus opciones las interpreta el propio rol.
         return sys.exit(_rol('cerebro', argumentos[1:]) or 0)
     args = parser.parse_args(argumentos or ['iniciar'])
+    if args.orden in (None, 'iniciar') and modo and not getattr(args, 'modo', None):
+        args.modo = modo
     try:
         sys.exit(args.funcion(args) or 0)
     except ErrorInstalacion as error:

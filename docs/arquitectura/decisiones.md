@@ -111,3 +111,14 @@ Motivo: los expedientes de la escuela caben en un disco normal (unos 75 GB en el
 ## ADR-028 - Buzón de padres en la nube
 
 Propuesta 2026-10-13, por confirmar quién paga el hosting. Los padres no entran a la red de la escuela: suben documentos a un buzón en internet. El servidor se conecta al buzón (conexión saliente, sin abrir el módem ni IP pública), descarga lo nuevo, lo guarda con sus copias y avisa al buzón para que lo borre. El buzón no tiene datos de otras familias, no decide si un documento se acepta y no se conecta al cerebro. Se descartó alojar el portal en las PCs de la escuela: exigiría equipos encendidos día y noche, IP pública y exponer la red escolar. Requiere aviso de privacidad antes de abrirse.
+
+## ADR-029 - Dos ejecutables: SIDP-Servidor.exe y SIDP-Equipo.exe
+
+Aceptada 2026-10-13. Ajusta ADR-025. En lugar de un `sidp.exe` que decide solo si será servidor, se entregan dos archivos con el mismo programa por dentro y el papel fijo para el doble clic:
+
+- **SIDP-Servidor.exe**, solo en el servidor. Pide la clave dos veces (un error de dedo dejaría fuera a todas las demás PCs), comprueba que no exista ya un servidor con esa clave en la red y se niega si lo hay. Luego crea la instalación y abre el cortafuegos.
+- **SIDP-Equipo.exe**, en todas las demás PCs. Busca el servidor; si no lo encuentra, ofrece buscar otra vez o escribir la IP del servidor, pero **nunca** se vuelve servidor.
+
+Ambos muestran al abrir la fecha y versión de compilación (`compilacion.txt`, incrustado por `despliegue/compilar.py --tipo`). Ya configurada, una PC arranca según lo guardado aunque se abra el otro archivo, y lo avisa. Las órdenes (`prueba-conexion`, `equipos`, `identidades`...) funcionan igual en los dos.
+
+Motivo, la prueba real del 2026-10-12 ([SESIÓN](../SESION_2026-10-12.md)): PC2 no encontró a PC1 y se volvió servidor de una instalación aparte; se usó un `.exe` viejo sin notarlo. Con dos archivos, el error de "dos servidores" ya no puede ocurrir sin que alguien abra a propósito el archivo equivocado, y aun así se detecta. El `sidp.exe` de modo automático (`--tipo generico`, `iniciar --modo auto`) sigue disponible para desarrollo.

@@ -6,6 +6,10 @@ Primer arranque de un equipo sin configuración:
   3. Si la encuentra, descarga los datos públicos del paquete (certificado incluido),
      comprueba su firma y se une como agente, aprobado al instante.
   4. Si no hay ninguna, este equipo crea la instalación y queda como servidor.
+
+Con dos ejecutables (ADR-029) el papel viene fijado: SIDP-Servidor nunca se une a otro
+servidor (y se niega a crear uno segundo con la misma clave) y SIDP-Equipo nunca se
+vuelve servidor. El modo 'auto' conserva el comportamiento de un solo sidp.exe.
 """
 import random
 import time
@@ -17,6 +21,7 @@ from sidp.errores import ErrorInstalacion
 
 NOMBRE_PREDETERMINADO = 'SIDP'
 RONDAS = 2  # Dos búsquedas separadas al azar: dos equipos encendidos a la vez no crean dos instalaciones.
+MODOS = ('auto', 'servidor', 'equipo')
 
 
 def url_servidor(texto):
@@ -63,23 +68,38 @@ def descargar_paquete(url, provisional):
 
 def preparar(clave, nombre=None, puerto=configuracion.PUERTO_PLATAFORMA, aviso=None, espera=3.0, rondas=RONDAS,
              puerto_descubrimiento=configuracion.PUERTO_DESCUBRIMIENTO, destinos=None,
-             cortafuegos=True, url=None, decidir=None):
+             cortafuegos=True, url=None, decidir=None, modo='auto'):
     """Deja el equipo configurado y devuelve 'servidor' o 'estacion'.
 
     url: dirección del servidor cuando la red bloquea la difusión UDP; entonces no se busca ni se crea nada.
-    decidir: si no aparece nadie, pregunta qué hacer antes de crear otra instalación. Devuelve
-    'servidor', 'buscar' o la URL del servidor. Sin ella (modo no interactivo) se crea.
+    decidir: si no aparece nadie, pregunta qué hacer. Devuelve 'servidor' (solo en modo auto), 'buscar',
+    la URL del servidor o None para desistir. Sin ella (modo no interactivo) el modo auto crea la
+    instalación y el modo equipo se detiene con error.
+    modo: 'auto' (un solo sidp.exe), 'servidor' (SIDP-Servidor.exe) o 'equipo' (SIDP-Equipo.exe).
     """
+    if modo not in MODOS:
+        raise ValueError(f'Modo desconocido: {modo}')
     aviso = aviso or (lambda texto: print(texto, flush=True))
+    if modo == 'servidor':
+        aviso('Comprobando que no haya otro servidor de esta escuela en la red...')
+        existente, _ = buscar(clave, espera, rondas, puerto_descubrimiento, destinos)
+        if existente:
+            raise ErrorInstalacion(f'Ya hay un servidor de esta escuela en {existente}. Solo puede haber uno: '
+                                   'en esta computadora abra SIDP-Equipo.exe')
+        return _crear_servidor(clave, nombre, puerto, puerto_descubrimiento, cortafuegos, aviso)
     provisional = buscar(clave, rondas=0)[1]
     while True:
         if not url:
-            aviso('Buscando otras computadoras de la escuela en la red...')
+            aviso('Buscando el servidor de la escuela en la red...')
             url, provisional = buscar(clave, espera, rondas, puerto_descubrimiento, destinos)
         if not url:
-            respuesta = decidir() if decidir else 'servidor'
-            if respuesta == 'servidor':
+            respuesta = decidir() if decidir else ('servidor' if modo == 'auto' else None)
+            if respuesta == 'servidor' and modo == 'auto':
                 break
+            if respuesta is None or respuesta == 'servidor':
+                raise ErrorInstalacion('No se encontró el servidor de la escuela. Revise que SIDP-Servidor esté '
+                                       'abierto, que la clave sea idéntica y que la red sea Privada, '
+                                       'o indique su dirección con --url https://IP:8443')
             url = None if respuesta == 'buscar' else respuesta
             if not url:
                 continue
@@ -94,6 +114,10 @@ def preparar(clave, nombre=None, puerto=configuracion.PUERTO_PLATAFORMA, aviso=N
         paquete.guardar(configuracion.ruta_paquete())
         instalacion.unirse(paquete, ['agente'], url=url, aviso=aviso)
         return 'estacion'
+    return _crear_servidor(clave, nombre, puerto, puerto_descubrimiento, cortafuegos, aviso)
+
+
+def _crear_servidor(clave, nombre, puerto, puerto_descubrimiento, cortafuegos, aviso):
     aviso('Esta computadora será el servidor de la escuela.')
     resultado = instalacion.crear(nombre or NOMBRE_PREDETERMINADO, puerto, clave=clave,
                                   puerto_descubrimiento=puerto_descubrimiento)

@@ -1,6 +1,13 @@
 # Instalación y alta de equipos
 
-Objetivo: que agregar una computadora consista en **abrir `sidp.exe`** y aprobarla desde el servidor.
+Objetivo: que agregar una computadora consista en **abrir un `.exe`** y escribir la clave de escuela.
+
+## 0. Con clave de escuela (recomendado, ADR-025 y ADR-029)
+
+- **Servidor:** abrir `SIDP-Servidor.exe` y escribir la clave dos veces. Si ya hay un servidor con esa clave en la red, se niega.
+- **Demás PCs:** abrir `SIDP-Equipo.exe` con la misma clave. Busca el servidor y se une; si no lo encuentra, pide su IP o busca otra vez. Nunca se vuelve servidor.
+
+Los dos archivos son el mismo programa: las órdenes de este documento (`crear-instalacion`, `identidades`, `unirse`...) funcionan con cualquiera de ellos. Los ejemplos usan `sidp.exe` por brevedad. El resto de este documento describe la instalación manual, que sigue disponible.
 
 ## Carpeta del nodo (`SIDP_HOME`)
 
@@ -63,7 +70,7 @@ Otros roles: `sidp unirse --roles agente,cerebro` (perfil coordinador).
 
 El nodo es un proceso de consola. Para que arranque con el equipo:
 
-- **Windows:** `schtasks /Create /TN SIDP /SC ONSTART /RU SYSTEM /TR "\"C:\SIDP\sidp.exe\" iniciar"`. Con `/RU SYSTEM`, `SIDP_HOME` sigue siendo `C:\ProgramData\SIDP`.
+- **Windows:** `schtasks /Create /TN SIDP /SC ONSTART /RU SYSTEM /TR "\"C:\SIDP\SIDP-Servidor.exe\" iniciar"` (en las demás PCs, `SIDP-Equipo.exe`). Con `/RU SYSTEM`, `SIDP_HOME` sigue siendo `C:\ProgramData\SIDP`.
 - **Linux:** una unidad systemd con `ExecStart=/opt/sidp/sidp iniciar`, `Restart=always` y `Environment=SIDP_HOME=/var/lib/sidp`.
 
 Cortafuegos del servidor: permitir TCP 8443 y UDP 47800 **solo en la red privada**. En Windows lo hace `sidp cortafuegos` (consola de administrador). Para comprobar todo: `sidp prueba-conexion` ([guía con dos computadoras](../PRUEBA_DOS_EQUIPOS.md)).

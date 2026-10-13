@@ -18,7 +18,7 @@ jobs:
       - run: python -m pytest -q
 
   ejecutable:
-    # Ejecutable genérico, sin paquete de instalación: los secretos nunca pasan por CI.
+    # Ejecutables sin paquete de instalación: los secretos nunca pasan por CI.
     needs: pruebas
     runs-on: windows-latest
     steps:
@@ -27,14 +27,19 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements-build.txt
-      - run: python despliegue/compilar.py
-      - run: dist/sidp.exe --help
-      # Dos equipos simulados con el .exe real: alta, descubrimiento, TLS e ida y vuelta.
-      - run: python despliegue/ensayo_dos_equipos.py dist/sidp.exe
+      # Dos ejecutables (ADR-029): uno para el servidor y otro para las demás computadoras.
+      - run: python despliegue/compilar.py --tipo servidor
+      - run: python despliegue/compilar.py --tipo equipo
+      - run: dist/SIDP-Servidor.exe --help
+      - run: dist/SIDP-Equipo.exe --help
+      # Tres equipos simulados con los .exe reales: alta, descubrimiento, TLS, ida y vuelta, reparto
+      # y que un segundo servidor con la misma clave se niegue a crearse.
+      - run: python despliegue/ensayo_dos_equipos.py dist/SIDP-Servidor.exe --estacion dist/SIDP-Equipo.exe
       - run: Copy-Item docs/PRUEBA_DOS_EQUIPOS.md dist/
       - uses: actions/upload-artifact@v4
         with:
           name: sidp-windows
           path: |
-            dist/sidp.exe
+            dist/SIDP-Servidor.exe
+            dist/SIDP-Equipo.exe
             dist/PRUEBA_DOS_EQUIPOS.md
