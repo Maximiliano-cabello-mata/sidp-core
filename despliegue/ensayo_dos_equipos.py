@@ -1,11 +1,13 @@
-"""Ensayo con el ejecutable real: varios equipos simulados en una máquina (3 por omisión).
+"""Ensayo con los ejecutables reales: varios equipos simulados en una máquina (3 por omisión).
 
-    python despliegue/ensayo_dos_equipos.py dist/sidp.exe [--equipos 3]
+    python despliegue/ensayo_dos_equipos.py dist/SIDP-Servidor.exe --estacion dist/SIDP-Equipo.exe
+    python despliegue/ensayo_dos_equipos.py dist/sidp.exe          # un solo ejecutable, papel automático
 
-Igual que en la escuela (ADR-025): todos los equipos solo reciben el mismo sidp.exe y la
-misma clave de escuela. PC1 no encuentra a nadie y se vuelve servidor; los demás lo
-descubren por UDP, reciben el certificado firmado y se unen aprobados, sin archivos ni
-invitaciones. Luego `sidp prueba-conexion` debe pasar en todos, con la ida y vuelta desde
+Igual que en la escuela (ADR-025, ADR-029): PC1 abre el ejecutable del servidor y los demás
+el de equipo, todos con la misma clave de escuela. Los equipos descubren el servidor por UDP,
+reciben el certificado firmado y se unen aprobados, sin archivos ni invitaciones. Con dos
+ejecutables se comprueba además que un segundo servidor con la misma clave se niega a crearse.
+Luego `sidp prueba-conexion` debe pasar en todos, con la ida y vuelta desde
 PC1 hacia cada estación y el reparto de tareas entre todos los equipos (ADR-026).
 Sale con 0 si todo pasa. No sustituye la prueba en dos computadoras reales
 (ver docs/PRUEBA_DOS_EQUIPOS.md), pero valida el binario antes de repartirlo.
@@ -87,11 +89,13 @@ def main():
     for flujo in (sys.stdout, sys.stderr):
         flujo.reconfigure(errors='replace')  # Nunca abortar el ensayo por un carácter no imprimible.
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('ejecutable')
+    parser.add_argument('ejecutable', help='Ejecutable del servidor (o el único sidp.exe)')
+    parser.add_argument('--estacion', help='Ejecutable de los equipos (por omisión, el mismo)')
     parser.add_argument('--equipos', type=int, default=3, help='Equipos simulados (mínimo 2)')
     parser.add_argument('--conservar', action='store_true', help='No borrar las carpetas de ensayo')
     args = parser.parse_args()
     ejecutable = Path(args.ejecutable).resolve()
+    de_estacion = Path(args.estacion).resolve() if args.estacion else ejecutable
     base = Path(tempfile.mkdtemp(prefix='sidp-ensayo-'))
     equipos = [base / f'pc{numero}' for numero in range(1, max(args.equipos, 2) + 1)]
     servidor, estaciones = equipos[0], equipos[1:]
@@ -104,17 +108,27 @@ def main():
         if not esperar_puerto(puerto):
             raise SystemExit('PC1 no se volvió servidor (la plataforma no abrió su puerto)')
         for estacion in estaciones:
-            procesos.append(arrancar(ejecutable, estacion, ['iniciar', '--clave', clave]))
+            procesos.append(arrancar(de_estacion, estacion, ['iniciar', '--clave', clave]))
             if not esperar_archivo(estacion / 'nodo.json'):
                 raise SystemExit(f'{estacion.name} no se unió solo (descubrimiento o enrolamiento por clave)')
         time.sleep(5)  # Que los agentes arranquen y se registren en la plataforma.
+
+        if de_estacion != ejecutable:  # Dos ejecutables: nunca dos servidores con la misma clave.
+            try:
+                segundo = correr(ejecutable, ['iniciar', '--clave', clave, '--puerto', str(puerto_libre())],
+                                 base / 'pc-servidor-2', tiempo=120)
+                negado = segundo.returncode != 0 and 'Ya hay un servidor' in segundo.stdout + segundo.stderr
+            except subprocess.TimeoutExpired:  # Se quedó corriendo: se creó como servidor.
+                negado = False
+            if not negado:
+                fallos.append('un segundo servidor con la misma clave no se negó a crearse')
 
         # Ida y vuelta con cada estación y reparto de trabajo entre todos los equipos.
         if correr(ejecutable, ['prueba-conexion', '--reparto', str(3 * len(equipos)), '--espera', '150'],
                   servidor, tiempo=600).returncode:
             fallos.append('prueba-conexion en PC1 (ida y vuelta y reparto)')
         for estacion in estaciones:
-            if correr(ejecutable, ['prueba-conexion'], estacion).returncode:
+            if correr(de_estacion, ['prueba-conexion'], estacion).returncode:
                 fallos.append(f'prueba-conexion en {estacion.name.upper()}')
         correr(ejecutable, ['equipos'], servidor)
         completo = True

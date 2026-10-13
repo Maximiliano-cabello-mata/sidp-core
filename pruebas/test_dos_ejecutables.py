@@ -1,0 +1,114 @@
+"""SIDP-Servidor.exe y SIDP-Equipo.exe (ADR-029): el papel lo fija el ejecutable."""
+import builtins
+import os
+import socket
+import threading
+import time
+import pytest
+import uvicorn
+from backend.main import crear_app
+from comun import configuracion, descubrimiento, rutas
+from comun.configuracion import Nodo
+from sidp import automatico, cli
+from sidp.errores import ErrorInstalacion
+from pruebas.test_instalacion import puerto_libre
+
+CLAVE = 'Primaria Delfino 2026'
+
+
+@pytest.fixture
+def opciones():
+    udp = puerto_libre(socket.SOCK_DGRAM)
+    return dict(espera=0.5, rondas=1, puerto_descubrimiento=udp, destinos=('127.0.0.1',),
+                cortafuegos=False, aviso=lambda _: None)
+
+
+@pytest.fixture
+def servidor_en_red(tmp_path, monkeypatch, opciones):
+    """Un servidor creado con SIDP-Servidor, respondiendo en la red local simulada."""
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'pc1'))
+    assert automatico.preparar(CLAVE, 'Escuela', puerto_libre(), modo='servidor', **opciones) == 'servidor'
+    paquete = configuracion.cargar_paquete()
+    tls = rutas.datos_plataforma() / 'tls'
+    servidor = uvicorn.Server(uvicorn.Config(crear_app(), host='127.0.0.1', port=paquete.puerto, log_config=None,
+                                             ssl_certfile=str(tls / 'certificado.pem'), ssl_keyfile=str(tls / 'clave.pem')))
+    hilo = threading.Thread(target=servidor.run, daemon=True)
+    hilo.start()
+    respondedor = descubrimiento.Respondedor(paquete, '127.0.0.1')
+    respondedor.start()
+    while not servidor.started:
+        time.sleep(0.05)
+    try:
+        yield paquete
+    finally:
+        respondedor.detener()
+        servidor.should_exit = True
+        hilo.join(5)
+        os.environ.pop('SIDP_HOME', None)
+
+
+def test_un_segundo_servidor_con_la_misma_clave_se_niega(servidor_en_red, tmp_path, monkeypatch, opciones):
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'pc2'))
+    with pytest.raises(ErrorInstalacion, match='Ya hay un servidor'):
+        automatico.preparar(CLAVE, modo='servidor', **opciones)
+    assert Nodo.cargar() is None and configuracion.cargar_paquete() is None
+
+
+def test_el_equipo_se_une_y_nunca_crea_otro_servidor(servidor_en_red, tmp_path, monkeypatch, opciones):
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'pc2'))
+    assert automatico.preparar(CLAVE, modo='equipo', **opciones) == 'estacion'
+    assert Nodo.cargar().roles == ['agente']
+
+
+def test_equipo_sin_servidor_no_se_vuelve_servidor(tmp_path, monkeypatch, opciones):
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'sola'))
+    with pytest.raises(ErrorInstalacion, match='No se encontró el servidor'):
+        automatico.preparar(CLAVE, modo='equipo', **opciones)
+    # Aunque alguien conteste "S" a una pregunta vieja, el equipo no crea una instalación.
+    with pytest.raises(ErrorInstalacion):
+        automatico.preparar(CLAVE, modo='equipo', decidir=lambda: 'servidor', **opciones)
+    assert Nodo.cargar() is None and configuracion.cargar_paquete() is None
+
+
+def test_equipo_busca_otra_vez_y_luego_desiste(tmp_path, monkeypatch, opciones):
+    monkeypatch.setenv('SIDP_HOME', str(tmp_path / 'sola'))
+    respuestas = iter(['buscar', None])
+    with pytest.raises(ErrorInstalacion):
+        automatico.preparar(CLAVE, modo='equipo', decidir=lambda: next(respuestas), **opciones)
+    assert next(respuestas, 'agotadas') == 'agotadas'  # Buscó dos veces antes de desistir.
+
+
+def entradas(monkeypatch, *valores):
+    cola = list(valores)
+
+    def leer(_pregunta=''):
+        if not cola:
+            raise EOFError
+        return cola.pop(0)
+    monkeypatch.setattr(builtins, 'input', leer)
+
+
+def test_pregunta_del_equipo_no_ofrece_ser_servidor(monkeypatch, capsys):
+    entradas(monkeypatch, '', '192.168.1.20', 'S')
+    assert cli._decidir_equipo() == 'buscar'
+    assert cli._decidir_equipo() == 'https://192.168.1.20:8443'
+    assert cli._decidir_equipo() == 'https://S:8443'  # "S" se toma como dirección, no como "ser servidor".
+    assert cli._decidir_equipo() is None  # Sin nadie al teclado: desiste.
+    assert 'PRIMERA computadora' not in capsys.readouterr().out
+
+
+def test_el_servidor_pide_la_clave_dos_veces(monkeypatch):
+    entradas(monkeypatch, 'primaria delfino', 'primaria delfin0', 'primaria delfino', ' Primaria  Delfino ')
+    assert cli._pedir_clave('servidor') == 'primaria delfino'
+    entradas(monkeypatch, 'primaria delfino')
+    assert cli._pedir_clave('equipo') == 'primaria delfino'  # En los equipos basta una vez.
+
+
+def test_el_ejecutable_fija_el_modo_del_doble_clic(monkeypatch):
+    vistos = []
+    monkeypatch.setattr(cli, 'iniciar', lambda args: vistos.append(args.modo) or 0)
+    for argumentos, modo, esperado in (([], 'servidor', 'servidor'), (['iniciar'], 'equipo', 'equipo'),
+                                       (['iniciar', '--modo', 'auto'], 'equipo', 'auto'), ([], None, None)):
+        with pytest.raises(SystemExit):
+            cli.main(argumentos, modo=modo)
+        assert vistos.pop() == esperado
