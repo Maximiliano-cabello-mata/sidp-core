@@ -69,6 +69,8 @@ def esperar_puerto(puerto, limite=60):
 
 
 def main():
+    for flujo in (sys.stdout, sys.stderr):  # La consola de Windows en CI usa cp1252.
+        flujo.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('ejecutable')
     parser.add_argument('--conservar', action='store_true', help='No borrar las carpetas de ensayo')
