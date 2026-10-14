@@ -1,0 +1,68 @@
+inicio de profesor 
+los profesores solo tiene acceso a pase de lista, subir calificaciones y observaciones 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar alumno (solo de mis grupos)... | 👤 Profesor
+================================================================================
+ 👉 Inicio         |  ¡Buen día, Mtra. Laura! 🍎
+                   |  
+ 👥 Mi   Grupo     |  =========================================================
+                   |  📌 TUS RECORDATORIOS DE HOY
+                   |  =========================================================
+                   |  • ⚠️ No has pasado lista en: 1ro "A" (Matemáticas).
+                   |  • ⏳ El periodo para subir calificaciones cierra este viernes.
+                   |
+                   |  =========================================================
+                   |  📚 TUS CLASES ASIGNADAS
+                   |  =========================================================
+                   |  [ 📘 1ro "A" - Matemáticas ] ➡️ [ Entrar a la clase ]
+                   |  [ 📙 3ro "B" - Física      ] ➡️ [ Entrar a la clase ]
+                   |
+                   |  ( ❌ Nota: No hay menú de Inventario, Firmas, ni Ajustes. 
+                   |    El menú izquierdo es lo más pequeño posible ).
+================================================================================
+
+
+
+su grupo con nombres completos de los alumnos y asistencia 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar alumno en esta clase...      | 👤 Profesor
+================================================================================
+ 🏠 Inicio         |  MATEMÁTICAS - 1ro "A"
+                   |  
+ 👉 Mi   Grupo     |  =========================================================
+                   |  [ 📅 PASE DE LISTA ]  [ 📝 CALIFICACIONES ]  [ 👁️ OBSERVACIONES ]
+                   |  =========================================================
+                   |
+                   |  📅 ASISTENCIA DEL DÍA: Hoy, 14 de Octubre
+                   |
+                   |  ---------------------------------------------------------
+                   |  | No. | Alumno              | Asistencia                 |
+                   |  |-----|---------------------|----------------------------|
+                   |  | 1   | Gómez, Carlos       | (🟢 Presente) (🔴 Falta)   |
+                   |  | 2   | López, María        | (🟢 Presente) (🔴 Falta)   |
+                   |  | 3   | Pérez, Juan         | (🟢 Presente) (🔴 Falta)   |
+                   |  ---------------------------------------------------------
+                   |  [ 💾 Guardar Asistencia de Hoy ]
+================================================================================
+
+
+las observaciones que se tiene de los alumnos 
+================================================================================
+  👁️ OBSERVACIONES DEL GRUPO: 1ro "A"
+--------------------------------------------------------------------------------
+  Selecciona un alumno para agregar un reporte de conducta o desempeño.
+  
+  [ Buscar Alumno... 🔍 ] (Ej. Selecciona a "Carlos Gómez")
+
+  Escribe tu observación sobre Carlos:
+  [ Carlos ha mostrado mucha mejora en las multiplicaciones, pero platica 
+    mucho durante las explicaciones. _________________________________ ]
+
+  Tipo de nota: 
+  ( ) Positiva 🌟    ( ) Neutra 📝    ( ) Alerta de Conducta ⚠️
+
+                             [ ❌ Cancelar ]    [ 💾 Guardar Observación ]
+================================================================================
+
+
+

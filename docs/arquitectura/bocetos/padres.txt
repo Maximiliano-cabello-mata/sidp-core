@@ -1,0 +1,39 @@
+padres 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 👤 Padre/Tutor: Juan Pérez | [ Salir ]
+================================================================================
+ 
+  INSCRIPCIÓN DE: Carlos Gómez Pérez (Ingreso a 1er Grado)
+  ⚠️ Estado: Incompleto. Debes subir TODOS los documentos para finalizar.
+  
+  Instrucciones: Escanea o toma una foto clara de cada documento y súbelo
+  en su sección correspondiente.
+
+  =========================================================================
+  📁 SECCIÓN 1: DOCUMENTOS DEL ALUMNO (Obligatorios)
+  =========================================================================
+  [ ⬆️ Subir ] Hoja de registro 
+  [ ⬆️ Subir ] Carta compromiso 
+  [ ✅ SUBIDO ] Acta de nacimiento (carlos_acta.pdf) 👁️ Ver
+  [ ⬆️ Subir ] CURP del alumno
+  [ ⬆️ Subir ] Boleta de grados anteriores
+  [ ⬆️ Subir ] Comprobante de domicilio (No mayor a 3 meses)
+  [ ⬆️ Subir ] Certificado Médico
+  
+  -------------------------------------------------------------------------
+  🌟 REQUISITOS ESPECIALES (Solo para Nuevo Ingreso / 1er Grado)
+  -------------------------------------------------------------------------
+  [ ⬆️ Subir ] Formato SAID (Asignación oficial)
+  [ ⬆️ Subir ] Certificado de 3º de Kinder
+  
+  =========================================================================
+  📁 SECCIÓN 2: DOCUMENTOS DEL PADRE O TUTOR (Obligatorios)
+  =========================================================================
+  [ ⬆️ Subir ] Acta de nacimiento del Tutor
+  [ ⬆️ Subir ] CURP del Tutor
+  [ ⬆️ Subir ] Credencial INE (Ampliada al 200%, frente y reverso)
+
+  =========================================================================
+                            [ 📤 ENVIAR EXPEDIENTE PARA REVISIÓN ]
+         (El botón está en gris 🔒 hasta que todos los documentos digan ✅ SUBIDO)
+================================================================================

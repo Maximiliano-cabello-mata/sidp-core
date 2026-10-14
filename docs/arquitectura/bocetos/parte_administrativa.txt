@@ -1,0 +1,192 @@
+parte administrativa 
+Inicio
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Búsqueda rápida de alumnos... | 🔔 (2) | 👤 Director
+================================================================================
+ 👉 Inicio         |  ¡Buenos días, Ana! 👋 
+                   |  Aquí tienes el resumen de tu escuela hoy (14 de Octubre).
+ 👥 Personas       |  
+                   |  =========================================================
+ 📂 Archivo        |  📊 VISTAZO RÁPIDO
+    Escolar        |  =========================================================
+                   |  [ 👨‍🎓 450 ]          [ 📝 12 ]            [ 🟢 Óptimo ]
+ 📝 Asistencias    |  Alumnos Activos    Grupos Evaluados     Estado del Sistema
+    y Calific.     |  
+                   |
+ 📦 Inventario     |  =========================================================
+                   |  🚀 ACCESOS RÁPIDOS (Lo que haces más seguido)
+ ⚙️ Ajustes        |  =========================================================
+                   |  [ + Inscribir Alumno ]   [ 📊 Ver Reporte de Asistencia ]
+                   |  [ 🔍 Buscar Expediente ] [ 🔄 Conexión con RENAPO: Activa ]
+                   |
+                   |  =========================================================
+                   |  📋 ACTIVIDAD RECIENTE EN LA ESCUELA
+                   |  =========================================================
+                   |  • Hace 10 min: Secretaría inscribió a "Carlos Gómez" (1ro A).
+                   |  • Hace 45 min: Sistema respaldó la base de datos automáticamente.
+                   |  • Ayer 18:00: Mtra. Laura subió calificaciones de 3ro B.
+================================================================================
+
+
+sección de personas 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar (Nombre, Matrícula o CURP)... | 👤 Menú
+================================================================================
+ 🏠 Inicio         |  DIRECTORIO DE PERSONAS
+                   |  
+ 👉 Personas       |  =========================================================
+                   |  [ 👨‍🎓 ALUMNOS ]  [ 👩‍🏫 DOCENTES ]  [ 👨‍👩‍👧 TUTORES ]
+ 📂 Archivo        |  =========================================================
+    Escolar        |
+                   |  [ + Inscribir / Registrar Nuevo ]   [ 📥 Importar Lista ]
+ 📝 Asistencias    |  
+    y Calific.     |  ---------------------------------------------------------
+                   |  | Matrícula | Nombre Completo | CURP Validado | Rol     | Acciones |
+ 📦 Inventario     |  |-----------|-----------------|---------------|---------|----------|
+                   |  | 2026-001  | Pérez, Juan     | [✅ RENAPO]   | Alumno  | [Ver]    |
+ ⚙️ Ajustes        |  | 2026-002  | Gómez, Carlos   | [✅ RENAPO]   | Alumno  | [Ver]    |
+                   |  | DOC-014   | Mtra. Laura R.  | [✅ RENAPO]   | Docente | [Ver]    |
+                   |  | TUT-089   | Sr. Pérez, J.   | [⚠️ Faltante] | Tutor   | [Ver]    |
+                   |  ---------------------------------------------------------
+================================================================================
+
+
+
+sección de archivo escolar 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar...                           | 👤 Super Admin
+================================================================================
+ 🏠 Inicio         |  ARCHIVO ESCOLAR > EXPEDIENTE DEL ALUMNO
+                   |  
+ 👥 Personas       |  👤 Carlos Gómez López | Matrícula: 2026-045 | Grupo: 3ro "B"
+                   |  =========================================================
+ 👉 Archivo        |  [ 📋 Datos Generales ]  [ 📂 DOCUMENTOS ]  [ 👁️ QUIÉN HA VISTO ESTO ]
+    Escolar        |  =========================================================
+                   |
+ 📝 Asistencias    |  DOCUMENTOS DEL ALUMNO (Acceso Ilimitado Activado 🟢)
+    y Calific.     |  Aquí puedes ver y descargar todo el archivo digital.
+                   |  
+ 📦 Inventario     |  ---------------------------------------------------------
+                   |  📄 Acta de Nacimiento     | Subido: 10/Ago | [👁️ Ver] [⬇️ Descargar]
+ ⚙️ Ajustes        |  📄 CURP (Valido x RENAPO) | Subido: 10/Ago | [👁️ Ver] [⬇️ Descargar]
+                   |  🏥 Certificado Médico     | Subido: 12/Ago | [👁️ Ver] [⬇️ Descargar]
+                   |  📝 Carta Responsiva       | Subido: 12/Ago | [👁️ Ver] [⬇️ Descargar]
+                   |  ---------------------------------------------------------
+                   |
+                   |  ⬇️ EL OJO DEL SISTEMA: HISTORIAL DE VISITAS (Auditoría) ⬇️
+                   |  ---------------------------------------------------------
+                   |  • Hoy 10:15 AM - Ana G. (Directora) descargó "Certificado Médico".
+                   |  • Ayer 08:30 AM - Rosa M. (Secretaria) vio "Acta de Nacimiento".
+                   |  • 12/Ago 14:00 PM - Sistema validó CURP automáticamente.
+================================================================================
+
+
+
+sección de asistencia y calificaciones 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar grupo o profesor... | 🔔 (1) | 👤 Director
+================================================================================
+ 🏠 Inicio         |  ASISTENCIAS Y CALIFICACIONES (SUPERVISIÓN)
+                   |  
+ 👥 Personas       |  =========================================================
+                   |  [ 📅 REPORTE DE ASISTENCIAS ]  [ 📝 BOLETAS Y CALIFICACIONES ]
+ 📂 Archivo        |  =========================================================
+    Escolar        |
+                   |  SEGUIMIENTO POR GRUPOS
+ 👉 Asistencias    |  Revisa el avance de los profesores en sus evaluaciones diarias.
+    y Calific.     |  
+                   |  ---------------------------------------------------------
+ 📦 Inventario     |  | Grupo     | Profesor Titular | Asistencia Hoy | Calificaciones |
+                   |  |-----------|------------------|----------------|----------------|
+ ⚙️ Ajustes        |  | 1ro "A"   | Mtra. Laura R.   | ✅ Capturada   | ⏳ Pendiente   |
+                   |  | 2do "B"   | Mtro. Carlos G.  | ⚠️ Faltante    | ✅ Completadas |
+                   |  | 3ro "A"   | Mtra. Rosa M.    | ✅ Capturada   | ✅ Completadas |
+                   |  ---------------------------------------------------------
+                   |
+                   |  [ 👁️ Ver Detalles del Grupo ]     [ 🖨️ Exportar Reportes ]
+================================================================================
+
+
+sección de inventario 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar equipo, silla, libro... | 🔔 (1) | 👤 Menú
+================================================================================
+ 🏠 Inicio         |  INVENTARIO Y ALMACÉN
+                   |  
+ 👥 Personas       |  =========================================================
+                   |  [ 💻 TECNOLOGÍA ]  [ 🪑 MOBILIARIO ]  [ 🔄 PRÉSTAMOS ]
+ 📂 Archivo        |  =========================================================
+    Escolar        |
+                   |  [ + Agregar Nuevo Artículo ]   [ 📷 Escanear Código QR ]
+ 📝 Asistencias    |  
+    y Calific.     |  ---------------------------------------------------------
+                   |  | Código  | Artículo            | Estado        | Responsable / Ubicación |
+ 👉 Inventario     |  |---------|---------------------|---------------|-------------------------|
+                   |  | LAP-001 | Laptop HP Plata     | 🔴 En Préstamo| Mtra. Laura (Aula 3)    |
+ ⚙️ Ajustes        |  | PRO-005 | Proyector Epson     | 🟢 Disponible | Almacén Principal       |
+                   |  | PRO-006 | Proyector Epson     | ⚠️ Dañado     | Mantenimiento           |
+                   |  | SIL-102 | Silla de Escritorio | 🟢 Disponible | Aula de Cómputo         |
+                   |  ---------------------------------------------------------
+================================================================================
+
+
+
+sección de ajustes 
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar en configuración... | 🔔 (1) | 👤 Super Admin
+================================================================================
+ 🏠 Inicio         |  AJUSTES DEL SISTEMA
+                   |  
+ 👥 Personas       |  =========================================================
+                   |  [ 🏫 Datos de Escuela ] [ 👥 Personal ] [ 📋 Auditoría ] [ 💾 Respaldos ]
+ 📂 Archivo        |  =========================================================
+    Escolar        |
+                   |  SELECCIONA QUÉ DESEAS CONFIGURAR:
+ 📝 Asistencias    |  
+    y Calific.     |  ---------------------------------------------------------
+                   |  🏫 DATOS GENERALES DE LA ESCUELA (Políticas)
+ 📦 Inventario     |  • Ciclo escolar actual: 2026-2027
+                   |  • Cambiar logo o nombre de la institución.
+ 👉 Ajustes        |  • Activar/Desactivar periodos de evaluación.
+                   |  [ ✏️ Modificar Datos ]
+                   |  ---------------------------------------------------------
+                   |  👥 PERSONAL Y PERMISOS 
+                   |  • Administrar a los empleados, maestos y secretarias.
+                   |  • Decidir quién puede ver qué cosa.
+                   |  [ ⚙️ Administrar Personal ] 
+                   |  ---------------------------------------------------------
+                   |  📋 HISTORIAL DE MOVIMIENTOS (Auditoría)
+                   |  • Ver el registro detallado de quién borró o descargó archivos.
+                   |  [ 👁️ Revisar Historial ]
+                   |  ---------------------------------------------------------
+                   |  💾 COPIAS DE SEGURIDAD (Respaldos)
+                   |  • Guardar toda la información de la escuela para no perder nada.
+                   |  [ ⬇️ Descargar Respaldo Ahora ]
+                   |  ---------------------------------------------------------
+================================================================================
+
+================================================================================
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar...                           | 👤 Super Admin
+================================================================================
+ 🏠 Inicio         |  AJUSTES > PERSONAL > EDITAR PERMISOS
+                   |  
+ 👥 Personas       |  =========================================================
+                   |  [ 👤 Datos del Empleado ]  [ 🔐 PERMISOS Y ACCESOS ]
+ 📂 Archivo        |  =========================================================
+    Escolar        |
+                   |  EMPLEADO: Rosa Martínez
+ 📝 Asistencias    |  PUESTO: Secretaria de Control Escolar
+    y Calific.     |  
+                   |  ¿QUÉ PUEDE HACER ESTA PERSONA EN EL SISTEMA?
+ 📦 Inventario     |  (Marca con una ✔️ lo que le autorizas hacer)
+                   |
+ 👉 Ajustes        |  ---------------------------------------------------------
+                   |  [ ✔️ ] Inscribir alumnos nuevos.
+                   |  [ ✔️ ] Ver y descargar documentos de identidad (Actas, CURP).
+                   |  [    ] Ver documentos confidenciales (Médicos, Psicológicos). 🔒
+                   |  [ ✔️ ] Subir calificaciones.
+                   |  [    ] Eliminar alumnos o borrar expedientes completos. 🔒
+                   |  ---------------------------------------------------------
+                   |
+                   |          [ ❌ Cancelar ]        [ 💾 Guardar Permisos ]
+================================================================================

@@ -52,7 +52,7 @@ En Windows: `SIDP-Servidor.exe` en el servidor y `SIDP-Equipo.exe` en las demás
 - [Módulo de expediente](docs/arquitectura/modulo_expediente.md)
 - [Validación documental](docs/arquitectura/validacion_documental.md)
 - [Cerebro que aprende](docs/arquitectura/cerebro_aprendizaje.md)
-- [Diseño de interfaz de usuario (UI)](docs/arquitectura/interfaz_usuario.md)
+- [Interfaces de usuario (UI/UX)](docs/arquitectura/interfaz_usuario.md) · [Dirección](docs/arquitectura/interfaz_administrativo.md) · [Secretaría](docs/arquitectura/interfaz_secretario.md) · [Profesor](docs/arquitectura/interfaz_profesor.md) · [Padres](docs/arquitectura/interfaz_padres.md)
 - [Registro de la sesión de diseño 2026-10-11](docs/SESION_2026-10-11.md)
 
 ## Estado real
