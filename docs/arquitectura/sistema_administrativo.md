@@ -79,7 +79,7 @@ UUID como identificador de las entidades nuevas y columna `version` para control
 
 ## Instalacion
 
-Ya existe: un solo ejecutable, alta de equipos con aprobacion o invitacion, conexion cifrada y prueba de conectividad (`instalacion.md`, `docs/PRUEBA_DOS_EQUIPOS.md`). Pendiente: asistente grafico de primer arranque (crear usuario de direccion, conectar la cuenta Microsoft, enrolar el equipo), instalador firmado y actualizaciones con respaldo previo y reversion.
+Ya existe: un solo ejecutable, alta de equipos con aprobacion o invitacion, conexion cifrada y prueba de conectividad (`instalacion.md`, `docs/guias/PRUEBA_DOS_EQUIPOS.md`). Pendiente: asistente grafico de primer arranque (crear usuario de direccion, conectar la cuenta Microsoft, enrolar el equipo), instalador firmado y actualizaciones con respaldo previo y reversion.
 
 ## Riesgos y decisiones abiertas
 
@@ -93,7 +93,7 @@ Ya existe: un solo ejecutable, alta de equipos con aprobacion o invitacion, cone
 
 ## Fases
 
-El orden general del proyecto esta en `docs/PLAN.md`; estas fases detallan el producto administrativo.
+El orden general del proyecto esta en `docs/PLAN.md`; estas fases detallan el producto administrativo. Desde el 2026-10-14 el plan las reparte en fases A (cuentas), B (alumnos), C (expediente), D (busqueda) y E (copias); si algo no coincide, manda PLAN.md.
 
 | Fase | Contenido |
 |---|---|

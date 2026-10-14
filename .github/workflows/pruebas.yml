@@ -35,7 +35,7 @@ jobs:
       # Tres equipos simulados con los .exe reales: alta, descubrimiento, TLS, ida y vuelta, reparto
       # y que un segundo servidor con la misma clave se niegue a crearse.
       - run: python despliegue/ensayo_dos_equipos.py dist/SIDP-Servidor.exe --estacion dist/SIDP-Equipo.exe
-      - run: Copy-Item docs/PRUEBA_DOS_EQUIPOS.md dist/
+      - run: Copy-Item docs/guias/PRUEBA_DOS_EQUIPOS.md dist/
       - uses: actions/upload-artifact@v4
         with:
           name: sidp-windows

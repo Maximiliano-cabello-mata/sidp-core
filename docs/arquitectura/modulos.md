@@ -45,7 +45,7 @@ Una capacidad es una función incorporada y repetible que el agente ejecuta cuan
 
 ## Ciclo de vida de un módulo
 
-Diseño (ADR si cambia fronteras) → contrato en `contratos/` → migraciones → servicio → rutas → pruebas → registro → documentación en `docs/arquitectura.md` (tabla de módulos).
+Diseño (ADR si cambia fronteras) → contrato en `contratos/` → migraciones → servicio → rutas → pruebas → registro → documentación en `docs/arquitectura/base_tecnica.md` (tabla de módulos).
 
 
 ## Publicar eventos de un nuevo módulo

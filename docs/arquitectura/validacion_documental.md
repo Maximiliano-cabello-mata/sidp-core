@@ -70,7 +70,32 @@ Las evidencias son de solo anadir. El veredicto cambia solo por accion humana y 
 
 El OCR no es exacto; por eso todo campo extraido lleva confianza y la persona decide. Validar el contenido no prueba que un documento fisico sea autentico; eso lo da la verificacion oficial y el cotejo con el original. Alumnos sin CURP, extranjeros o con documentos de otra entidad necesitan estado `no_aplica` o prorroga con motivo.
 
+## Plataforma web de padres (2026-10-14)
+
+Decidido con Maximiliano el 2026-10-14. Amplia este documento y el alcance del buzon de ADR-028. El orden esta en [PLAN.md](../PLAN.md#validación-de-documentos-y-plataforma-web-de-padres).
+
+Documentos:
+
+- **Alumno:** acta de nacimiento, certificado medico, boletas de los grados cursados. La CURP se escribe y se valida que exista, sin pedir el documento.
+- **Tutor:** INE, acta de nacimiento (prueba el parentesco con el acta del alumno), CURP, comprobante de domicilio.
+- **Formatos:** ficha de inscripcion y ficha de autorizacion. SIDP las llena con datos validados y el tutor las firma.
+
+Como funciona:
+
+1. **Plataforma web de padres.** El padre se registra con su correo (confirmado con un codigo), captura los datos del alumno y sube cada documento. Al subirlo, una revision rapida avisa si la foto esta borrosa o no es el documento pedido.
+2. **Plantilla de lo esperado** por tipo y version: textos fijos, campos y formatos, contenido del QR y reglas internas y cruzadas. Se arma con ejemplos tachados, sin datos de nadie.
+3. **Validacion automatica.** Procesos fijos y el cerebro (PC 4) leen texto, QR y OCR, comparan con la plantilla y el expediente, y anotan inconsistencias. Es la revision superficial de los niveles 1 a 3.
+4. **Existencia de la CURP.** Se revisa el digito verificador y luego el QR del acta, validado en gob.mx (por probar si tiene captcha). Las excepciones las consulta en RENAPO una persona, por lote. No hay API publica; el servicio web es por convenio con secretarias estatales de educacion. `backend/conectores/renapo.py` devuelve datos simulados y debe reemplazarse.
+5. **Autorizacion manual** (nivel 4). El sistema muestra al administrador que falta y que inconsistencias encontro. Solo el administrador dice si o no (se mantiene ADR-023). Con el si, el padre recibe un correo positivo. Con el no, el sistema le envia el reporte de inconsistencias y que corregir, hecho con plantillas fijas y sin copias de documentos.
+6. **Datos para analisis.** Los campos extraidos se guardan ordenados y se analizan en cifras agregadas por grupo y ciclo. Los datos de salud no entran al analisis.
+
+Los documentos se procesan en las computadoras de la escuela: la plataforma en internet solo recibe y entrega (ADR-028).
+
+Faltan en `tipo_documento` de [diseno_integral.sql](../../database/diseno_integral.sql): acta y CURP del tutor, ficha de inscripcion y ficha de autorizacion. Las interfaces de Paola proponen ademas hoja de registro, carta compromiso, formato SAID y certificado de 3o de kinder; se confirman con la escuela.
+
 ## Orden de construccion
+
+Sustituido el 2026-10-14 por los pasos de [PLAN.md](../PLAN.md#validación-de-documentos-y-plataforma-web-de-padres). Se conserva como referencia:
 
 1. Nivel 1 (CURP estructural, hash, vigencia) y el modelo `evidencia` y `veredicto`.
 2. Interfaz de validacion del administrativo con el veredicto humano.

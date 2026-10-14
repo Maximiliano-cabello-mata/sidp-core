@@ -6,7 +6,7 @@ La instalación del servidor y el alta de equipos están en [instalacion.md](ins
 
 ## Prueba de conectividad
 
-`sidp prueba-conexion` en cualquier equipo: descubrimiento, puerto, TLS, reloj y credenciales. En el servidor añade el último contacto de cada agente y una ida y vuelta con cada agente remoto. Sale con código 0 si no hay fallas y guarda `registros/conectividad-*.json`. Abrir el cortafuegos del servidor (Windows, consola de administrador): `sidp cortafuegos`. Guía paso a paso: [PRUEBA_DOS_EQUIPOS.md](../PRUEBA_DOS_EQUIPOS.md).
+`sidp prueba-conexion` en cualquier equipo: descubrimiento, puerto, TLS, reloj y credenciales. En el servidor añade el último contacto de cada agente y una ida y vuelta con cada agente remoto. Sale con código 0 si no hay fallas y guarda `registros/conectividad-*.json`. Abrir el cortafuegos del servidor (Windows, consola de administrador): `sidp cortafuegos`. Guía paso a paso: [PRUEBA_DOS_EQUIPOS.md](../guias/PRUEBA_DOS_EQUIPOS.md).
 
 ## Salud
 

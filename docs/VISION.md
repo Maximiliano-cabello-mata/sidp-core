@@ -1,6 +1,6 @@
 # Visión de SIDP
 
-Fecha: 2026-10-13. Resume las ideas acordadas con el dueño del proyecto. **El alcance queda cerrado aquí:** cualquier idea nueva espera a que termine el piloto. El orden de construcción está en [PLAN.md](PLAN.md).
+Fecha: 2026-10-13, ajustada el 2026-10-14 (plataforma web de padres). Resume las ideas acordadas con el dueño del proyecto. **El alcance queda cerrado aquí:** cualquier idea nueva espera a que termine el piloto. El orden de construcción está en [PLAN.md](PLAN.md).
 
 ## La idea
 
@@ -13,16 +13,16 @@ El problema que resuelve: el personal pierde horas capturando, buscando, llenand
 | Pieza | Qué es | Dónde corre |
 |---|---|---|
 | Servidor | La única plataforma: base de datos, archivos y páginas | Una PC de la escuela, siempre encendida en horario escolar, por cable al módem, con no-break y disco externo. Puede seguir usándose para trabajo administrativo |
-| Demás PCs | Se unen solas con `sidp.exe` y la clave de escuela; guardan una copia y ayudan con tareas pesadas (PDF, compresión) | Cualquier PC de la red escolar |
+| Demás PCs | Se unen solas con `SIDP-Equipo.exe` y la clave de escuela; guardan una copia y ayudan con tareas pesadas (PDF, compresión) | Cualquier PC de la red escolar |
 | Cerebro (IA) | Ayudante: valida documentos, redacta borradores, propone campos de formatos, analiza datos | PC 4 dedicada (Ryzen 5, 24 GB, disco mecánico de 128 GB solo para temporales). No aloja la plataforma |
-| Buzón de padres | Página en internet donde los padres suben documentos | Hosting en la nube. El servidor descarga lo nuevo; no se abre el módem |
+| Plataforma web de padres | Página en internet donde los padres se registran con su correo, suben documentos y reciben el resultado | Hosting en la nube. El servidor descarga lo nuevo; no se abre el módem |
 
 Principios:
 
 1. **Una sola plataforma, un solo servidor** (ADR-019, ADR-027). Las demás PCs protegen los datos con copias; no guardan pedazos de ellos.
-2. **Crecer solo con el `.exe`** (ADR-025). Una PC nueva copia `sidp.exe`, escribe la clave y queda unida, con copia y como ayudante. Nadie tiene que ir a configurarla.
+2. **Crecer solo con el `.exe`** (ADR-025, ADR-029). Una PC nueva copia `SIDP-Equipo.exe`, escribe la clave y queda unida, con copia y como ayudante. Nadie tiene que ir a configurarla.
 3. **Todo funciona sin el cerebro** (ADR-023). La IA prepara; una persona decide. Nunca aprueba, firma ni envía nada por sí sola.
-4. **Los padres no entran a la red de la escuela.** Solo tocan el buzón (ADR-028).
+4. **Los padres no entran a la red de la escuela.** Solo tocan la plataforma web de padres (ADR-028).
 
 ## Quién la usa
 
@@ -30,7 +30,7 @@ Principios:
 |---|---|---|
 | Administrativos | Navegador en la red escolar | Expedientes, formatos, documentos, inventario, asistencia de profesores, revisar lo que preparó la IA, reportes |
 | Profesores | Navegador o celular en la red escolar | Pase de lista, calificaciones, exámenes diagnósticos, consultas de sus grupos |
-| Padres | Buzón en internet | Subir documentos de sus hijos, ver qué falta y qué se aceptó, actualizar contacto, leer avisos |
+| Padres | Plataforma web en internet | Registrarse con su correo, subir documentos de sus hijos, ver qué falta, recibir el resultado por correo, actualizar contacto, leer avisos |
 
 ## Qué hace (alcance cerrado)
 
@@ -67,18 +67,21 @@ Un PDF oficial cerrado solo se llena encima de sus espacios; los de Word y Excel
 
 Valida documentos de padres (datos que no coinciden, fotos ilegibles, hojas faltantes), redacta borradores con plantillas, llena formatos, propone campos y analiza faltas y promedios. No se reentrena: mejora con plantillas, ejemplos y las correcciones del personal. En la PC 4, sin tarjeta gráfica, trabaja en segundo plano (por ejemplo, revisar de noche lo que subieron los padres), no al instante. Opción recomendada, por confirmar: mixta (lo privado y sencillo local, lo difícil en la nube sin datos personales). Detalle en [cerebro_aprendizaje.md](arquitectura/cerebro_aprendizaje.md).
 
-### Buzón de padres
+### Plataforma web de padres
+
+Antes llamada buzón. Detalle en [validación documental](arquitectura/validacion_documental.md#plataforma-web-de-padres-2026-10-14).
 
 | Hace | No hace |
 |---|---|
-| Cuenta con el folio que da la escuela y la CURP del alumno | No muestra datos de otras familias |
+| Cuenta con el correo del padre, confirmado con un código | No muestra datos de otras familias |
+| Captura los datos del alumno; de la CURP solo se revisa que exista, sin pedir el documento | No pide el documento de la CURP |
 | Lista de documentos que faltan | No guarda documentos para siempre: se borran al confirmar que la escuela los tiene |
-| Recibe fotos y PDF desde el celular | No decide si un documento se acepta |
-| Estado de cada documento: recibido, aceptado o rechazado con motivo | No cambia calificaciones, asistencia ni datos escolares |
+| Recibe fotos y PDF desde el celular, con un aviso si la foto está borrosa o no es el documento pedido | No decide si un documento se acepta: el sistema revisa en la escuela y decide el administrador |
+| Estado de cada documento y un correo con el resultado: positivo, o el reporte de inconsistencias y qué corregir | No cambia calificaciones, asistencia ni datos escolares |
 | Actualizar teléfono, correo y domicilio | No se conecta al cerebro ni a la red escolar |
 | Avisos de la escuela | No cobra pagos |
 
-Mostrar calificaciones a los padres se decide después del piloto.
+Los datos extraídos se analizan solo en cifras agregadas por grupo y ciclo. Mostrar calificaciones a los padres se decide después del piloto.
 
 ## Qué no hace
 
@@ -99,11 +102,11 @@ Mostrar calificaciones a los padres se decide después del piloto.
 | Antivirus bloquea el `.exe` | Permitirlo una vez en cada PC |
 | Alguien que sabe la clave deja la escuela | Cambio de clave (pendiente, antes de datos reales) |
 | Wi-Fi escolar aísla a las PCs | Prueba en la escuela primero; unir por IP si hace falta |
-| Datos personales de menores | Cuentas por persona, aviso de privacidad antes del buzón, HTTPS, respaldo |
+| Datos personales de menores | Cuentas por persona, aviso de privacidad antes de abrir la plataforma de padres, HTTPS, respaldo |
 | El proyecto depende de una persona | Documentación suficiente para que otro lo mantenga |
 
 ## Decisiones pendientes
 
 1. IA local, en la nube o mixta (recomendada: mixta).
-2. Confirmar el buzón de padres en un hosting y quién paga la mensualidad.
+2. Confirmar la plataforma de padres en un hosting y quién paga la mensualidad.
 3. Número de alumnos y de PCs, y disco libre de cada una.

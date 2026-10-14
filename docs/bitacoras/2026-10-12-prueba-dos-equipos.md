@@ -2,7 +2,7 @@
 
 Bitácora de la puesta en marcha de la prueba de dos computadoras con `sidp.exe`: los
 errores que aparecieron, su causa y cómo se resolvieron. El procedimiento oficial está
-en `docs/PRUEBA_DOS_EQUIPOS.md`; esto documenta un caso real que se desvió de él.
+en `docs/guias/PRUEBA_DOS_EQUIPOS.md`; esto documenta un caso real que se desvió de él.
 
 > Datos del entorno: PC1 = servidor (`192.168.100.18:8443`), PC2 = estación (host `KANEDA`,
 > Windows + WSL2). Clave de escuela usada: valor de prueba de 8 dígitos (**cámbiala por una
