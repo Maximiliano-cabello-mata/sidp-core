@@ -12,7 +12,7 @@ Dos ejecutables con el mismo programa (ADR-029): `SIDP-Servidor.exe` para el ser
 | Equipo nuevo (manual) | Abrir `SIDP-Equipo.exe` (con paquete incrustado o `instalacion.json` al lado) |
 | Aprobar | En el servidor: `sidp identidades aprobar <equipo>-agente` |
 | Abrir cortafuegos (servidor) | `sidp cortafuegos` en consola de administrador |
-| Comprobar conexión | `sidp prueba-conexion` en cada equipo ([guía](../docs/PRUEBA_DOS_EQUIPOS.md)) |
+| Comprobar conexión | `sidp prueba-conexion` en cada equipo ([guía](../docs/guias/PRUEBA_DOS_EQUIPOS.md)) |
 | Ensayo del binario | `python despliegue/ensayo_dos_equipos.py dist/SIDP-Servidor.exe --estacion dist/SIDP-Equipo.exe` (lo corre CI) |
 | Arranque automático | `schtasks /Create /TN SIDP /SC ONSTART /RU SYSTEM /TR "\"C:\SIDP\SIDP-Servidor.exe\" iniciar"` |
 

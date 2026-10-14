@@ -1,6 +1,6 @@
 # Arquitectura SIDP
 
-Versión 0.3 · 2026-10-13. Documento rector de la **base técnica**: describe lo construido y probado; lo pendiente se marca como tal. El producto escolar que se construye encima (dos plataformas, expediente, validación documental) está en [sistema administrativo](arquitectura/sistema_administrativo.md) y el cerebro que aprende en [cerebro](arquitectura/cerebro_aprendizaje.md). Si un documento contradice a las [decisiones](arquitectura/decisiones.md), prevalecen las decisiones.
+Versión 0.3 · 2026-10-13. Documento rector de la **base técnica**: describe lo construido y probado; lo pendiente se marca como tal. El producto escolar que se construye encima (dos plataformas, expediente, validación documental) está en [sistema administrativo](sistema_administrativo.md) y el cerebro que aprende en [cerebro](cerebro_aprendizaje.md). Si un documento contradice a las [decisiones](decisiones.md), prevalecen las decisiones.
 
 ## 1. Contexto y objetivos
 
@@ -14,7 +14,7 @@ Por eso la arquitectura persigue, en este orden:
 4. **Modularidad.** Cada función escolar futura es un módulo con tablas, migraciones, rutas y capacidades propias.
 5. **Seguridad por defecto.** Acceso cerrado sin configuración, TLS con certificado fijado, identidades revocables por equipo y ningún código recibido por red.
 
-Las funciones escolares (expediente, validación documental, docentes) están diseñadas (ADR-019 a ADR-023) pero aún sin código; se construyen como módulos sobre esta base después del login del personal ([plan](PLAN.md)).
+Las funciones escolares (expediente, validación documental, docentes) están diseñadas (ADR-019 a ADR-023) pero aún sin código; se construyen como módulos sobre esta base después del login del personal ([plan](../PLAN.md)).
 
 ## 2. Invariantes
 
@@ -100,7 +100,7 @@ La plataforma es **un proceso** (uvicorn con un solo worker, sin recarga) que co
 | `orquestacion` | `dispositivos`, `tareas`, `eventos` | `/api/v1/tareas*`, `/api/v1/dispositivos/registro` | identidad |
 | `escolar` | `alumnos`, `ciclos_escolares` | `/api/alumnos` | sistema |
 
-Cada módulo declara un `Modulo` con nombre, versión, migraciones ordenadas, router, dependencias y gancho de arranque. El contrato completo está en [modulos.md](arquitectura/modulos.md). Los módulos se registran **en código**: el ejecutable contiene exactamente lo que se probó. No hay carga dinámica.
+Cada módulo declara un `Modulo` con nombre, versión, migraciones ordenadas, router, dependencias y gancho de arranque. El contrato completo está en [modulos.md](modulos.md). Los módulos se registran **en código**: el ejecutable contiene exactamente lo que se probó. No hay carga dinámica.
 
 ### Datos
 
@@ -114,7 +114,7 @@ SQLite es la elección inicial para un escritor local. La capacidad real debe me
 
 ## 6. Instalación, descubrimiento y enrolamiento
 
-Resumen. El detalle está en [instalacion.md](arquitectura/instalacion.md).
+Resumen. El detalle está en [instalacion.md](instalacion.md).
 
 1. **Servidor:** `sidp crear-instalacion --nombre "..."` genera:
    - el paquete `instalacion.json`: identificador, secreto de 256 bits y certificado público;
@@ -153,7 +153,7 @@ sequenceDiagram
 - **Agente.** Entrega primero los resultados pendientes, que guarda en disco antes de enviarlos. Luego reclama, ejecuta y guarda. Cuando no hay trabajo, espera de 2 s hasta 15 s. Si pierde a la plataforma cinco veces seguidas, la busca de nuevo y actualiza `nodo.json` (la IP del servidor puede cambiar). Con 401 o 403 termina con código 3.
 - **Cerebro.** `sidp cerebro --clave X` crea un diagnóstico; `sidp cerebro --servicio` observa eventos propios y guarda cursor/inbox. El supervisor usa el modo servicio. La planificación administrativa multietapa sigue pendiente.
 - **Plataforma.** Corre HTTPS en `0.0.0.0:8443` y un hilo de descubrimiento en UDP 47800. Sin paquete, arranca en modo laboratorio en `127.0.0.1:8000`.
-- **Prueba de conectividad.** `sidp prueba-conexion` comprueba descubrimiento, puerto, TLS, reloj y credenciales; en el servidor envía además una tarea dirigida a cada agente remoto y mide la ida y vuelta (ADR-024, [guía](PRUEBA_DOS_EQUIPOS.md)).
+- **Prueba de conectividad.** `sidp prueba-conexion` comprueba descubrimiento, puerto, TLS, reloj y credenciales; en el servidor envía además una tarea dirigida a cada agente remoto y mide la ida y vuelta (ADR-024, [guía](../guias/PRUEBA_DOS_EQUIPOS.md)).
 - **Un solo ejecutable.** Con doble clic y una clave de escuela, el primer equipo se vuelve servidor y los demás lo encuentran y se unen solos, sin USB ni invitaciones (ADR-025).
 
 ## 8. Seguridad
@@ -172,7 +172,7 @@ Riesgo aceptado: un `sidp.exe` con paquete incrustado contiene el secreto. Quien
 
 ## 9. Presupuesto de recursos
 
-Medido una vez en un laboratorio Linux con el ejecutable PyInstaller de una sola pieza (memoria residente). **No son mediciones en las computadoras de la escuela** ni límites garantizados; se repetirán en el piloto ([validación](VALIDACION_INFRAESTRUCTURA.md)).
+Medido una vez en un laboratorio Linux con el ejecutable PyInstaller de una sola pieza (memoria residente). **No son mediciones en las computadoras de la escuela** ni límites garantizados; se repetirán en el piloto ([validación](../archivo/validacion_infraestructura.md)).
 
 | Proceso | RAM aprox. | CPU en reposo | Disco |
 |---|---|---|---|
@@ -194,7 +194,7 @@ Un servidor con plataforma y agente cabe en menos de 200 MB de RAM. Objetivo mí
 | Reserva antigua | 409; no sobrescribe la nueva asignación |
 | IP del servidor cambia | El agente redescubre por UDP y actualiza `nodo.json` |
 | Red caída | El agente conserva pendientes y reintenta |
-| Plataforma caída | Sin escrituras centrales; restaurar desde copia ([operación](arquitectura/operacion.md)) |
+| Plataforma caída | Sin escrituras centrales; restaurar desde copia ([operación](operacion.md)) |
 | Credencial revocada | 401; el agente sale con código 3 y el supervisor espera 60 s |
 | Disco casi lleno | Salud amarilla; la escritura falla con error, nunca con un falso éxito |
 | Equipo clonado con el mismo nombre | El enrolamiento automático prueba un sufijo (`-2`, `-3`, …) |
@@ -218,12 +218,12 @@ docs/        arquitectura, decisiones, producto, investigación, operación, pla
 frontend/    interfaz futura (se servirá desde backend/static)
 ```
 
-El índice completo de documentos está en el [README](../README.md#documentación).
+El índice completo de documentos está en el [README](../../README.md#documentación).
 
 
 ## Base ampliada: fundamentos y garantías
 
-Consultar [investigación primaria](investigacion/fundamentos-distribuidos.md), [comunicación y recursos](arquitectura/comunicacion-y-recursos.md) y [SQL](arquitectura/sql-y-procedimientos.md). Estas especificaciones prevalecen sobre estimaciones iniciales de recursos, que no son mediciones.
+Consultar [investigación primaria](../investigacion/fundamentos-distribuidos.md), [comunicación y recursos](comunicacion-y-recursos.md) y [SQL](sql-y-procedimientos.md). Estas especificaciones prevalecen sobre estimaciones iniciales de recursos, que no son mediciones.
 
 La cola incorpora telemetria y politicas_nodo, vista resumen_cola e índice único de trabajo activo por agente. La configuración requiere revisión esperada. La admisión predeterminada limita a dos tareas globales, una por agente y mil pendientes. No son cuotas duras de CPU/RAM.
 

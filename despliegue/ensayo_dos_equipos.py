@@ -10,7 +10,7 @@ ejecutables se comprueba además que un segundo servidor con la misma clave se n
 Luego `sidp prueba-conexion` debe pasar en todos, con la ida y vuelta desde
 PC1 hacia cada estación y el reparto de tareas entre todos los equipos (ADR-026).
 Sale con 0 si todo pasa. No sustituye la prueba en dos computadoras reales
-(ver docs/PRUEBA_DOS_EQUIPOS.md), pero valida el binario antes de repartirlo.
+(ver docs/guias/PRUEBA_DOS_EQUIPOS.md), pero valida el binario antes de repartirlo.
 """
 import argparse
 import locale
