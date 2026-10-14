@@ -27,40 +27,41 @@ Cada fase usa las tablas de [diseno_integral.sql](../database/diseno_integral.sq
 | D. Búsqueda y faltantes | Búsqueda por nombre, CURP, grupo o tipo; faltantes por grupo; exportar todo | Cualquier alumno aparece en segundos |
 | E. Copias (3g) | Copia a otra PC y cada noche al disco externo; prueba de restauración | Se apaga el servidor y no se pierde nada |
 
-El buzón y el cerebro ya no van al final: ver la sección de validación. Después: docentes, formatos y piloto.
+La plataforma de padres y el cerebro ya no van al final: ver la sección de validación. Después: docentes, formatos y piloto.
 
-## Validación de documentos: los padres suben, el cerebro valida
+## Validación de documentos: plataforma web de padres
 
-Corregido el 2026-10-14 con la idea de Maximiliano. Amplía [validacion_documental.md](arquitectura/validacion_documental.md) (ADR-022).
+Corregido el 2026-10-14 con la idea de Maximiliano. Amplía [validacion_documental.md](arquitectura/validacion_documental.md) (ADR-022) y cambia el alcance del buzón de ADR-028.
 
 Documentos:
 
-- **Alumno:** CURP, acta de nacimiento, certificado médico, boletas de los grados cursados.
+- **Alumno:** acta de nacimiento, certificado médico, boletas de los grados cursados. La CURP se escribe y se valida que exista, sin pedir el documento.
 - **Tutor:** INE, acta de nacimiento (prueba el parentesco con el acta del alumno), CURP, comprobante de domicilio.
 - **Formatos:** ficha de inscripción y ficha de autorización. SIDP las llena con datos validados y el tutor las firma.
 
-Faltan en `tipo_documento`: acta y CURP del tutor, ficha de inscripción y autorización.
-
 Cómo funciona:
 
-1. **Los padres suben todo por el buzón** (ADR-028). La ventanilla con escáner queda como respaldo.
-2. **Cada tipo y versión de documento tiene una plantilla de lo esperado**: textos fijos para reconocerlo, campos y formatos, qué debe decir su QR y reglas internas y cruzadas. Se arma con ejemplos tachados y no contiene datos de nadie.
-3. **El cerebro (PC 4) valida contra la plantilla**: reconoce el tipo, lee texto, QR y OCR, compara y marca inconsistencias. Por ejemplo, que el QR del acta no diga lo impreso o que la fecha de la INE no sea la de su CURP. Deja el resultado en `sugerencia_ia`.
-4. **RENAPO lo consulta una persona**, porque gob.mx/curp tiene captcha. El cerebro lee el PDF descargado y lo cruza con el acta y la INE. No hay API pública; el servicio web es por convenio con secretarías estatales de educación. No se usan APIs de terceros. `backend/conectores/renapo.py` devuelve datos simulados y debe reemplazarse.
-5. **La secretaría confirma, corrige o rechaza con motivo**, y el padre ve el resultado en el buzón.
+1. **Plataforma web de padres.** El padre se registra con su correo (confirmado con un código), captura los datos del alumno y sube cada documento. Al subirlo, una revisión rápida avisa si la foto está borrosa o no es el documento pedido.
+2. **Plantilla de lo esperado** por tipo y versión: textos fijos, campos y formatos, contenido del QR y reglas internas y cruzadas. Se arma con ejemplos tachados, sin datos de nadie.
+3. **Validación automática.** Procesos fijos y el cerebro (PC 4) leen texto, QR y OCR, comparan con la plantilla y el expediente, y anotan inconsistencias.
+4. **Existencia de la CURP.** Se revisa el dígito verificador y luego el QR del acta, validado en gob.mx (por probar si tiene captcha). Las excepciones las consulta en RENAPO una persona, por lote. No hay API pública; el servicio web es por convenio con secretarías estatales de educación. `backend/conectores/renapo.py` devuelve datos simulados y debe reemplazarse.
+5. **Correo de resultado.** Un positivo, o un negativo con la lista de inconsistencias y qué corregir, hecho con plantillas fijas y sin copias de documentos. Por decidir: si el positivo sale solo o lo confirma la secretaría (hoy ADR-023 dice que la IA no acepta sola).
+6. **Datos para análisis.** Los campos extraídos se guardan ordenados y se analizan en cifras agregadas por grupo y ciclo.
 
 | Paso | Qué | Listo cuando |
 |---|---|---|
-| 1 | Juntar ejemplos tachados de cada documento (varios modelos de INE y actas de distintos estados) | Hay un ejemplo de cada tipo |
+| 1 | Ejemplos tachados de cada documento (varios modelos de INE y actas de distintos estados) | Hay un ejemplo de cada tipo |
 | 2 | Una plantilla por tipo y versión | Cada tipo tiene plantilla aprobada |
 | 3 | Comparador: reglas fijas, internas y cruzadas; reemplazo del conector simulado | Pruebas con documentos buenos y malos pasan |
 | 4 | Cerebro lector en la PC 4 (tipo, texto, QR, OCR), medido con fotos de celular | Se sabe cuánto lee bien y cuánto tarda |
-| 5 | RENAPO con persona y lectura del PDF por el cerebro | Una CURP queda verificada con su PDF |
-| 6 | Pantalla de revisión de la secretaría (fase C) | Un expediente de prueba se revisa en minutos |
-| 7 | Buzón de padres | Un padre de prueba sube su expediente desde el celular |
-| 8 | Modelo de visión local, solo si el OCR no alcanza | Decidido con las mediciones |
+| 5 | Existencia de la CURP: probar la validación del QR del acta; RENAPO por lote para excepciones | Se sabe qué parte es automática |
+| 6 | Correos de resultado con plantillas y registro de envíos | Un padre de prueba recibe ambos correos |
+| 7 | Plataforma web de padres | Un padre de prueba completa su expediente desde el celular |
+| 8 | Pantalla de la secretaría para excepciones | Un lote de prueba se atiende en minutos |
+| 9 | Análisis de los datos extraídos | Hay un reporte con datos de prueba |
+| 10 | Modelo de visión local, solo si el OCR no alcanza | Decidido con las mediciones |
 
-Nuevo orden: fase A con los pasos 1 a 4 en paralelo; fase B; fase C con la validación (pasos 5 y 6); fase E de copias; buzón (paso 7), porque con él entran documentos reales. La búsqueda (fase D) puede ir después. Se vuelven urgentes quién paga el buzón y el aviso de privacidad.
+Nuevo orden: fase A con los pasos 1 a 5 en paralelo; fase B; fase C con los pasos 6 a 8; fase E de copias; la plataforma se abre a familias reales y después el análisis. Urgen el aviso de privacidad (incluido el uso para estadística), quién paga el hospedaje y la cuenta de correo de envío.
 
 ## Reglas de trabajo
 
