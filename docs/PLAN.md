@@ -1,5 +1,7 @@
 # Plan de construcción
 
+> Hay una [propuesta de plan del 2026-10-14](PLAN_PROPUESTA.md) en revisión (borrador, sujeto a cambios mayores). Hasta aprobarla, este sigue siendo el plan vigente.
+
 Plan único del proyecto. Las fases de [sistema administrativo](arquitectura/sistema_administrativo.md#fases) y de [cerebro](arquitectura/cerebro_aprendizaje.md#fases) detallan el contenido de cada producto, pero el orden y el estado se llevan aquí.
 
 ## A. Base técnica

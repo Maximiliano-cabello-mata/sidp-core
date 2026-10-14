@@ -29,6 +29,7 @@ En Windows: `SIDP-Servidor.exe` en el servidor y `SIDP-Equipo.exe` en las demás
 **Empezar aquí**
 - [Visión y alcance](docs/VISION.md): qué es SIDP, qué hace y qué no
 - [Plan y estado](docs/PLAN.md): ruta por fases
+- [Propuesta de plan 2026-10-14](docs/PLAN_PROPUESTA.md): borrador, sujeto a cambios mayores
 - [Prueba con dos computadoras](docs/PRUEBA_DOS_EQUIPOS.md)
 - [Manual de laboratorio](docs/manual_usuario.md)
 
