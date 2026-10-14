@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIDP - Sistema Integral de Plataforma Escolar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .hidden-view { display: none; }
+        .active-view { display: block; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex overflow-hidden text-gray-800">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-blue-900 text-white flex flex-col transition-all duration-300">
+        <div class="h-16 flex items-center px-6 border-b border-blue-800 font-bold text-xl tracking-wider">
+            <i class="fa-solid fa-school mr-2"></i> SIDP 
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2" id="sidebar-menu">
+            <!-- Los items del menú se generan con JS dependiendo del rol -->
+        </nav>
+        <div class="p-4 border-t border-blue-800 text-xs text-blue-300 text-center">
+            SIDP Core v1.0
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- Topbar -->
+        <header class="h-16 bg-white shadow-sm flex items-center justify-between px-6 z-10">
+            <div class="flex items-center text-lg font-semibold text-gray-700" id="topbar-title">
+                [ 🏫 Nombre de tu Escuela ]
+            </div>
+            
+            <div class="flex items-center space-x-6">
+                <!-- Barra de búsqueda rápida -->
+                <div class="relative text-gray-500">
+                    <input type="text" id="global-search" placeholder="Buscar..." class="bg-gray-100 rounded-full pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5"></i>
+                </div>
+                
+                <div class="relative text-gray-500 hover:text-blue-600 cursor-pointer">
+                    <i class="fa-solid fa-bell text-xl"></i>
+                    <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center" id="notif-count">2</span>
+                </div>
+                
+                <!-- Selector de Roles (Simulador) -->
+                <div class="relative">
+                    <select id="role-selector" onchange="changeRole(this.value)" class="appearance-none bg-blue-50 border border-blue-300 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 pr-8 font-semibold cursor-pointer">
+                        <option value="admin">👤 Director (Admin)</option>
+                        <option value="secretaria">👤 Secretaria</option>
+                        <option value="profesor">👤 Profesor</option>
+                        <option value="padre">👤 Padre / Tutor</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-3.5 text-blue-500 text-xs pointer-events-none"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Area -->
+        <main class="flex-1 overflow-y-auto p-6 bg-gray-50" id="main-content">
+            
+            <!-- VISTA: DIRECTOR - INICIO -->
+            <div id="view-admin-inicio" class="hidden-view">
+                <h1 class="text-2xl font-bold mb-2">¡Buenos días, Ana! 👋</h1>
+                <p class="text-gray-600 mb-6">Aquí tienes el resumen de tu escuela hoy.</p>
+                
+                <div class="grid grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg text-2xl"><i class="fa-solid fa-user-graduate"></i></div>
+                        <div><p class="text-3xl font-bold">450</p><p class="text-sm text-gray-500">Alumnos Activos</p></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                        <div class="bg-purple-100 text-purple-600 p-3 rounded-lg text-2xl"><i class="fa-solid fa-chalkboard-user"></i></div>
+                        <div><p class="text-3xl font-bold">12</p><p class="text-sm text-gray-500">Grupos Evaluados</p></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                        <div class="bg-green-100 text-green-600 p-3 rounded-lg text-2xl"><i class="fa-solid fa-server"></i></div>
+                        <div><p class="text-2xl font-bold text-green-600">Óptimo</p><p class="text-sm text-gray-500">Estado del Sistema</p></div>
+                    </div>
+                </div>
+
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">🚀 Accesos Rápidos</h2>
+                <div class="flex space-x-4 mb-8">
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700"><i class="fa-solid fa-plus mr-2"></i>Inscribir Alumno</button>
+                    <button class="bg-white border text-gray-700 px-4 py-2 rounded shadow-sm hover:bg-gray-50"><i class="fa-solid fa-chart-bar mr-2"></i>Reporte de Asistencia</button>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"><i class="fa-solid fa-rotate mr-2"></i>RENAPO: Activa</span>
+                </div>
+
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">📋 Actividad Reciente</h2>
+                <ul class="space-y-3 text-sm text-gray-600 bg-white p-4 rounded-lg shadow-sm">
+                    <li><span class="font-bold text-gray-800">Hace 10 min:</span> Secretaría inscribió a "Carlos Gómez" (1ro A).</li>
+                    <li><span class="font-bold text-gray-800">Hace 45 min:</span> Sistema respaldó la base de datos automáticamente.</li>
+                    <li><span class="font-bold text-gray-800">Ayer 18:00:</span> Mtra. Laura subió calificaciones de 3ro B.</li>
+                </ul>
+            </div>
+
+            <!-- VISTA: SECRETARIA - INICIO -->
+            <div id="view-sec-inicio" class="hidden-view">
+                <h1 class="text-2xl font-bold mb-2">¡Buen día, Rosa! 👋</h1>
+                <p class="text-gray-600 mb-6">Resumen de tu jornada para hoy.</p>
+                
+                <div class="grid grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-l-4 border-l-blue-500">
+                        <p class="text-3xl font-bold text-gray-800">12</p><p class="text-sm text-gray-500">Nuevos ingresos (Este mes)</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-l-4 border-l-orange-500">
+                        <p class="text-3xl font-bold text-gray-800">5</p><p class="text-sm text-gray-500">Faltan Documentos</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-l-4 border-l-purple-500">
+                        <p class="text-3xl font-bold text-gray-800">3</p><p class="text-sm text-gray-500">Esperando Firma</p>
+                    </div>
+                </div>
+
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">⚠️ Alertas y Tareas Pendientes</h2>
+                <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
+                    <div class="p-4 border-b bg-red-50 text-red-800 flex justify-between items-center">
+                        <div><i class="fa-solid fa-triangle-exclamation mr-2"></i> <b>Urgente:</b> Juan Pérez (1ro A) aún no entrega Acta de Nacimiento.</div>
+                        <button class="text-sm underline font-bold">Ver Folder</button>
+                    </div>
+                    <div class="p-4 border-b bg-yellow-50 text-yellow-800 flex justify-between items-center">
+                        <div><i class="fa-solid fa-clock mr-2"></i> <b>Recordatorio:</b> Cierre de calificaciones de 3ro B es el viernes.</div>
+                    </div>
+                    <div class="p-4 bg-green-50 text-green-800 flex justify-between items-center">
+                        <div><i class="fa-solid fa-check-circle mr-2"></i> <b>Trámite Listo:</b> El Director ya firmó la constancia de María López.</div>
+                        <button class="text-sm underline font-bold text-green-900"><i class="fa-solid fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA: PROFESOR - INICIO -->
+            <div id="view-prof-inicio" class="hidden-view max-w-4xl mx-auto">
+                <h1 class="text-2xl font-bold mb-2">¡Buen día, Mtra. Laura! 🍎</h1>
+                
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 shadow-sm mt-6">
+                    <h2 class="text-yellow-800 font-bold mb-2"><i class="fa-solid fa-thumbtack mr-2"></i> TUS RECORDATORIOS DE HOY</h2>
+                    <ul class="list-disc list-inside text-yellow-700 space-y-1">
+                        <li><b>⚠️ No has pasado lista en:</b> 1ro "A" (Matemáticas).</li>
+                        <li><b>⏳ Cierre:</b> El periodo para subir calificaciones cierra este viernes.</li>
+                    </ul>
+                </div>
+
+                <h2 class="text-lg font-bold mb-4 border-b pb-2 text-gray-700"><i class="fa-solid fa-book-open mr-2"></i> TUS CLASES ASIGNADAS</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white border rounded-lg p-5 shadow-sm hover:shadow-md transition cursor-pointer flex justify-between items-center" onclick="changeView('view-prof-grupo')">
+                        <div>
+                            <span class="text-2xl mr-2">📘</span>
+                            <span class="font-bold text-lg">1ro "A" - Matemáticas</span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right text-blue-500"></i>
+                    </div>
+                    <div class="bg-white border rounded-lg p-5 shadow-sm hover:shadow-md transition cursor-pointer flex justify-between items-center">
+                        <div>
+                            <span class="text-2xl mr-2">📙</span>
+                            <span class="font-bold text-lg">3ro "B" - Física</span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right text-blue-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA: PROFESOR - MI GRUPO -->
+            <div id="view-prof-grupo" class="hidden-view max-w-5xl mx-auto">
+                <div class="flex items-center space-x-4 mb-6">
+                    <button onclick="changeView('view-prof-inicio')" class="text-blue-600 hover:underline"><i class="fa-solid fa-arrow-left"></i> Volver</button>
+                    <h1 class="text-2xl font-bold">MATEMÁTICAS - 1ro "A"</h1>
+                </div>
+
+                <div class="flex space-x-2 border-b mb-6">
+                    <button class="px-4 py-2 font-bold text-blue-600 border-b-2 border-blue-600"><i class="fa-regular fa-calendar-check mr-2"></i> Pase de Lista</button>
+                    <button class="px-4 py-2 text-gray-500 hover:text-gray-800"><i class="fa-solid fa-pen-to-square mr-2"></i> Calificaciones</button>
+                    <button class="px-4 py-2 text-gray-500 hover:text-gray-800"><i class="fa-regular fa-eye mr-2"></i> Observaciones</button>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm border p-6">
+                    <h3 class="font-bold text-gray-700 mb-4">📅 ASISTENCIA DEL DÍA: Hoy, 14 de Octubre</h3>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 text-sm">
+                                <th class="p-3 border-b w-12 text-center">No.</th>
+                                <th class="p-3 border-b">Alumno</th>
+                                <th class="p-3 border-b text-center">Asistencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b">
+                                <td class="p-3 text-center">1</td>
+                                <td class="p-3 font-medium">Gómez, Carlos</td>
+                                <td class="p-3 text-center space-x-2">
+                                    <button class="bg-green-100 text-green-700 px-3 py-1 rounded shadow-sm border border-green-200">🟢 Presente</button>
+                                    <button class="bg-white text-gray-500 px-3 py-1 rounded border hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition">🔴 Falta</button>
+                                </td>
+                            </tr>
+                            <tr class="border-b">
+                                <td class="p-3 text-center">2</td>
+                                <td class="p-3 font-medium">López, María</td>
+                                <td class="p-3 text-center space-x-2">
+                                    <button class="bg-white text-gray-500 px-3 py-1 rounded border hover:bg-green-50 transition">🟢 Presente</button>
+                                    <button class="bg-red-100 text-red-700 px-3 py-1 rounded shadow-sm border border-red-200">🔴 Falta</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-6 flex justify-end">
+                        <button class="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700"><i class="fa-solid fa-floppy-disk mr-2"></i> Guardar Asistencia</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA: PADRES - INSCRIPCIÓN -->
+            <div id="view-padre-inicio" class="hidden-view max-w-4xl mx-auto">
+                <div class="bg-blue-900 text-white p-6 rounded-t-xl">
+                    <h1 class="text-2xl font-bold">INSCRIPCIÓN DE: Carlos Gómez Pérez</h1>
+                    <p class="text-blue-200">Ingreso a 1er Grado</p>
+                </div>
+                
+                <div class="bg-white border-x border-b rounded-b-xl p-6 shadow-sm mb-6">
+                    <div class="flex items-center text-orange-600 bg-orange-50 p-4 rounded mb-6">
+                        <i class="fa-solid fa-triangle-exclamation text-2xl mr-4"></i>
+                        <div>
+                            <span class="font-bold block">Estado: Incompleto.</span>
+                            <span class="text-sm">Debes subir TODOS los documentos para finalizar.</span>
+                        </div>
+                    </div>
+
+                    <h2 class="font-bold text-gray-800 bg-gray-100 p-2 rounded mb-4">📁 SECCIÓN 1: DOCUMENTOS DEL ALUMNO</h2>
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
+                            <span><i class="fa-regular fa-file-pdf text-gray-400 mr-2"></i> Hoja de registro</span>
+                            <button class="text-blue-600 bg-blue-50 px-3 py-1 rounded text-sm hover:bg-blue-100"><i class="fa-solid fa-arrow-up-from-bracket mr-1"></i> Subir</button>
+                        </li>
+                        <li class="flex items-center justify-between p-3 border rounded bg-green-50 border-green-200">
+                            <span><i class="fa-regular fa-file-pdf text-green-500 mr-2"></i> Acta de nacimiento <span class="text-xs text-gray-500">(carlos_acta.pdf)</span></span>
+                            <div class="space-x-2">
+                                <span class="text-green-700 text-sm font-bold mr-2"><i class="fa-solid fa-check"></i> SUBIDO</span>
+                                <button class="text-gray-500 hover:text-gray-800"><i class="fa-regular fa-eye"></i></button>
+                            </div>
+                        </li>
+                        <li class="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
+                            <span><i class="fa-regular fa-file-pdf text-gray-400 mr-2"></i> CURP del alumno</span>
+                            <button class="text-blue-600 bg-blue-50 px-3 py-1 rounded text-sm hover:bg-blue-100"><i class="fa-solid fa-arrow-up-from-bracket mr-1"></i> Subir</button>
+                        </li>
+                    </ul>
+
+                    <h2 class="font-bold text-gray-800 bg-gray-100 p-2 rounded mb-4">📁 SECCIÓN 2: DOCUMENTOS DEL TUTOR</h2>
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
+                            <span><i class="fa-regular fa-id-card text-gray-400 mr-2"></i> Credencial INE (Frente y Reverso)</span>
+                            <button class="text-blue-600 bg-blue-50 px-3 py-1 rounded text-sm hover:bg-blue-100"><i class="fa-solid fa-arrow-up-from-bracket mr-1"></i> Subir</button>
+                        </li>
+                    </ul>
+
+                    <div class="mt-8 text-center border-t pt-6">
+                        <button class="bg-gray-300 text-gray-500 px-8 py-3 rounded-lg font-bold cursor-not-allowed w-full md:w-auto" disabled>
+                            <i class="fa-solid fa-paper-plane mr-2"></i> ENVIAR EXPEDIENTE PARA REVISIÓN
+                        </button>
+                        <p class="text-xs text-gray-400 mt-2">El botón se activará cuando todos los documentos digan "SUBIDO".</p>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Script para lógica de roles y vistas -->
+    <script>
+        // Configuración de menús por rol según los txt
+        const roleMenus = {
+            admin: [
+                { id: 'admin-inicio', icon: 'fa-house', text: 'Inicio', view: 'view-admin-inicio' },
+                { id: 'admin-personas', icon: 'fa-users', text: 'Personas', view: 'view-admin-inicio' },
+                { id: 'admin-archivo', icon: 'fa-folder-open', text: 'Archivo Escolar', view: 'view-admin-inicio' },
+                { id: 'admin-asis', icon: 'fa-clipboard-check', text: 'Asistencias y Calific.', view: 'view-admin-inicio' },
+                { id: 'admin-inv', icon: 'fa-boxes-stacked', text: 'Inventario', view: 'view-admin-inicio' },
+                { id: 'admin-ajustes', icon: 'fa-gear', text: 'Ajustes', view: 'view-admin-inicio' }
+            ],
+            secretaria: [
+                { id: 'sec-inicio', icon: 'fa-house', text: 'Inicio', view: 'view-sec-inicio' },
+                { id: 'sec-personas', icon: 'fa-users', text: 'Personas', view: 'view-sec-inicio' },
+                { id: 'sec-archivo', icon: 'fa-folder-open', text: 'Archivo Escolar', view: 'view-sec-inicio' },
+                { id: 'sec-inv', icon: 'fa-boxes-stacked', text: 'Inventario', view: 'view-sec-inicio' }
+            ],
+            profesor: [
+                { id: 'prof-inicio', icon: 'fa-house', text: 'Inicio', view: 'view-prof-inicio' },
+                { id: 'prof-grupo', icon: 'fa-users-rectangle', text: 'Mi Grupo', view: 'view-prof-grupo' }
+            ],
+            padre: [
+                { id: 'padre-inicio', icon: 'fa-folder-user', text: 'Expediente', view: 'view-padre-inicio' },
+                { id: 'padre-salir', icon: 'fa-arrow-right-from-bracket', text: 'Salir', view: 'view-padre-inicio' }
+            ]
+        };
+
+        const topbarTitles = {
+            admin: "🔍 Búsqueda rápida de alumnos... | 👤 Director",
+            secretaria: "🔍 Buscar alumno, grupo... | 👤 Secretaria",
+            profesor: "🔍 Buscar alumno... | 👤 Profesor",
+            padre: "👤 Padre/Tutor: Juan Pérez"
+        };
+
+        const defaultViews = {
+            admin: 'view-admin-inicio',
+            secretaria: 'view-sec-inicio',
+            profesor: 'view-prof-inicio',
+            padre: 'view-padre-inicio'
+        };
+
+        function changeRole(role) {
+            // Actualizar menú lateral
+            const menuContainer = document.getElementById('sidebar-menu');
+            menuContainer.innerHTML = '';
+            
+            roleMenus[role].forEach((item, index) => {
+                const isActive = index === 0 ? 'bg-blue-800 border-l-4 border-blue-400' : 'hover:bg-blue-800 border-l-4 border-transparent';
+                const menuItem = `
+                    <a href="#" onclick="changeView('${item.view}')" class="flex items-center px-4 py-3 rounded-r-lg transition-colors ${isActive}">
+                        <i class="fa-solid ${item.icon} w-6 text-center mr-3"></i>
+                        <span class="font-medium">${item.text}</span>
+                    </a>
+                `;
+                menuContainer.innerHTML += menuItem;
+            });
+
+            // Ocultar buscador global y notificaciones si es padre
+            if(role === 'padre') {
+                document.getElementById('global-search').parentElement.style.display = 'none';
+                document.getElementById('notif-count').parentElement.style.display = 'none';
+            } else {
+                document.getElementById('global-search').parentElement.style.display = 'block';
+                document.getElementById('notif-count').parentElement.style.display = 'block';
+            }
+
+            // Cambiar vista activa
+            changeView(defaultViews[role]);
+        }
+
+        function changeView(viewId) {
+            // Ocultar todas las vistas
+            const views = document.querySelectorAll('[id^="view-"]');
+            views.forEach(v => {
+                v.classList.remove('active-view');
+                v.classList.add('hidden-view');
+            });
+            
+            // Mostrar la seleccionada
+            document.getElementById(viewId).classList.remove('hidden-view');
+            document.getElementById(viewId).classList.add('active-view');
+        }
+
+        // Inicializar con admin
+        changeRole('admin');
+    </script>
+</body>
+</html>

@@ -41,6 +41,10 @@ Cada portal cuenta con su propia documentación detallada y wireframes específi
 | **Docente (Profesor)** | [**`interfaz_profesor.md`**](interfaz_profesor.md) | [`bocetos/profesor.txt`](bocetos/profesor.txt) | Interfaz minimalista de 2 opciones (*Inicio* y *Mi Grupo*), pase de lista diario por grupo, captura de calificaciones y bitácora de observaciones por alumno. |
 | **Padres de Familia y Tutores** | [**`interfaz_padres.md`**](interfaz_padres.md) | [`bocetos/padres.txt`](bocetos/padres.txt) | Autoservicio web/móvil para inscripción digital, carga de documentos del alumno, requisitos especiales (SAID/Kínder) y candado de envío 100% completo. |
 
+> [!TIP]
+> **Prototipo Interactivo Disponible:**  
+> Puedes abrir el archivo [**`bocetos/delfino.html`**](bocetos/delfino.html) directamente en tu navegador web para explorar la maqueta visual e interactiva con selector de roles en tiempo real (*Director, Secretaria, Profesor y Padre/Tutor*).
+
 ---
 
 ## 3. Matriz Comparativa de Roles y Privilegios en Pantalla
