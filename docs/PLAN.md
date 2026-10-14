@@ -54,7 +54,7 @@ Ya no va al final: avanza en paralelo desde la fase A. La validación funciona c
 | 7 | Plataforma web de padres | Un padre de prueba completa su expediente desde el celular |
 | 8 | Pantalla del administrador: lo que falta, inconsistencias y sí o no | Un lote de prueba se autoriza en minutos |
 | 9 | Análisis de los datos extraídos | Hay un reporte con datos de prueba |
-| 10 | Cerebro (IA) como ayuda opcional, solo si las mediciones del paso 4 muestran que los procesos no alcanzan | Decidido con las mediciones |
+| 10 | Cerebro (`llama3.1` en la PC 4) que solo opina en la zona gris (nombres o domicilios parecidos); se mide en el [laboratorio](../cerebro/laboratorio/LEEME.md) | Se sabe si sus opiniones ayudan al administrador |
 
 ## Orden de trabajo
 
