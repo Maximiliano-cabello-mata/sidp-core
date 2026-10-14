@@ -2,6 +2,8 @@
 
 > **Estado: borrador, sujeto a cambios mayores.** [PLAN.md](PLAN.md) sigue siendo el plan vigente hasta que esta propuesta se apruebe. Aquí se junta el análisis del 2026-10-14 para trabajarlo en el repositorio.
 
+Bitácora y reporte de la sesión: [SESION_2026-10-14.md](SESION_2026-10-14.md).
+
 Documentos completos (Claude Docs):
 
 - [SIDP: análisis y plan claro](https://claude.ai/code/artifact/885ebf90-7ec1-4528-9e65-57a22650d7cc): qué está mal, qué tenemos, diagramas y fases.
