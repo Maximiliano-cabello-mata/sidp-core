@@ -65,7 +65,7 @@ Subir de nivel requiere aprobacion humana explicita y una tasa de acierto medida
 
 ## Fases
 
-Desde el 2026-10-14 el cerebro empieza antes, como lector de documentos de padres (pasos 1 a 5 de [PLAN.md](../PLAN.md#validación-de-documentos-y-plataforma-web-de-padres)). Si algo no coincide, manda PLAN.md.
+Desde el 2026-10-14 la validacion de documentos de padres se hace con procesos fijos, sin IA ([PLAN.md](../PLAN.md#validación-de-documentos-y-plataforma-web-de-padres)). El cerebro solo entra como ayuda opcional (paso 10) si las mediciones muestran que los procesos no alcanzan. Si algo no coincide, manda PLAN.md.
 
 1. Memoria y auditoria: registrar propuestas y decisiones con datos de prueba.
 2. Primer caso real: faltantes y recordatorios del expediente (nivel 1).

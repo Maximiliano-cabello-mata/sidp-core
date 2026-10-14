@@ -14,7 +14,7 @@ El problema que resuelve: el personal pierde horas capturando, buscando, llenand
 |---|---|---|
 | Servidor | La única plataforma: base de datos, archivos y páginas | Una PC de la escuela, siempre encendida en horario escolar, por cable al módem, con no-break y disco externo. Puede seguir usándose para trabajo administrativo |
 | Demás PCs | Se unen solas con `SIDP-Equipo.exe` y la clave de escuela; guardan una copia y ayudan con tareas pesadas (PDF, compresión) | Cualquier PC de la red escolar |
-| Cerebro (IA) | Ayudante: valida documentos, redacta borradores, propone campos de formatos, analiza datos | PC 4 dedicada (Ryzen 5, 24 GB, disco mecánico de 128 GB solo para temporales). No aloja la plataforma |
+| Cerebro (IA) | Ayudante opcional: redacta borradores, propone campos de formatos, analiza datos | PC 4 dedicada (Ryzen 5, 24 GB, disco mecánico de 128 GB solo para temporales). No aloja la plataforma |
 | Plataforma web de padres | Página en internet donde los padres se registran con su correo, suben documentos y reciben el resultado | Hosting en la nube. El servidor descarga lo nuevo; no se abre el módem |
 
 Principios:
@@ -65,7 +65,7 @@ Un PDF oficial cerrado solo se llena encima de sus espacios; los de Word y Excel
 
 ### Cerebro
 
-Valida documentos de padres (datos que no coinciden, fotos ilegibles, hojas faltantes), redacta borradores con plantillas, llena formatos, propone campos y analiza faltas y promedios. No se reentrena: mejora con plantillas, ejemplos y las correcciones del personal. En la PC 4, sin tarjeta gráfica, trabaja en segundo plano (por ejemplo, revisar de noche lo que subieron los padres), no al instante. Opción recomendada, por confirmar: mixta (lo privado y sencillo local, lo difícil en la nube sin datos personales). Detalle en [cerebro_aprendizaje.md](arquitectura/cerebro_aprendizaje.md).
+La validación de documentos de padres no depende de él: la hacen procesos fijos (QR, texto, OCR clásico y reglas). El cerebro solo ayuda si esos procesos no alcanzan. Redacta borradores con plantillas, llena formatos, propone campos y analiza faltas y promedios. No se reentrena: mejora con plantillas, ejemplos y las correcciones del personal. En la PC 4, sin tarjeta gráfica, trabaja en segundo plano (por ejemplo, revisar de noche lo que subieron los padres), no al instante. Opción recomendada, por confirmar: mixta (lo privado y sencillo local, lo difícil en la nube sin datos personales). Detalle en [cerebro_aprendizaje.md](arquitectura/cerebro_aprendizaje.md).
 
 ### Plataforma web de padres
 

@@ -41,20 +41,20 @@ Después de E: docentes y dirección (asistencia, calificaciones, exámenes diag
 
 ## Validación de documentos y plataforma web de padres
 
-Ya no va al final: avanza en paralelo desde la fase A. El diseño está en [validación documental](arquitectura/validacion_documental.md#plataforma-web-de-padres-2026-10-14).
+Ya no va al final: avanza en paralelo desde la fase A. La validación funciona con procesos fijos y no depende de la IA (decisión del 2026-10-14): si la PC 4 está apagada, nada se detiene. El diseño está en [validación documental](arquitectura/validacion_documental.md#plataforma-web-de-padres-2026-10-14).
 
 | Paso | Qué | Listo cuando |
 |---|---|---|
 | 1 | Ejemplos tachados de cada documento (varios modelos de INE y actas de distintos estados) | Hay un ejemplo de cada tipo |
 | 2 | Una plantilla de lo esperado por tipo y versión | Cada tipo tiene plantilla aprobada |
 | 3 | Comparador: reglas fijas, internas y cruzadas; reemplazo del conector simulado `backend/conectores/renapo.py` | Pruebas con documentos buenos y malos pasan |
-| 4 | Cerebro lector en la PC 4 (tipo, texto, QR, OCR), medido con fotos de celular | Se sabe cuánto lee bien y cuánto tarda |
+| 4 | Lector con procesos fijos, sin IA: tipo por los textos de la plantilla, texto del PDF, QR, OCR clásico (Tesseract) y revisión de la foto; medido con fotos de celular | Se sabe cuánto lee bien y cuánto tarda; lo que no se lee pasa al administrador |
 | 5 | Existencia de la CURP: probar la validación del QR del acta; RENAPO por lote para excepciones | Se sabe qué parte es automática |
 | 6 | Correos de resultado con plantillas y registro de envíos | Un padre de prueba recibe ambos correos |
 | 7 | Plataforma web de padres | Un padre de prueba completa su expediente desde el celular |
 | 8 | Pantalla del administrador: lo que falta, inconsistencias y sí o no | Un lote de prueba se autoriza en minutos |
 | 9 | Análisis de los datos extraídos | Hay un reporte con datos de prueba |
-| 10 | Modelo de visión local, solo si el OCR no alcanza | Decidido con las mediciones |
+| 10 | Cerebro (IA) como ayuda opcional, solo si las mediciones del paso 4 muestran que los procesos no alcanzan | Decidido con las mediciones |
 
 ## Orden de trabajo
 
