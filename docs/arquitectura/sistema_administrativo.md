@@ -67,7 +67,7 @@ El login puede usar cuentas del dominio Microsoft institucional si el administra
 
 ## Pantallas del administrativo (primera version)
 
-Inicio con pendientes del dia; Alumnos (busqueda y expediente); Inscripcion (ciclo, requisitos, avance); Recepcion de documentos (escaneo por lote); Validacion (cola de revision); Faltantes y prorrogas; Constancias e impresion; Evaluaciones y boletas; Estadistica; Configuracion (catalogo de documentos, usuarios, dispositivos, respaldos).
+Inicio con pendientes del dia; Alumnos (busqueda y expediente); Inscripcion (ciclo, requisitos, avance); Recepcion de documentos (escaneo por lote); Validacion (cola de revision); Faltantes y prorrogas; Constancias e impresion; Evaluaciones y boletas; Estadistica; Configuracion (catalogo de documentos, usuarios, dispositivos, respaldos). Para ver los wireframes y la especificación detallada de cada pantalla, consultar [interfaz_usuario.md](interfaz_usuario.md).
 
 ## Datos
 
