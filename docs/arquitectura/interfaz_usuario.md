@@ -1,6 +1,6 @@
 # Diseño de Interfaz de Usuario (UI) y Experiencia de Usuario (UX) — SIDP
 
-Fecha: 2026-10-13  
+Fecha: 2026-10-14  
 Estado: Aprobado para diseño y maquetación de frontend  
 Documento rector de interfaz para el Sistema Integral Delfino Pando (SIDP).  
 Relacionado con: [ADR-019](decisiones.md) (arquitectura de datos), [ADR-022](decisiones.md) (validación documental), [sistema_administrativo.md](sistema_administrativo.md) y [modulo_expediente.md](modulo_expediente.md).
@@ -9,19 +9,20 @@ Relacionado con: [ADR-019](decisiones.md) (arquitectura de datos), [ADR-022](dec
 
 ## 1. Visión y Principios de Diseño
 
-La interfaz de SIDP está diseñada para operar de manera ágil, intuitiva y confiable en computadoras de escritorio y estaciones de trabajo dentro de una escuela primaria en red local (LAN).
+La interfaz administrativa de SIDP está diseñada para operar de manera ágil, intuitiva y confiable en computadoras de escritorio y estaciones de trabajo dentro de una escuela primaria en red local (LAN).
 
 ### Principios rectores:
-1. **Claridad inmediata:** Menos clics, tipografía legible y estados visuales con códigos de color directos (🟢 Disponible / Óptimo, 🔴 En Préstamo / Crítico, ⚠️ Advertencia / Faltante).
-2. **Validación asistida en origen:** El sistema ayuda al usuario a evitar errores humanos autocompletando datos oficiales (RENAPO) a partir de la CURP.
-3. **Seguridad y auditoría visible ("El Ojo del Sistema"):** Cada consulta, descarga, firma o modificación deja un rastro claro e inmutable accesible para los administradores.
-4. **Permisos por función mínima:** Cada miembro del personal accede exclusivamente a las funciones y documentos autorizados para su rol.
+1. **Claridad operativa:** Menos clics, tipografía legible y estados visuales con códigos de color directos (🟢 Disponible / Óptimo, 🔴 En Préstamo / Crítico, ⚠️ Advertencia / Faltante, ⏳ Pendiente).
+2. **Validación asistida en origen:** El sistema ayuda al personal a evitar errores de captura autocompletando datos oficiales (RENAPO) a partir de la CURP.
+3. **Supervisión académica continua:** Monitoreo diario en tiempo real sobre la captura de asistencias por grupo y el avance en evaluaciones/calificaciones docentes.
+4. **Seguridad y auditoría visible ("El Ojo del Sistema"):** Cada consulta, descarga o modificación documental deja un rastro inmutable y visible para la dirección.
+5. **Permisos por función mínima:** Cada integrante del personal accede estrictamente a las funciones y documentos correspondientes a su perfil.
 
 ---
 
 ## 2. Estructura y Navegación Global (Layout Maestro)
 
-La interfaz se divide en dos componentes principales fijos en pantalla:
+La interfaz se divide en dos áreas principales fijas en pantalla:
 
 ```mermaid
 flowchart TD
@@ -40,12 +41,12 @@ flowchart TD
   * Identificación de la institución: `[ 🏫 Nombre de tu Escuela ]`
   * Buscador global rápido (contextual según la sección activa).
   * Centro de notificaciones con contador visual (`🔔 (N)`).
-  * Perfil activo y selector de rol (`👤 Director`, `👤 Super Admin`, `👤 Secretaria`).
+  * Perfil activo y selector de rol (`👤 Director`, `👤 Super Admin`, `👤 Menú`).
 * **Barra Lateral (Sidebar):**
   * 🏠 **Inicio:** Resumen ejecutivo, accesos rápidos y actividad reciente.
   * 👥 **Personas:** Directorio y registro de alumnos, docentes y tutores.
   * 📂 **Archivo Escolar:** Expediente digital, documentos y trazabilidad.
-  * ✍️ **Firmar Documentos:** Bandeja de firma electrónica y validación.
+  * 📝 **Asistencias y Calific.:** Supervisión del avance diario y evaluaciones por grupo.
   * 📦 **Inventario:** Control de tecnología, mobiliario y préstamos.
   * ⚙️ **Ajustes:** Configuración del plantel, personal, permisos y respaldos.
 
@@ -55,12 +56,12 @@ flowchart TD
 
 ### 3.1. Inicio (Dashboard Principal)
 
-Panel de control que recibe al personal al iniciar el día, ofreciendo métricas operativas al instante, atajos directos a tareas frecuentes y bitácora de eventos recientes.
+Panel de control que recibe a la dirección y personal al iniciar el día, ofreciendo métricas operativas al instante, atajos directos a tareas frecuentes y bitácora de eventos recientes.
 
 #### Componentes:
-* **Métricas clave (KPIs):** Alumnos activos, documentos pendientes de firma y salud de la plataforma/LAN.
-* **Accesos rápidos:** Acciones de un solo clic para las operaciones más comunes.
-* **Actividad reciente:** Eventos registrados en tiempo real por el personal y el sistema.
+* **Vistazo Rápido (KPIs):** Alumnos activos (`[ 👨‍🎓 450 ]`), avance de evaluaciones (`[ 📝 12 ] Grupos Evaluados`) y salud del sistema (`[ 🟢 Óptimo ]`).
+* **Accesos Rápidos:** Acciones de un solo clic para las operaciones más cotidianas (`+ Inscribir Alumno`, `Ver Reporte de Asistencia`, `Buscar Expediente`, estado de conexión con RENAPO).
+* **Actividad Reciente:** Eventos registrados en tiempo real por el personal y procesos automáticos del sistema.
 
 #### Wireframe:
 ```text
@@ -73,14 +74,14 @@ Panel de control que recibe al personal al iniciar el día, ofreciendo métricas
                    |  =========================================================
  📂 Archivo        |  📊 VISTAZO RÁPIDO
     Escolar        |  =========================================================
-                   |  [ 👨🎓 450 ]          [ ✍️ 5 ]             [ 🟢 Óptimo ]
- ✍️ Firmar         |  Alumnos Activos    Docs. por Firmar     Estado del Sistema
-    Documentos     |  
+                   |  [ 👨‍🎓 450 ]          [ 📝 12 ]            [ 🟢 Óptimo ]
+ 📝 Asistencias    |  Alumnos Activos    Grupos Evaluados     Estado del Sistema
+    y Calific.     |  
                    |
  📦 Inventario     |  =========================================================
                    |  🚀 ACCESOS RÁPIDOS (Lo que haces más seguido)
  ⚙️ Ajustes        |  =========================================================
-                   |  [ + Inscribir Alumno ]   [ 📄 Revisar Bandeja de Firmas ]
+                   |  [ + Inscribir Alumno ]   [ 📊 Ver Reporte de Asistencia ]
                    |  [ 🔍 Buscar Expediente ] [ 🔄 Conexión con RENAPO: Activa ]
                    |
                    |  =========================================================
@@ -94,16 +95,16 @@ Panel de control que recibe al personal al iniciar el día, ofreciendo métricas
 
 ---
 
-### 3.2. Directorio de Personas y Alta con RENAPO
+### 3.2. Directorio de Personas
 
 Gestión centralizada de todas las personas que forman parte de la comunidad escolar: estudiantes, docentes y padres de familia o tutores.
 
 #### Características clave:
 * **Filtros por rol:** Pestañas segmentadas para Alumnos, Docentes y Tutores.
 * **Estado de validación de CURP:** Distintivo visual claro (`[✅ RENAPO]` o `[⚠️ Faltante]`).
-* **Asistente de registro inteligente:** Evita errores de captura solicitando la CURP primero y autocompletando nombre, fecha de nacimiento, edad y entidad federativa tras la verificación oficial.
+* **Acciones:** Inscripción/alta de nuevas personas e importación de listas.
 
-#### Wireframe del Directorio:
+#### Wireframe:
 ```text
 ================================================================================
 [ 🏫 Nombre de tu Escuela ] | 🔍 Buscar (Nombre, Matrícula o CURP)... | 👤 Menú
@@ -111,12 +112,12 @@ Gestión centralizada de todas las personas que forman parte de la comunidad esc
  🏠 Inicio         |  DIRECTORIO DE PERSONAS
                    |  
  👉 Personas       |  =========================================================
-                   |  [ 👨🎓 ALUMNOS ]  [ 👩🏫 DOCENTES ]  [ 👨👩👧 TUTORES ]
+                   |  [ 👨‍🎓 ALUMNOS ]  [ 👩‍🏫 DOCENTES ]  [ 👨‍👩‍👧 TUTORES ]
  📂 Archivo        |  =========================================================
     Escolar        |
                    |  [ + Inscribir / Registrar Nuevo ]   [ 📥 Importar Lista ]
- ✍️ Firmar         |  
-    Documentos     |  ---------------------------------------------------------
+ 📝 Asistencias    |  
+    y Calific.     |  ---------------------------------------------------------
                    |  | Matrícula | Nombre Completo | CURP Validado | Rol     | Acciones |
  📦 Inventario     |  |-----------|-----------------|---------------|---------|----------|
                    |  | 2026-001  | Pérez, Juan     | [✅ RENAPO]   | Alumno  | [Ver]    |
@@ -124,33 +125,6 @@ Gestión centralizada de todas las personas que forman parte de la comunidad esc
                    |  | DOC-014   | Mtra. Laura R.  | [✅ RENAPO]   | Docente | [Ver]    |
                    |  | TUT-089   | Sr. Pérez, J.   | [⚠️ Faltante] | Tutor   | [Ver]    |
                    |  ---------------------------------------------------------
-================================================================================
-```
-
-#### Wireframe del Formulario / Modal de Registro:
-```text
-================================================================================
-  👤 REGISTRAR NUEVA PERSONA
---------------------------------------------------------------------------------
-  Para evitar errores, ingresa la CURP de la persona. 
-  El sistema autocompletará el resto de los datos.
-
-  [ CURP: PEJU051012HDFRRM01 ]  [ 🔍 Validar y Buscar ]
-
-  ----------------------------------------------------------------------
-  (Después de hacer clic en Validar, el sistema muestra automáticamente:)
-
-  ✅ Identidad Confirmada por RENAPO
-  Nombre: JUAN PÉREZ LÓPEZ
-  Nacimiento: 12/Oct/2005 (21 años)
-  Entidad: Ciudad de México
-
-  Selecciona el rol que tendrá en la escuela:
-  ( ) Alumno Nuevo
-  ( ) Docente
-  ( ) Tutor / Padre de familia
-
-                             [ ❌ Cancelar ]    [ 💾 Guardar Persona ]
 ================================================================================
 ```
 
@@ -162,8 +136,9 @@ Administración del archivo digital oficial de cada alumno con control de acceso
 
 #### Puntos destacados:
 * **Ficha del alumno:** Identificación rápida por Nombre, Matrícula y Grado/Grupo.
+* **Pestañas:** Datos Generales, Documentos y Quién ha visto esto.
 * **Repositorio documental:** Visualización y descarga de Acta de Nacimiento, CURP validada, Certificado Médico y Cartas Responsivas.
-* **El Ojo del Sistema (Historial de Visitas y Auditoría):** Registro inmutable en pantalla de quién descargó o visualizó cada documento, con hora y usuario exacto.
+* **El Ojo del Sistema (Historial de Visitas y Auditoría):** Registro inmutable en pantalla de quién descargó o visualizó cada documento, con fecha, hora y usuario exacto.
 
 #### Wireframe:
 ```text
@@ -177,8 +152,8 @@ Administración del archivo digital oficial de cada alumno con control de acceso
  👉 Archivo        |  [ 📋 Datos Generales ]  [ 📂 DOCUMENTOS ]  [ 👁️ QUIÉN HA VISTO ESTO ]
     Escolar        |  =========================================================
                    |
- ✍️ Firmar         |  DOCUMENTOS DEL ALUMNO (Acceso Ilimitado Activado 🟢)
-    Documentos     |  Aquí puedes ver y descargar todo el archivo digital.
+ 📝 Asistencias    |  DOCUMENTOS DEL ALUMNO (Acceso Ilimitado Activado 🟢)
+    y Calific.     |  Aquí puedes ver y descargar todo el archivo digital.
                    |  
  📦 Inventario     |  ---------------------------------------------------------
                    |  📄 Acta de Nacimiento     | Subido: 10/Ago | [👁️ Ver] [⬇️ Descargar]
@@ -197,55 +172,42 @@ Administración del archivo digital oficial de cada alumno con control de acceso
 
 ---
 
-### 3.4. Firmar Documentos (Firma Electrónica Avanzada)
+### 3.4. Asistencias y Calificaciones (Supervisión)
 
-Flujo para directivos y autoridades escolares que permite avalar electrónicamente constancias, boletas y nombramientos mediante certificados digitales seguros.
+Módulo central para el seguimiento directivo y administrativo del trabajo escolar cotidiano de los docentes.
 
 #### Características:
-* **Bandeja de entrada organizada:** Pestañas para documentos "Por Firmar", "Ya Firmados" y herramienta para "Verificar Firma".
-* **Firma en lote:** Selección múltiple mediante casillas de verificación para autorizar varios documentos de una sola vez.
-* **Modal de seguridad criptográfica:** Confirmación de identidad mediante archivo de certificado digital (`.cer`) y contraseña de firma.
+* **Vistas segmentadas:** Pestañas para `[ 📅 REPORTE DE ASISTENCIAS ]` y `[ 📝 BOLETAS Y CALIFICACIONES ]`.
+* **Monitoreo por grupos:** Supervisión en tiempo real del pase de lista del día y estado de captura de evaluaciones periódicas.
+* **Semáforo de cumplimiento:**
+  * ✅ **Capturada / Completadas:** Cumplido en tiempo y forma.
+  * ⏳ **Pendiente:** En proceso de captura dentro del plazo.
+  * ⚠️ **Faltante:** Sin captura registrada para el día en curso.
+* **Operaciones directas:** Consulta detallada por grupo y exportación/impresión de reportes oficiales.
 
-#### Wireframe de la Bandeja:
+#### Wireframe:
 ```text
 ================================================================================
-[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar documento o alumno... | 🔔 (5) | 👤 Director
+[ 🏫 Nombre de tu Escuela ] | 🔍 Buscar grupo o profesor... | 🔔 (1) | 👤 Director
 ================================================================================
- 🏠 Inicio         |  FIRMAR DOCUMENTOS
+ 🏠 Inicio         |  ASISTENCIAS Y CALIFICACIONES (SUPERVISIÓN)
                    |  
  👥 Personas       |  =========================================================
-                   |  [ 📥 POR FIRMAR (5) ]  [ 🗂️ YA FIRMADOS ]  [ 🔍 VERIFICAR FIRMA ]
+                   |  [ 📅 REPORTE DE ASISTENCIAS ]  [ 📝 BOLETAS Y CALIFICACIONES ]
  📂 Archivo        |  =========================================================
     Escolar        |
-                   |  DOCUMENTOS PENDIENTES DE TU AUTORIZACIÓN
- 👉 Firmar         |  Selecciona los documentos que deseas firmar electrónicamente.
-    Documentos     |  
+                   |  SEGUIMIENTO POR GRUPOS
+ 👉 Asistencias    |  Revisa el avance de los profesores en sus evaluaciones diarias.
+    y Calific.     |  
                    |  ---------------------------------------------------------
- 📦 Inventario     |  | ✔️ | Tipo de Documento  | Alumno / Docente | Fecha Generado |
-                   |  |----|--------------------|------------------|----------------|
- ⚙️ Ajustes        |  | [ ]| Constancia Estudio | Juan Pérez (1ro) | Hoy 09:00 AM   |
-                   |  | [ ]| Boleta de Calific. | Carlos Gómez     | Ayer 14:30 PM  |
-                   |  | [ ]| Nombramiento       | Mtra. Laura Ruiz | Ayer 10:00 AM  |
+ 📦 Inventario     |  | Grupo     | Profesor Titular | Asistencia Hoy | Calificaciones |
+                   |  |-----------|------------------|----------------|----------------|
+ ⚙️ Ajustes        |  | 1ro "A"   | Mtra. Laura R.   | ✅ Capturada   | ⏳ Pendiente   |
+                   |  | 2do "B"   | Mtro. Carlos G.  | ⚠️ Faltante    | ✅ Completadas |
+                   |  | 3ro "A"   | Mtra. Rosa M.    | ✅ Capturada   | ✅ Completadas |
                    |  ---------------------------------------------------------
                    |
-                   |  [ 👁️ Revisar Seleccionados ]     [ ✍️ FIRMAR SELECCIONADOS ]
-================================================================================
-```
-
-#### Wireframe del Modal de Autorización:
-```text
-================================================================================
-  🔐 AUTORIZACIÓN DE FIRMA DIGITAL
---------------------------------------------------------------------------------
-  Estás a punto de firmar 3 documentos con valor oficial.
-
-  Por seguridad, confirma tu identidad:
-
-  Tu Certificado Digital:  [ Archivo_Firma_Director.cer 📁 ] (Cargado)
-  
-  Contraseña de tu firma:  [ ******************** ]
-
-                           [ ❌ Cancelar ]    [ ✍️ AUTORIZAR Y FIRMAR ]
+                   |  [ 👁️ Ver Detalles del Grupo ]     [ 🖨️ Exportar Reportes ]
 ================================================================================
 ```
 
@@ -275,8 +237,8 @@ Control de recursos materiales del plantel educativo categorizados por tipo de b
  📂 Archivo        |  =========================================================
     Escolar        |
                    |  [ + Agregar Nuevo Artículo ]   [ 📷 Escanear Código QR ]
- ✍️ Firmar         |  
-    Documentos     |  ---------------------------------------------------------
+ 📝 Asistencias    |  
+    y Calific.     |  ---------------------------------------------------------
                    |  | Código  | Artículo            | Estado        | Responsable / Ubicación |
  👉 Inventario     |  |---------|---------------------|---------------|-------------------------|
                    |  | LAP-001 | Laptop HP Plata     | 🔴 En Préstamo| Mtra. Laura (Aula 3)    |
@@ -296,7 +258,7 @@ Centro de administración general del sistema escolar, control de políticas, au
 #### Pantalla Principal de Ajustes:
 * **Datos Generales de la Escuela:** Ciclo escolar en curso, logotipo, periodos de evaluación.
 * **Personal y Permisos:** Gestión de empleados y control de acceso por privilegios granulares.
-* **Historial de Movimientos:** Auditoría completa de eliminaciones, firmas y descargas.
+* **Historial de Movimientos:** Auditoría completa de eliminaciones y descargas de archivos.
 * **Copias de Seguridad (Respaldos):** Descarga inmediata de copias de la base de datos SQLite WAL.
 
 #### Wireframe del Panel de Ajustes:
@@ -311,21 +273,21 @@ Centro de administración general del sistema escolar, control de políticas, au
  📂 Archivo        |  =========================================================
     Escolar        |
                    |  SELECCIONA QUÉ DESEAS CONFIGURAR:
- ✍️ Firmar         |  
-    Documentos     |  ---------------------------------------------------------
+ 📝 Asistencias    |  
+    y Calific.     |  ---------------------------------------------------------
                    |  🏫 DATOS GENERALES DE LA ESCUELA (Políticas)
  📦 Inventario     |  • Ciclo escolar actual: 2026-2027
                    |  • Cambiar logo o nombre de la institución.
  👉 Ajustes        |  • Activar/Desactivar periodos de evaluación.
                    |  [ ✏️ Modificar Datos ]
                    |  ---------------------------------------------------------
-                   |  👥 PERSONAL Y PERMISOS (Aquí entra el boceto que me mandaste)
+                   |  👥 PERSONAL Y PERMISOS 
                    |  • Administrar a los empleados, maestos y secretarias.
                    |  • Decidir quién puede ver qué cosa.
                    |  [ ⚙️ Administrar Personal ] 
                    |  ---------------------------------------------------------
                    |  📋 HISTORIAL DE MOVIMIENTOS (Auditoría)
-                   |  • Ver el registro detallado de quién borró, firmó o descargó archivos.
+                   |  • Ver el registro detallado de quién borró o descargó archivos.
                    |  [ 👁️ Revisar Historial ]
                    |  ---------------------------------------------------------
                    |  💾 COPIAS DE SEGURIDAD (Respaldos)
@@ -350,21 +312,20 @@ Permite al Super Administrador definir con precisión quirúrgica las facultades
  📂 Archivo        |  =========================================================
     Escolar        |
                    |  EMPLEADO: Rosa Martínez
- ✍️ Firmar         |  PUESTO: Secretaria de Control Escolar
-    Documentos     |  
+ 📝 Asistencias    |  PUESTO: Secretaria de Control Escolar
+    y Calific.     |  
                    |  ¿QUÉ PUEDE HACER ESTA PERSONA EN EL SISTEMA?
  📦 Inventario     |  (Marca con una ✔️ lo que le autorizas hacer)
                    |
  👉 Ajustes        |  ---------------------------------------------------------
                    |  [ ✔️ ] Inscribir alumnos nuevos.
                    |  [ ✔️ ] Ver y descargar documentos de identidad (Actas, CURP).
-                   |  [   ] Ver documentos confidenciales (Médicos, Psicológicos). 🔒
+                   |  [    ] Ver documentos confidenciales (Médicos, Psicológicos). 🔒
                    |  [ ✔️ ] Subir calificaciones.
-                   |  [   ] Firmar documentos oficiales (Uso de Certificados). 🔒
-                   |  [   ] Eliminar alumnos o borrar expedientes completos. 🔒
+                   |  [    ] Eliminar alumnos o borrar expedientes completos. 🔒
                    |  ---------------------------------------------------------
                    |
-                   |           [ ❌ Cancelar ]        [ 💾 Guardar Permisos ]
+                   |          [ ❌ Cancelar ]        [ 💾 Guardar Permisos ]
 ================================================================================
 ```
 
@@ -377,8 +338,8 @@ Permite al Super Administrador definir con precisión quirúrgica las facultades
 | Inscribir alumnos nuevos | ✅ | ✅ | ❌ | ❌ |
 | Ver documentos de identidad (Acta, CURP) | ✅ | ✅ | ❌ | ❌ |
 | Ver documentos confidenciales (Médicos/Psicológicos) | ✅ | 🔒 (Req. permiso) | ❌ | ❌ |
-| Capturar calificaciones de grupo asignado | ✅ | ✅ | ✅ (Sólo sus grupos) | ❌ |
-| Firmar documentos oficiales con e.firma/.cer | ✅ | ❌ | ❌ | ❌ |
+| Supervisar asistencias y avance escolar | ✅ | ✅ (Lectura) | ❌ | ❌ |
+| Capturar asistencias y calificaciones | ✅ | ✅ (Apoyo) | ✅ (Sus grupos) | ❌ |
 | Eliminar alumnos o expedientes completos | ✅ | ❌ | ❌ | ❌ |
 | Gestión de inventario y préstamos | ✅ | ✅ | 👁️ (Consulta) | ❌ |
 | Descargar copias de seguridad / auditoría | ✅ | ❌ | ❌ | ✅ |
