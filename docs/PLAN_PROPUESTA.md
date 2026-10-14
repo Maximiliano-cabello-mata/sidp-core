@@ -27,32 +27,40 @@ Cada fase usa las tablas de [diseno_integral.sql](../database/diseno_integral.sq
 | D. Búsqueda y faltantes | Búsqueda por nombre, CURP, grupo o tipo; faltantes por grupo; exportar todo | Cualquier alumno aparece en segundos |
 | E. Copias (3g) | Copia a otra PC y cada noche al disco externo; prueba de restauración | Se apaga el servidor y no se pierde nada |
 
-Después: docentes, formatos, piloto, buzón de padres y modelo de IA.
+El buzón y el cerebro ya no van al final: ver la sección de validación. Después: docentes, formatos y piloto.
 
-## Validación de documentos: empezar por el inicio del ciclo de vida
+## Validación de documentos: los padres suben, el cerebro valida
 
-Amplía [validacion_documental.md](arquitectura/validacion_documental.md) (ADR-022) con la lista de documentos de la escuela:
+Corregido el 2026-10-14 con la idea de Maximiliano. Amplía [validacion_documental.md](arquitectura/validacion_documental.md) (ADR-022).
+
+Documentos:
 
 - **Alumno:** CURP, acta de nacimiento, certificado médico, boletas de los grados cursados.
 - **Tutor:** INE, acta de nacimiento (prueba el parentesco con el acta del alumno), CURP, comprobante de domicilio.
-- **Formatos:** ficha de inscripción y ficha de autorización. SIDP las llena con datos validados, el tutor firma y se escanean.
+- **Formatos:** ficha de inscripción y ficha de autorización. SIDP las llena con datos validados y el tutor las firma.
 
 Faltan en `tipo_documento`: acta y CURP del tutor, ficha de inscripción y autorización.
 
-Tres niveles antes de la decisión humana: reglas fijas (dígito verificador de la CURP, fechas, vigencias), cruce entre documentos y verificación oficial asistida (QR del acta y de la INE, cédula del médico, consulta de CURP en gob.mx con constancia). RENAPO no ofrece API pública; su servicio web es por convenio con secretarías estatales de educación. Falta preguntar si el Estado de México lo tiene. No se usan APIs de terceros. `backend/conectores/renapo.py` devuelve datos simulados y debe reemplazarse.
+Cómo funciona:
 
-El cerebro solo lee (texto del PDF, QR, OCR con Tesseract en la PC 4) y escribe propuestas en `sugerencia_ia`; sin él, la secretaria captura los campos. Los documentos no salen a la nube.
+1. **Los padres suben todo por el buzón** (ADR-028). La ventanilla con escáner queda como respaldo.
+2. **Cada tipo y versión de documento tiene una plantilla de lo esperado**: textos fijos para reconocerlo, campos y formatos, qué debe decir su QR y reglas internas y cruzadas. Se arma con ejemplos tachados y no contiene datos de nadie.
+3. **El cerebro (PC 4) valida contra la plantilla**: reconoce el tipo, lee texto, QR y OCR, compara y marca inconsistencias. Por ejemplo, que el QR del acta no diga lo impreso o que la fecha de la INE no sea la de su CURP. Deja el resultado en `sugerencia_ia`.
+4. **RENAPO lo consulta una persona**, porque gob.mx/curp tiene captcha. El cerebro lee el PDF descargado y lo cruza con el acta y la INE. No hay API pública; el servicio web es por convenio con secretarías estatales de educación. No se usan APIs de terceros. `backend/conectores/renapo.py` devuelve datos simulados y debe reemplazarse.
+5. **La secretaría confirma, corrige o rechaza con motivo**, y el padre ve el resultado en el buzón.
 
-| Paso | Qué | Lista cuando |
+| Paso | Qué | Listo cuando |
 |---|---|---|
-| 1 | Juntar un ejemplo tachado de cada documento y formato; confirmar la lista con la escuela | Hay un ejemplo de cada tipo |
-| 2 | Preguntar a la supervisión por el convenio con RENAPO y si el MIGE valida la CURP | Hay respuesta |
-| 3 | Reglas fijas y reemplazo del conector simulado (en paralelo con la fase A) | Pruebas con CURP buenas y malas pasan |
-| 4 | Cruce entre documentos con campos capturados a mano | Un expediente de prueba muestra qué coincide |
-| 5 | Pantalla de revisión con decisión y motivo (fase C) | La secretaria valida un expediente de prueba |
-| 6 | Cerebro: texto, QR y OCR; medir con 20 documentos tachados | Hay mediciones en la PC 4 |
-| 7 | Verificación oficial asistida con constancia | Una CURP queda con su constancia |
+| 1 | Juntar ejemplos tachados de cada documento (varios modelos de INE y actas de distintos estados) | Hay un ejemplo de cada tipo |
+| 2 | Una plantilla por tipo y versión | Cada tipo tiene plantilla aprobada |
+| 3 | Comparador: reglas fijas, internas y cruzadas; reemplazo del conector simulado | Pruebas con documentos buenos y malos pasan |
+| 4 | Cerebro lector en la PC 4 (tipo, texto, QR, OCR), medido con fotos de celular | Se sabe cuánto lee bien y cuánto tarda |
+| 5 | RENAPO con persona y lectura del PDF por el cerebro | Una CURP queda verificada con su PDF |
+| 6 | Pantalla de revisión de la secretaría (fase C) | Un expediente de prueba se revisa en minutos |
+| 7 | Buzón de padres | Un padre de prueba sube su expediente desde el celular |
 | 8 | Modelo de visión local, solo si el OCR no alcanza | Decidido con las mediciones |
+
+Nuevo orden: fase A con los pasos 1 a 4 en paralelo; fase B; fase C con la validación (pasos 5 y 6); fase E de copias; buzón (paso 7), porque con él entran documentos reales. La búsqueda (fase D) puede ir después. Se vuelven urgentes quién paga el buzón y el aviso de privacidad.
 
 ## Reglas de trabajo
 
