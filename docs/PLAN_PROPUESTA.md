@@ -45,7 +45,7 @@ Cómo funciona:
 2. **Plantilla de lo esperado** por tipo y versión: textos fijos, campos y formatos, contenido del QR y reglas internas y cruzadas. Se arma con ejemplos tachados, sin datos de nadie.
 3. **Validación automática.** Procesos fijos y el cerebro (PC 4) leen texto, QR y OCR, comparan con la plantilla y el expediente, y anotan inconsistencias.
 4. **Existencia de la CURP.** Se revisa el dígito verificador y luego el QR del acta, validado en gob.mx (por probar si tiene captcha). Las excepciones las consulta en RENAPO una persona, por lote. No hay API pública; el servicio web es por convenio con secretarías estatales de educación. `backend/conectores/renapo.py` devuelve datos simulados y debe reemplazarse.
-5. **Correo de resultado.** Un positivo, o un negativo con la lista de inconsistencias y qué corregir, hecho con plantillas fijas y sin copias de documentos. Por decidir: si el positivo sale solo o lo confirma la secretaría (hoy ADR-023 dice que la IA no acepta sola).
+5. **Autorización manual.** El sistema muestra al administrador qué falta y qué inconsistencias encontró. Solo el administrador dice sí o no (se mantiene ADR-023). Con el sí, el padre recibe un correo positivo. Con el no, el sistema le envía el reporte de inconsistencias y qué corregir, hecho con plantillas fijas y sin copias de documentos.
 6. **Datos para análisis.** Los campos extraídos se guardan ordenados y se analizan en cifras agregadas por grupo y ciclo.
 
 | Paso | Qué | Listo cuando |
@@ -57,7 +57,7 @@ Cómo funciona:
 | 5 | Existencia de la CURP: probar la validación del QR del acta; RENAPO por lote para excepciones | Se sabe qué parte es automática |
 | 6 | Correos de resultado con plantillas y registro de envíos | Un padre de prueba recibe ambos correos |
 | 7 | Plataforma web de padres | Un padre de prueba completa su expediente desde el celular |
-| 8 | Pantalla de la secretaría para excepciones | Un lote de prueba se atiende en minutos |
+| 8 | Pantalla del administrador: lo que falta, inconsistencias y sí o no | Un lote de prueba se autoriza en minutos |
 | 9 | Análisis de los datos extraídos | Hay un reporte con datos de prueba |
 | 10 | Modelo de visión local, solo si el OCR no alcanza | Decidido con las mediciones |
 
