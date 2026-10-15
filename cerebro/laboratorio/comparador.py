@@ -58,6 +58,36 @@ def comparar(a, b, tipo):
     return ('gris' if valor >= (NOMBRE_GRIS if tipo == 'nombre' else DOMICILIO_GRIS) else 'distinto'), valor
 
 
+def distancia(a, b):
+    """Cuántas letras hay que cambiar, quitar o poner para pasar de a a b."""
+    fila = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        anterior, fila[0] = fila[0], i
+        for j, y in enumerate(b, 1):
+            anterior, fila[j] = fila[j], min(fila[j] + 1, fila[j - 1] + 1, anterior + (x != y))
+    return fila[-1]
+
+
+def sin_consultar(a, b, tipo):
+    """Motivo por el que una zona gris no se le pregunta al modelo, o None.
+
+    En la tarea 002 el modelo dijo "es la misma persona" cuando faltaba un
+    apellido, cuando el nombre estaba al revés o cuando cambiaba un apellido
+    (Reyes y Reyna). Esos casos los reconoce el proceso y quedan en "duda":
+    al modelo solo llegan nombres donde cada palabra cambia a lo más una letra.
+    """
+    if tipo != 'nombre':
+        return None
+    pa, pb = normalizar(a, tipo).split(), normalizar(b, tipo).split()
+    if sorted(pa) == sorted(pb):
+        return 'los mismos nombres en otro orden'
+    if len(pa) != len(pb):
+        return 'falta o sobra un nombre o apellido'
+    if any(distancia(x, y) > 1 for x, y in zip(pa, pb)):
+        return 'un nombre o apellido cambia en más de una letra'
+    return None
+
+
 def digito_curp(curp):
     suma = sum(DICCIONARIO_CURP.index(c) * (18 - i) for i, c in enumerate(curp[:17]))
     return str((10 - suma % 10) % 10)
@@ -97,7 +127,8 @@ def revisar(ficha, hoy):
         if resultado == 'distinto':
             hallazgo(campo, f'"{a}" no coincide con "{b}"', 'alta')
         elif resultado == 'gris':
-            grises.append({'campo': campo, 'tipo': tipo, 'a': a, 'b': b, 'parecido': round(valor, 2)})
+            grises.append({'campo': campo, 'tipo': tipo, 'a': a, 'b': b, 'parecido': round(valor, 2),
+                           'sin_consultar': sin_consultar(a, b, tipo)})
         return resultado
 
     alumno, acta = ficha.get('alumno', {}), ficha.get('acta_alumno', {})

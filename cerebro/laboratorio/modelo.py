@@ -9,7 +9,7 @@ import time
 import urllib.request
 
 URL = 'http://127.0.0.1:11434/api/chat'
-MODELO = 'sidp-revisor'
+MODELO = 'sidp-revisor-2'  # Mejor resultado en la tarea 002.
 ESQUEMA = {
     'type': 'object',
     'properties': {

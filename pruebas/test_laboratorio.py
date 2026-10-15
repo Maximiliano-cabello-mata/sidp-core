@@ -23,6 +23,24 @@ def test_comparar(a, b, tipo, resultado):
     assert comparador.comparar(a, b, tipo)[0] == resultado
 
 
+@pytest.mark.parametrize('a,b,motivo', [
+    ('JOSE LUIS PERES ORTEGA', 'JOSE LUIS PEREZ ORTEGA', None),
+    ('ROBERTO MENDOZA ROJAS', 'ROBERTA MENDOZA ROJAS', None),
+    ('MARIA JOSE CASTILLO', 'JOSE MARIA CASTILLO', 'los mismos nombres en otro orden'),
+    ('ALEJANDRA RIOS', 'ALEJANDRA RIOS VARGAS', 'falta o sobra un nombre o apellido'),
+    ('PEDRO SOTO REYES', 'PEDRO SOTO REYNA', 'un nombre o apellido cambia en más de una letra'),
+])
+def test_sin_consultar(a, b, motivo):
+    assert comparador.sin_consultar(a, b, 'nombre') == motivo
+    assert comparador.sin_consultar(a, b, 'domicilio') is None
+
+
+def test_lo_que_no_se_consulta_admite_duda():
+    pares = json.loads((correr.AQUI / 'pares.json').read_text(encoding='utf-8'))['pares']
+    fijos = [p for p in correr.correr_pares(pares, False, modelo.MODELO, modelo.URL, 1) if p['sin_consultar']]
+    assert fijos and all('duda' in p['esperado'] for p in fijos)
+
+
 def test_curp():
     assert comparador.desglose_curp('HERL180314HMCRMSA9') == {
         'fecha': '2018-03-14', 'sexo': 'H', 'entidad': 'MC', 'digito_valido': True}

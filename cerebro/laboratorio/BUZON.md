@@ -70,3 +70,35 @@ Antes había solo 4 comparaciones en zona gris, muy pocas para saber si el model
    git push origin claude/project-thread-vp6ab8
    ```
 7. Avísale a Maximiliano que ya se subió.
+
+Resultado (2026-10-15): `sidp-revisor` acertó 27 de 54 y `sidp-revisor-2` 42 de 54, en unos 5 s por opinión. Los dos dijeron "si" cuando era "no" 12 veces. Con `sidp-revisor-2` fue cuando faltaba un apellido (pares 3 y 12), con el nombre al revés (par 10) y con Reyes / Reyna (par 8). Desde ahora esos casos los reconoce el proceso y quedan en "duda" sin preguntar al modelo.
+
+## Tarea 003: el modelo solo opina donde los procesos no saben (2026-10-15)
+
+Ahora el proceso deja en "duda", sin preguntar al modelo, los nombres en otro orden, los que tienen un nombre o apellido de más o de menos y los que cambian más de una letra en una palabra. Hay 12 pares nuevos (19 a 30) que no se usaron para ajustar nada: sirven para ver si el modelo acierta en casos que no conoce. El modelo de siempre ahora es `sidp-revisor-2`; no hay que crear otro.
+
+1. Actualiza la rama:
+   ```
+   git checkout claude/project-thread-vp6ab8
+   git pull
+   ```
+2. Comprueba los procesos. Debe decir "11 de 11", "30 de 30" y "5 de 5":
+   ```
+   python -m cerebro.laboratorio.correr --sin-modelo
+   python -m cerebro.laboratorio.correr --pares --sin-modelo
+   ```
+3. Corre los 30 pares y luego las 11 fichas con el modelo:
+   ```
+   python -m cerebro.laboratorio.correr --pares
+   python -m cerebro.laboratorio.correr
+   ```
+   Mientras corren, mira en el Administrador de tareas cuánto CPU usa Ollama.
+4. Agrega "## Notas del agente" al final de cada informe nuevo (RAM libre antes y después, uso de CPU, errores).
+5. Sube solo los dos informes nuevos de `cerebro/laboratorio/resultados/`:
+   ```
+   git add cerebro/laboratorio/resultados/
+   git commit -m "laboratorio: resultado de la tarea 003"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+6. Avísale a Maximiliano que ya se subió.
