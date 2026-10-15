@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "ANA SOFIA BRAVO LEON",
+  "curp": "BALA170822MMCRNNA2"
+ },
+ "tutor": {
+  "nombre": "JORGE BRAVO CRUZ",
+  "parentesco": "padre",
+  "domicilio": "Av. Juárez 12, Col. Centro, Metepec"
+ }
+}

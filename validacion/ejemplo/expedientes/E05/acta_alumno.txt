@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): MATEO  Primer apellido: LOPEZ  Segundo apellido: GIL
+Sexo: HOMBRE
+Fecha de nacimiento: 20/12/2018
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: LOGM180220HMCPLTA5
+Datos de filiación de la persona registrada
+Padre: JUAN PEREZ LOPEZ  Nacionalidad: MEXICANA
+Madre: CARMEN GIL VEGA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

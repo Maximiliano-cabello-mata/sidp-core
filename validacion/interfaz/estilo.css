@@ -1,0 +1,43 @@
+/* Estilo de las pantallas de validación. Colores en variables para que Paola los cambie en un solo lugar. */
+:root {
+  --fondo: #f3f4f6; --tarjeta: #ffffff; --texto: #1f2937; --suave: #6b7280; --borde: #e5e7eb;
+  --azul: #1d4ed8; --azul-claro: #dbeafe; --verde: #15803d; --ambar: #b45309; --rojo: #b91c1c; --aviso: #fef3c7; --aviso-texto: #78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --fondo: #111827; --tarjeta: #1f2937; --texto: #f3f4f6; --suave: #9ca3af; --borde: #374151; --azul-claro: #1e3a8a; --aviso: #422006; --aviso-texto: #fde68a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+header { background: var(--azul); color: #fff; padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+header h1 { margin: 0; font-size: 19px; }
+header .modo { background: rgba(255,255,255,.18); border-radius: 999px; padding: 2px 12px; font-size: 13px; }
+header a { color: #fff; }
+main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.aviso { background: var(--aviso); color: var(--aviso-texto); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tarjeta, .panel { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; }
+.numero { font-size: 26px; font-weight: 700; } .etiqueta { color: var(--suave); font-size: 13px; }
+.barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.columnas { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 14px; align-items: start; }
+@media (max-width: 760px) { .columnas { grid-template-columns: 1fr; } }
+button, .boton { font: inherit; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); border-radius: 8px; padding: 7px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+button.principal { background: var(--azul); border-color: var(--azul); color: #fff; }
+button.verde { background: var(--verde); border-color: var(--verde); color: #fff; }
+button.rojo { background: var(--rojo); border-color: var(--rojo); color: #fff; }
+button:disabled { opacity: .5; cursor: wait; }
+input, select, textarea { font: inherit; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 7px 10px; width: 100%; }
+textarea { min-height: 120px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+label { display: block; font-size: 13px; color: var(--suave); margin: 8px 0 3px; }
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li { border-bottom: 1px solid var(--borde); padding: 8px 4px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.lista li.activo { background: var(--azul-claro); border-radius: 8px; }
+.insignia { border-radius: 999px; padding: 1px 9px; font-size: 12px; color: #fff; white-space: nowrap; }
+.listo, .autorizado { background: var(--verde); } .revision { background: var(--ambar); } .rechazado { background: var(--rojo); } .pendiente { background: var(--suave); }
+.chico { font-size: 12px; color: var(--suave); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td, th { border-bottom: 1px solid var(--borde); padding: 6px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.alta { color: var(--rojo); } .media { color: var(--ambar); }
+h2 { font-size: 17px; margin: 4px 0 10px; } h3 { font-size: 15px; margin: 14px 0 6px; }
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
+.oculto { display: none; }
+pre { white-space: pre-wrap; background: var(--fondo); border-radius: 8px; padding: 10px; font-size: 13px; }

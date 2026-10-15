@@ -2,6 +2,7 @@
 
     python despliegue/compilar.py --tipo servidor         # SIDP-Servidor.exe (ADR-029)
     python despliegue/compilar.py --tipo equipo           # SIDP-Equipo.exe
+    python despliegue/compilar.py --tipo validador        # SIDP-Validador.exe (entorno de pruebas de validación)
     python despliegue/compilar.py                         # sidp.exe genérico (papel automático)
     python despliegue/compilar.py --paquete C:\\ProgramData\\SIDP\\instalacion.json
 
@@ -36,7 +37,10 @@ TIPOS = {  # tipo: (nombre del ejecutable, punto de entrada)
     'servidor': ('SIDP-Servidor', 'entrada_servidor.py'),
     'equipo': ('SIDP-Equipo', 'entrada_equipo.py'),
     'generico': ('sidp', '__main__.py'),
+    'validador': ('SIDP-Validador', 'entrada_validador.py'),
 }
+# Archivos que el validador lee en tiempo de ejecución: pantallas y el diseño de la base.
+DATOS_VALIDADOR = [('validacion/interfaz', 'validacion/interfaz'), ('database/diseno_integral.sql', 'database')]
 
 
 def version_git():
@@ -71,7 +75,11 @@ def main():
     comando = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--console',
                '--name', args.nombre, '--paths', str(RAIZ), '--distpath', args.destino,
                '--workpath', str(trabajo / 'build'), '--specpath', str(trabajo)]
-    comando += [f'--hidden-import={m}' for m in OCULTOS] + [f'--exclude-module={m}' for m in EXCLUIDOS]
+    if args.tipo == 'validador':  # Sin servidor web externo; numpy (de opencv) necesita unittest.
+        comando += [f'--exclude-module={m}' for m in EXCLUIDOS if m != 'unittest']
+        comando += [arg for origen, destino in DATOS_VALIDADOR for arg in ('--add-data', f'{RAIZ / origen}{os.pathsep}{destino}')]
+    else:
+        comando += [f'--hidden-import={m}' for m in OCULTOS] + [f'--exclude-module={m}' for m in EXCLUIDOS]
     comando += ['--add-data', f'{compilacion}{os.pathsep}.']
     if args.paquete:
         datos = validar_paquete(args.paquete)

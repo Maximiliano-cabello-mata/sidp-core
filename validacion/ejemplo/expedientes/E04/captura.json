@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "SOFIA RUIZ PAZ",
+  "curp": "RUPS190610MMCZZFA0"
+ },
+ "tutor": {
+  "nombre": "PEDRO RUIZ SOLIS",
+  "parentesco": "padre",
+  "domicilio": "Calle Cedro 11, Col. La Joya, Toluca"
+ }
+}

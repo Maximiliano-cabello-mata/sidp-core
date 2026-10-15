@@ -1,0 +1,9 @@
+# Herramientas del lector para la PC 4 (validación y cerebro). El .exe del administrador solo lleva pypdf, para leer PDF si la PC 4 está apagada.
+# Instalar con: python -m pip install -r validacion/requisitos.txt
+# Tesseract (respaldo del OCR y detector del giro) se instala aparte, con español: ver docs/guias/ENTORNO_PRUEBAS.md.
+# PaddleOCR va aparte porque es pesado: validacion/requisitos_paddle.txt.
+pypdf>=5.1
+pypdfium2>=4.30
+pillow>=10.0
+opencv-python-headless>=4.10
+zxing-cpp>=2.2

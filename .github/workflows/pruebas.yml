@@ -30,16 +30,23 @@ jobs:
       # Dos ejecutables (ADR-029): uno para el servidor y otro para las demás computadoras.
       - run: python despliegue/compilar.py --tipo servidor
       - run: python despliegue/compilar.py --tipo equipo
+      # Entorno de pruebas de validación: el .exe del administrador revisa el ejemplo inventado
+      # sin cerebro y falla si algún falso pasa como listo.
+      - run: python -m pip install "pypdf>=5.1"
+      - run: python despliegue/compilar.py --tipo validador
+      - run: dist/SIDP-Validador.exe validacion/ejemplo --hoy 2026-10-14 --revisar --sin-modelo
       - run: dist/SIDP-Servidor.exe --help
       - run: dist/SIDP-Equipo.exe --help
       # Tres equipos simulados con los .exe reales: alta, descubrimiento, TLS, ida y vuelta, reparto
       # y que un segundo servidor con la misma clave se niegue a crearse.
       - run: python despliegue/ensayo_dos_equipos.py dist/SIDP-Servidor.exe --estacion dist/SIDP-Equipo.exe
-      - run: Copy-Item docs/guias/PRUEBA_DOS_EQUIPOS.md dist/
+      - run: Copy-Item docs/guias/PRUEBA_DOS_EQUIPOS.md, docs/guias/ENTORNO_PRUEBAS.md dist/
       - uses: actions/upload-artifact@v4
         with:
           name: sidp-windows
           path: |
             dist/SIDP-Servidor.exe
             dist/SIDP-Equipo.exe
+            dist/SIDP-Validador.exe
             dist/PRUEBA_DOS_EQUIPOS.md
+            dist/ENTORNO_PRUEBAS.md

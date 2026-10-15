@@ -1,0 +1,5 @@
+# Lector principal de fotos (PaddleOCR, en CPU). Opcional: si no se instala o no arranca, el lector usa Tesseract.
+# Instalar con: python -m pip install -r validacion/requisitos_paddle.txt
+# La primera vez descarga sus modelos (unos 100 MB) y después trabaja sin internet.
+paddlepaddle>=3.0
+paddleocr>=3.0

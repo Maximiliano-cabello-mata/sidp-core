@@ -24,12 +24,15 @@ python -m sidp prueba-conexion                                       # diagnóst
 
 En Windows: `SIDP-Servidor.exe` en el servidor y `SIDP-Equipo.exe` en las demás PCs, con la misma clave de escuela ([guía](docs/guias/PRUEBA_DOS_EQUIPOS.md)). Los dos se descargan del CI (artefacto `sidp-windows`).
 
+Entorno de pruebas de validación de documentos: `SIDP-Validador.exe` en la PC del administrador (viene en el mismo artefacto) y el cerebro en la PC 4 con `validacion\iniciar_cerebro.bat` ([guía](docs/guias/ENTORNO_PRUEBAS.md)).
+
 ## Documentación
 
 **Empezar aquí**
 - [Visión y alcance](docs/VISION.md): qué es SIDP, qué hace y qué no
 - [Plan](docs/PLAN.md): fases A a E, validación de documentos y orden de trabajo
 - [Prueba con dos computadoras](docs/guias/PRUEBA_DOS_EQUIPOS.md) · [Manual de laboratorio](docs/guias/manual_laboratorio.md)
+- [Entorno de pruebas de validación](docs/guias/ENTORNO_PRUEBAS.md) · [Prueba oficial con documentos](docs/guias/PRUEBA_VALIDACION.md)
 
 **Producto escolar (diseño)**
 - [Base de datos integral](docs/arquitectura/base_de_datos.md) · [esquema de diseño](database/diseno_integral.sql)

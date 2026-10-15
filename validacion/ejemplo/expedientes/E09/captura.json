@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "JULIAN PRADO LUNA",
+  "curp": "PALJ180303HMCRNLA6"
+ },
+ "tutor": {
+  "nombre": "ELENA LUNA SILVA",
+  "parentesco": "madre",
+  "domicilio": "Calle Allende 40, Col. Centro, Lerma"
+ }
+}

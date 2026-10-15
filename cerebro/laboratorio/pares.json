@@ -1,0 +1,308 @@
+{
+ "nota": "Datos inventados. Pares que los procesos dejan en zona gris, con la respuesta aceptable. Los marcados \"nuevo\" (19 a 30) no se usaron para ajustar el modelo ni los procesos.",
+ "pares": [
+  {
+   "id": 1,
+   "tipo": "nombre",
+   "a": "JOSE LUIS PERES ORTEGA",
+   "b": "JOSE LUIS PEREZ ORTEGA",
+   "esperado": [
+    "si"
+   ]
+  },
+  {
+   "id": 2,
+   "tipo": "nombre",
+   "a": "MARIA DE LOURDES SANCHEZ RUIZ",
+   "b": "Ma. de Lourdes Sanches Ruiz",
+   "esperado": [
+    "si"
+   ]
+  },
+  {
+   "id": 3,
+   "tipo": "nombre",
+   "a": "JUAN CARLOS LOPEZ",
+   "b": "JUAN CARLOS LOPEZ HERNANDEZ",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 4,
+   "tipo": "nombre",
+   "a": "LUIS FERNANDO DIAZ CRUZ",
+   "b": "LUIS FERNANDO DIAS CRUZ",
+   "esperado": [
+    "si"
+   ]
+  },
+  {
+   "id": 5,
+   "tipo": "nombre",
+   "a": "ROBERTO MENDOZA ROJAS",
+   "b": "ROBERTA MENDOZA ROJAS",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 6,
+   "tipo": "nombre",
+   "a": "DANIEL TORRES ARIAS",
+   "b": "DANIELA TORRES ARIAS",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 7,
+   "tipo": "nombre",
+   "a": "CARMEN VELAZQUEZ PAZ",
+   "b": "CARMEN VELASQUEZ PAZ",
+   "esperado": [
+    "si"
+   ]
+  },
+  {
+   "id": 8,
+   "tipo": "nombre",
+   "a": "PEDRO SOTO REYES",
+   "b": "PEDRO SOTO REYNA",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 9,
+   "tipo": "nombre",
+   "a": "JESUS ALEJANDRO NUÑEZ",
+   "b": "JESUS ALEJANDRO NUNES",
+   "esperado": [
+    "si"
+   ]
+  },
+  {
+   "id": 10,
+   "tipo": "nombre",
+   "a": "MARIA JOSE CASTILLO",
+   "b": "JOSE MARIA CASTILLO",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 11,
+   "tipo": "nombre",
+   "a": "GERARDO IBARRA SOLIS",
+   "b": "GERARDO YBARRA SOLIS",
+   "esperado": [
+    "si",
+    "duda"
+   ]
+  },
+  {
+   "id": 12,
+   "tipo": "nombre",
+   "a": "ALEJANDRA RIOS",
+   "b": "ALEJANDRA RIOS VARGAS",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 13,
+   "tipo": "domicilio",
+   "a": "Calle Fresno 9, Col. Las Flores, Zinacantepec",
+   "b": "CALLE FRESNO 9 FRACC LAS FLORES ZINACANTEPEC",
+   "esperado": [
+    "si",
+    "duda"
+   ]
+  },
+  {
+   "id": 14,
+   "tipo": "domicilio",
+   "a": "Calle Roble 22, Col. Centro, Toluca",
+   "b": "CALLE ROBLE 22 COL CENTRO METEPEC",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 15,
+   "tipo": "domicilio",
+   "a": "Privada Juárez 3, Barrio Santa Cruz, Lerma",
+   "b": "PRIV JUAREZ 3 STA CRUZ LERMA",
+   "esperado": [
+    "si"
+   ]
+  },
+  {
+   "id": 16,
+   "tipo": "domicilio",
+   "a": "Calle Sauce 30, San Mateo Atenco",
+   "b": "CALLE SAUCE 30 SAN PEDRO ATENCO",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 17,
+   "tipo": "domicilio",
+   "a": "Calle Cedro 11, Col. La Joya, Toluca",
+   "b": "CALLE CEDRO 11 COL LA LOMA TOLUCA",
+   "esperado": [
+    "no",
+    "duda"
+   ]
+  },
+  {
+   "id": 18,
+   "tipo": "domicilio",
+   "a": "Calle Pino 5, Col. Centro, Toluca",
+   "b": "C. PINO NO. 5 CENTRO TOLUCA DE LERDO",
+   "esperado": [
+    "si"
+   ]
+  },
+  {
+   "id": 19,
+   "tipo": "nombre",
+   "a": "ANA SOFIA BRAVO LEON",
+   "b": "ANA SOFIA BRABO LEON",
+   "esperado": [
+    "si"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 20,
+   "tipo": "nombre",
+   "a": "MARIO CRUZ PEÑA",
+   "b": "MARIA CRUZ PEÑA",
+   "esperado": [
+    "no",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 21,
+   "tipo": "nombre",
+   "a": "FERNANDO RAMIREZ OLVERA",
+   "b": "FERNANDO RAMIRES OLVERA",
+   "esperado": [
+    "si"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 22,
+   "tipo": "nombre",
+   "a": "PAULO HERRERA DIAZ",
+   "b": "PAULA HERRERA DIAZ",
+   "esperado": [
+    "no",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 23,
+   "tipo": "nombre",
+   "a": "XIMENA GALVAN ROSAS",
+   "b": "JIMENA GALVAN ROSAS",
+   "esperado": [
+    "si",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 24,
+   "tipo": "nombre",
+   "a": "ELENA MORA SILVA",
+   "b": "ELENA MORA SILVIA",
+   "esperado": [
+    "no",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 25,
+   "tipo": "nombre",
+   "a": "IVAN TREJO LARA",
+   "b": "IVAN TEJO LARA",
+   "esperado": [
+    "si",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 26,
+   "tipo": "nombre",
+   "a": "JORGE LUNA PRADO",
+   "b": "JORGE LUNA PARDO",
+   "esperado": [
+    "no",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 27,
+   "tipo": "domicilio",
+   "a": "Calle Laurel 7, Col. Las Palmas, Metepec",
+   "b": "CALLE LAUREL 7 COL LAS PALOMAS METEPEC",
+   "esperado": [
+    "no",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 28,
+   "tipo": "domicilio",
+   "a": "Calle Hidalgo 15, San Felipe Tlalmimilolpan, Toluca",
+   "b": "HIDALGO 15 SN FELIPE TLALMIMILOLPAN TOLUCA",
+   "esperado": [
+    "si",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 29,
+   "tipo": "domicilio",
+   "a": "Calle Encino 3, Barrio La Merced, Almoloya",
+   "b": "CALLE ENCINO 3 BARRIO LA MERCED ALMOLOYA DE JUAREZ",
+   "esperado": [
+    "si",
+    "duda"
+   ],
+   "nuevo": true
+  },
+  {
+   "id": 30,
+   "tipo": "domicilio",
+   "a": "Calle Allende 40, Col. Centro, Lerma",
+   "b": "CALLE ALLENDE 40 COL CENTRO OCOYOACAC",
+   "esperado": [
+    "no",
+    "duda"
+   ],
+   "nuevo": true
+  }
+ ]
+}

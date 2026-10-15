@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): DIEGO  Primer apellido: CASTRO  Segundo apellido: NAVA
+Sexo: HOMBRE
+Fecha de nacimiento: 05/01/2018
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: CANS180105HMCSVGA4
+Datos de filiación de la persona registrada
+Padre: JUAN PEREZ LOPEZ  Nacionalidad: MEXICANA
+Madre: LAURA NAVA PEÑA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

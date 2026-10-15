@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIDP · Inscripción</title>
+<link rel="stylesheet" href="estilo.css">
+<script>/*SIDP_CONFIG*/</script>
+<script src="motor.js"></script>
+</head>
+<body>
+<header>
+  <h1>Inscripción · documentos del alumno</h1>
+  <span class="modo" id="modo"></span>
+</header>
+<main style="max-width:760px">
+  <div class="aviso" id="aviso"></div>
+  <div class="panel oculto" id="escuela" style="margin-bottom:14px">
+    <h2>¿Estás en la red de la escuela?</h2>
+    <p class="chico">Esta página pública no puede mandar documentos a las computadoras de la escuela. Conectado a su Wi-Fi,
+      escribe la dirección que muestra el panel del administrador y te lleva a la página de la prueba.</p>
+    <p><input id="escuela-ip" placeholder="192.168.1.30:8770" style="max-width:220px"> <button id="escuela-ir">Ir</button>
+      <span class="chico" id="escuela-mensaje"></span></p>
+  </div>
+  <form id="formulario" class="panel">
+    <h2>Datos del alumno</h2>
+    <div class="rejilla">
+      <div><label for="a-nombres">Nombre(s)</label><input id="a-nombres" required></div>
+      <div><label for="a-ap1">Primer apellido</label><input id="a-ap1" required></div>
+      <div><label for="a-ap2">Segundo apellido</label><input id="a-ap2"></div>
+      <div><label for="a-curp">CURP</label><input id="a-curp" maxlength="18" required></div>
+    </div>
+    <h2 style="margin-top:16px">Datos de la madre, padre o tutor</h2>
+    <div class="rejilla">
+      <div><label for="t-nombres">Nombre(s)</label><input id="t-nombres" required></div>
+      <div><label for="t-ap1">Primer apellido</label><input id="t-ap1" required></div>
+      <div><label for="t-ap2">Segundo apellido</label><input id="t-ap2"></div>
+      <div><label for="t-parentesco">Parentesco</label>
+        <select id="t-parentesco"><option value="madre">Madre</option><option value="padre">Padre</option>
+          <option value="tutor_legal">Tutor legal</option><option value="abuelo">Abuelo o abuela</option><option value="otro">Otro</option></select></div>
+      <div><label for="t-telefono">Teléfono</label><input id="t-telefono" inputmode="tel"></div>
+      <div><label for="t-correo">Correo</label><input id="t-correo" type="email"></div>
+    </div>
+    <label for="t-domicilio">Domicilio como viene en el comprobante (calle, número, colonia y municipio)</label>
+    <input id="t-domicilio" required>
+    <h2 style="margin-top:16px">Documentos</h2>
+    <p class="chico">PDF o foto clara, hasta 15 MB cada uno. Desde el celular puedes tomar la foto en ese momento.</p>
+    <div class="rejilla">
+      <div><label for="d-acta">Acta de nacimiento del alumno *</label><input id="d-acta" name="acta_alumno" type="file" accept=".pdf,image/*" required></div>
+      <div><label for="d-medico">Certificado médico *</label><input id="d-medico" name="certificado_medico" type="file" accept=".pdf,image/*" required></div>
+      <div><label for="d-boleta">Boleta del ciclo anterior</label><input id="d-boleta" name="boleta" type="file" accept=".pdf,image/*"></div>
+      <div><label for="d-ine">INE del tutor (frente y reverso) *</label><input id="d-ine" name="ine_tutor" type="file" accept=".pdf,image/*" multiple required></div>
+      <div><label for="d-acta-tutor">Acta de nacimiento del tutor</label><input id="d-acta-tutor" name="acta_tutor" type="file" accept=".pdf,image/*"></div>
+      <div><label for="d-comprobante">Comprobante de domicilio (3 meses o menos) *</label><input id="d-comprobante" name="comprobante" type="file" accept=".pdf,image/*" required></div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:14px;color:var(--texto)">
+      <input type="checkbox" id="permiso" required style="width:auto">
+      <span id="texto-permiso"></span></label>
+    <p><button class="principal" type="submit" id="enviar">Enviar documentos</button> <span class="chico" id="mensaje"></span></p>
+  </form>
+  <div class="panel oculto" id="recibido" style="margin-top:14px"></div>
+</main>
+<script>
+const motor = crearMotor();
+const $ = (id) => document.getElementById(id);
+const demo = SIDP.modo === 'demo';
+$('modo').textContent = demo ? 'Demostración' : 'Entorno de pruebas';
+$('aviso').textContent = demo
+  ? 'Página pública de demostración: usa solo documentos inventados. Los archivos se revisan en tu navegador y no se envían a ningún lado. Las fotos no se leen aquí (solo PDF con texto); en el entorno de pruebas sí.'
+  : 'Entorno de pruebas de la escuela: los documentos se guardan en la computadora del administrador y se revisan en la PC del cerebro.';
+$('texto-permiso').textContent = demo ? 'Entiendo que es una demostración con datos inventados.'
+                                      : 'Los documentos son de prueba o tengo permiso de sus dueños para usarlos en esta prueba.';
+if (demo) {
+  // Solo direcciones de una red local (10.x, 172.16-31.x, 192.168.x), con su puerto.
+  const local = /^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}(:\d{1,5})?$/;
+  $('escuela').classList.remove('oculto');
+  $('escuela-ip').value = new URLSearchParams(location.search).get('escuela') || '';
+  $('escuela-ir').onclick = () => {
+    const direccion = $('escuela-ip').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!local.test(direccion)) return ($('escuela-mensaje').textContent = 'Escribe una dirección como 192.168.1.30:8770');
+    location.href = `http://${direccion.includes(':') ? direccion : direccion + ':8770'}/padres`;
+  };
+}
+$('a-curp').addEventListener('input', (e) => (e.target.value = e.target.value.toUpperCase()));
+
+$('formulario').onsubmit = async (evento) => {
+  evento.preventDefault();
+  const valor = (id) => $(id).value.trim();
+  const captura = {
+    alumno: { nombres: valor('a-nombres'), primer_apellido: valor('a-ap1'), segundo_apellido: valor('a-ap2'), curp: valor('a-curp') },
+    tutor: { nombres: valor('t-nombres'), primer_apellido: valor('t-ap1'), segundo_apellido: valor('t-ap2'), parentesco: valor('t-parentesco'),
+             telefono: valor('t-telefono'), correo: valor('t-correo'), domicilio: valor('t-domicilio') },
+  };
+  const formulario = new FormData();
+  formulario.append('captura', JSON.stringify(captura));
+  for (const entrada of document.querySelectorAll('input[type=file]')) for (const archivo of entrada.files) formulario.append(entrada.name, archivo);
+  $('enviar').disabled = true;
+  $('mensaje').textContent = demo ? 'Preparando y revisando…' : 'Enviando…';
+  try {
+    await motor.listo;
+    const r = await motor.enviar(formulario);
+    $('recibido').classList.remove('oculto');
+    $('recibido').innerHTML = `<h2>Recibido</h2><p>Folio de recibido: <b>${esc(r.expediente)}</b></p>
+      <p>Revisión automática: <b>${esc(r.estado)}</b>. Una persona de la escuela revisa tu expediente y te avisa si autoriza o qué hay que corregir.</p>
+      <div id="detalle-demo"></div>`;
+    if (demo) {  // En la demostración no hay administrador: se muestra aquí lo que vería.
+      const d = (await motor.detalle(r.expediente)).resultado;
+      const puntos = [...d.hallazgos.map((h) => `${h.documento}: ${h.detalle}`), ...d.grises.map((g) => `${g.documento}: "${g.a}" contra "${g.b}" (zona gris)`),
+                      ...d.no_leidos.map((n) => `${n.documento}: no se pudo leer (${n.detalle})`)];
+      $('detalle-demo').innerHTML = '<h3>Lo que vería el administrador</h3>' +
+        (puntos.length ? '<ul>' + puntos.map((p) => `<li>${esc(p)}</li>`).join('') + '</ul>' : '<p>Todo coincide.</p>');
+    }
+    $('formulario').reset();
+    $('mensaje').textContent = '';
+  } catch (error) {
+    $('mensaje').textContent = 'No se pudo enviar: ' + error.message;
+  } finally {
+    $('enviar').disabled = false;
+  }
+};
+</script>
+</body>
+</html>

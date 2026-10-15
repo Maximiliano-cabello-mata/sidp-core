@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): JULIAN  Primer apellido: PRADO  Segundo apellido: LUNA
+Sexo: HOMBRE
+Fecha de nacimiento: 03/03/2018
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: PALJ180303HMCRNLA6
+Datos de filiación de la persona registrada
+Padre: JUAN PEREZ LOPEZ  Nacionalidad: MEXICANA
+Madre: ELENA LUNA SILVA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

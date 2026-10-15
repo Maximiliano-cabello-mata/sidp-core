@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "LUIS HERNANDEZ RAMOS",
+  "curp": "HERL180314HMCRMSA9"
+ },
+ "tutor": {
+  "nombre": "MARIA ELENA RAMOS SOTO",
+  "parentesco": "madre",
+  "domicilio": "Calle Pino 5, Col. Centro, Toluca"
+ }
+}

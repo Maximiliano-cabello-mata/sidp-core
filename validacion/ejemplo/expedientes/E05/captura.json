@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "MATEO LOPEZ GIL",
+  "curp": "LOGM180220HMCPLTA5"
+ },
+ "tutor": {
+  "nombre": "CARMEN GIL VEGA",
+  "parentesco": "madre",
+  "domicilio": "Calle Sauce 30, Zinacantepec"
+ }
+}

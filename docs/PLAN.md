@@ -56,6 +56,15 @@ Ya no va al final: avanza en paralelo desde la fase A. La validación funciona c
 | 9 | Análisis de los datos extraídos | Hay un reporte con datos de prueba |
 | 10 | Cerebro (`llama3.1` en la PC 4) que solo opina en la zona gris (nombres o domicilios parecidos); se mide en el [laboratorio](../cerebro/laboratorio/LEEME.md) | Se sabe si sus opiniones ayudan al administrador |
 
+Avance del 2026-10-15 ([bitácora](bitacoras/2026-10-15.md)):
+
+- Pasos 3 y 4: primera versión en [`validacion/`](../validacion/). Revisa un expediente completo (lo capturado contra cada documento) y lee PDF, escaneos y fotos de celular (recorte, perspectiva, sombra, giro, QR y franja de la INE). Medido con 49 fotos inventadas: 6 de 6 falsos detectados, 0 pasaron, 3 de 4 verdaderos listos.
+- Pasos 7, 8 y 9 en versión de prueba: `SIDP-Validador.exe` recibe a los padres en el Wi-Fi, guarda y deja autorizar o rechazar; el cerebro analiza lo guardado. Guía: [ENTORNO_PRUEBAS.md](guias/ENTORNO_PRUEBAS.md).
+- Paso 10: la PC 4 valida y opina por IP con clave. Los procesos marcan como "duda" los casos donde el modelo fallaba.
+- Base: SQLite (decisión de Maximiliano), con sus procedimientos en `database/procedimientos.py`.
+- Primera prueba con un expediente real: la comunicación funcionó y la lectura falló; ya se corrigió y falta repetirla.
+- Siguiente: modelo que ve (opina qué documento es y si se lee), PaddleOCR con Python 3.12 en la PC 4 y la prueba oficial con varios expedientes reales.
+
 ## Orden de trabajo
 
 1. Fase A, y en paralelo los pasos 1 a 5.
