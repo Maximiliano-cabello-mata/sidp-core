@@ -51,6 +51,21 @@ function motorLocal() {
     escaneoGuardar: (lote, datos) => api('/api/escaneo/guardar', { lote, ...datos }),
     escaneoDescartar: (lote) => api('/api/escaneo/descartar', { lote }),
     paginaUrl: (lote, archivo) => `/api/escaneo/pagina?lote=${encodeURIComponent(lote)}&archivo=${encodeURIComponent(archivo)}&t=${encodeURIComponent(SIDP.token || '')}`,
+    documentosPadres: () => api('/api/padres/documentos').then((r) => r.documentos),
+    plantillas: () => api('/api/plantillas'),
+    plantillaLeer: (archivos) => {
+      const formulario = new FormData();
+      for (const archivo of archivos) formulario.append('archivo', archivo, archivo.name);
+      return api('/api/plantillas/leer', formulario);
+    },
+    plantillaGuardar: (datos, archivos = []) => {
+      const formulario = new FormData();
+      formulario.append('captura', JSON.stringify(datos));
+      for (const archivo of archivos) formulario.append('muestra', archivo, archivo.name);
+      return api('/api/plantillas/guardar', formulario);
+    },
+    plantillaActiva: (clave, activa) => api('/api/plantillas/activa', { clave, activa }),
+    muestraUrl: (clave, archivo) => `/api/plantillas/muestra?clave=${encodeURIComponent(clave)}&archivo=${encodeURIComponent(archivo)}&t=${encodeURIComponent(SIDP.token || '')}`,
   };
 }
 
@@ -77,6 +92,13 @@ def escaneo(archivos):
     lista = [(a['nombre'], base64.b64decode(a['contenido'])) for a in json.loads(archivos)]
     try:
         return json.dumps({'ok': bandeja.escaneo_leer(lista)}, ensure_ascii=False, default=str)
+    except ErrorBandeja as error:
+        return json.dumps({'error': str(error)}, ensure_ascii=False)
+def plantilla(nombre, datos, archivos):
+    lista = [(a['nombre'], base64.b64decode(a['contenido'])) for a in json.loads(archivos)]
+    try:
+        salida = bandeja.plantilla_leer(lista) if nombre == 'leer' else bandeja.plantilla_guardar(json.loads(datos), lista, 'administrador (demostración)')
+        return json.dumps({'ok': salida}, ensure_ascii=False, default=str)
     except ErrorBandeja as error:
         return json.dumps({'error': str(error)}, ensure_ascii=False)
 def recibir(captura, archivos):
@@ -122,6 +144,14 @@ def recibir(captura, archivos):
     for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
     return btoa(binario);
   }
+  async function plantillaDemo(nombre, datos, archivos) {
+    await listo;
+    const lista = [];
+    for (const archivo of archivos) lista.push({ nombre: archivo.name, contenido: base64(await archivo.arrayBuffer()) });
+    const r = JSON.parse(py.globals.get('plantilla')(nombre, JSON.stringify(datos), JSON.stringify(lista)));
+    if (r.error) throw new Error(r.error);
+    return r.ok;
+  }
   return {
     listo,
     estado: () => llamar('estado'),
@@ -152,6 +182,12 @@ def recibir(captura, archivos):
     escaneoGuardar: (lote, datos) => llamar('escaneo_guardar', lote, datos, 'administrador (demostración)'),
     escaneoDescartar: (lote) => llamar('escaneo_descartar', lote),
     paginaUrl: null,
+    documentosPadres: () => llamar('documentos_padres'),
+    plantillas: () => llamar('lista_plantillas'),
+    plantillaLeer: (archivos) => plantillaDemo('leer', null, archivos),
+    plantillaGuardar: (datos, archivos = []) => plantillaDemo('guardar', datos, archivos),
+    plantillaActiva: (clave, activa) => llamar('plantilla_activa', clave, activa, 'administrador (demostración)'),
+    muestraUrl: null,
     enviar: async (formulario) => {
       await listo;
       const archivos = [];

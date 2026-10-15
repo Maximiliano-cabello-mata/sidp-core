@@ -41,6 +41,23 @@ class Registro:
             self.db.executescript(DISENO.read_text(encoding='utf-8'))
         self.db.execute('PRAGMA foreign_keys=ON')
         self.actor = self._administrador()
+        self.tipos_escuela = {}  # Documentos que agregó la escuela con una plantilla: clave -> (tipo, de quién).
+
+    def usar_plantillas(self, plantillas):
+        """Cada plantilla de la escuela es un tipo de documento en la base (tipo_documento), para poder registrarlo."""
+        for plantilla in plantillas:
+            if plantilla.get('fabrica'):
+                continue
+            clave, nombre = plantilla['clave'], plantilla['nombre']
+            if self.db.execute('SELECT 1 FROM tipo_documento WHERE nombre = ? AND clave != ?', (nombre, clave)).fetchone():
+                nombre = f'{nombre} (escuela)'  # El nombre es único en la base.
+            with self.db:
+                self.db.execute('INSERT INTO tipo_documento(clave, nombre, aplica_a, obligatorio_nuevo, caducidad) VALUES(?,?,?,?,?) '
+                                'ON CONFLICT(clave) DO UPDATE SET nombre = excluded.nombre, obligatorio_nuevo = excluded.obligatorio_nuevo, '
+                                'caducidad = excluded.caducidad, vigente = 1',
+                                (clave, nombre, plantilla['de'], int(plantilla['obligatorio']),
+                                 'fecha' if 'fecha_reciente' in plantilla['reglas'] else 'nunca'))
+            self.tipos_escuela[clave] = (clave, plantilla['de'])
 
     def _administrador(self):
         """La persona que revisa en el entorno de pruebas; en la plataforma será cada usuario con su cuenta."""
@@ -85,6 +102,7 @@ class Registro:
         Devuelve los identificadores para guardarlos junto al expediente.
         """
         extraidos = extraidos or {}
+        tipos = {**TIPO_DISENO, **self.tipos_escuela}
         alumno = self._persona('alumno', captura['alumno'], captura['alumno'].get('curp', '').upper())
         datos_tutor = captura.get('tutor') or {}
         tutor = self._persona('tutor', datos_tutor, str(datos_tutor.get('curp') or '').upper()) if datos_tutor.get('nombres') else None
@@ -94,7 +112,7 @@ class Registro:
         parentesco = parentesco if parentesco in ('madre', 'padre', 'tutor_legal', 'abuelo') else 'otro'
         documentos = []
         for espacio, ruta, contenido in archivos:
-            tipo, dueno = TIPO_DISENO.get(espacio, (None, None))
+            tipo, dueno = tipos.get(espacio, (None, None))
             mime = MIME.get(Path(ruta).suffix.lower())
             if not tipo or not mime or (dueno == 'tutor' and not tutor):
                 continue  # Opcionales sin tipo en el diseño (acta del tutor) o textos de prueba: solo quedan en la carpeta.

@@ -138,3 +138,48 @@ constancias inventadas, porque gob.mx no se puede abrir desde el entorno en la n
 Además, desde ese mismo día el vínculo tutor–alumno se aplica solo cuando el administrador
 autoriza el expediente. Antes se aplicaba al recibirlo, y cualquiera que escribiera la CURP de un
 alumno quedaba como su tutor principal.
+
+## Expedientes escaneados, ya revisados en papel (2026-10-15)
+
+Para las carpetas que la escuela ya revisó, no se corre la validación completa: solo se extraen los
+datos. En el panel, el cuadro "Escanear expediente" recibe los escaneos de un alumno (un PDF con varias
+hojas o varios archivos), separa las hojas, reconoce cada documento por sus textos fijos y propone los
+datos del alumno y del tutor (`validacion/extraer.py`, procesos fijos, sin IA):
+
+- La CURP se busca con su dígito verificador; las confusiones del OCR (O y 0, I y 1...) se corrigen por
+  posición. Una letra de más solo se quita si queda una sola CURP posible que cuadre con un nombre del texto.
+- El nombre se encuentra con las letras que trae la CURP, en cualquier orden del documento. Si no, se usan
+  las etiquetas del acta ("Nombre(s): ... Primer apellido: ...") o del frente de la INE, con un aviso.
+- La persona revisa, corrige y guarda. El expediente queda "validado en papel": sus documentos quedan
+  validados con origen `escaneo`, el tutor vinculado, y "Revisar todo" no lo vuelve a revisar. La CURP
+  sigue "sin validar" ante RENAPO hasta que alguien haga ese paso.
+
+## Plantillas de documentos (2026-10-15)
+
+Pedido de Maximiliano: que los administrativos agreguen documentos sin programar, y que se validen por
+plantilla. Una plantilla (`validacion/plantillas.py`) es solo datos:
+
+| Campo | Qué es |
+|---|---|
+| nombre, de | Cómo lo ven los padres y si es del alumno o del tutor |
+| obligatorio, para_padres | Si falta es hallazgo; si la página de padres lo pide |
+| textos | Frases fijas del documento (título, etiquetas), sin datos de nadie |
+| minimo | Cuántas de esas frases debe tener para aceptarlo |
+| reglas | Elegidas de una lista fija: nombre del alumno, nombre del tutor, CURP del alumno, domicilio, fecha reciente (con meses) |
+
+- **Cómo se arma.** El administrativo sube una muestra: el formato en blanco, o dos o tres llenos de personas
+  distintas. El sistema propone los renglones que se repiten y, de cada "Etiqueta: dato", solo la etiqueta.
+  La persona quita lo que sobre y guarda.
+- **Dónde se usa.** La página de padres pide los documentos con `para_padres`; el escaneo reconoce las hojas
+  de cada plantilla (las de la escuela ganan a las de fábrica porque son más específicas); la revisión valida
+  cada documento con sus textos y sus reglas, en esta PC o en el cerebro (la plantilla viaja con el pedido).
+- **De fábrica.** Acta, INE, comprobante y demás aparecen como plantillas versión 0. Se les pueden agregar
+  textos fijos (otra compañía de agua o de luz) y cambiar si son obligatorios; sus revisiones propias (CURP
+  del acta, franja de la INE, vigencia) siguen siendo código.
+- **Sin sobrescribir.** Cada cambio es otra versión (`plantillas/<clave>/v001.json`) y las muestras se guardan
+  junto a ella. Dar de baja un documento es otra versión con `activa: false`.
+- **En la base.** Cada plantilla de la escuela es una fila de `tipo_documento` (clave `p_...`), así sus
+  documentos se registran como cualquier otro.
+- **Límite honesto.** La plantilla reconoce un documento por lo que dice, no por cómo se ve: un documento
+  falso que copie las frases pasa este filtro. Para eso siguen la persona que autoriza y, después, el modelo
+  que ve (borrador en `propuestas/`).

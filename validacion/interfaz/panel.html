@@ -64,6 +64,16 @@
     <div class="panel"><h2>Expedientes</h2><ul class="lista" id="lista"></ul></div>
     <div class="panel" id="detalle"><p class="chico">Elige un expediente.</p></div>
   </div>
+  <div class="panel" id="panel-plantillas" style="margin-top:14px">
+    <h2>Plantillas de documentos</h2>
+    <p class="chico">Qué documentos pide la escuela y cómo se reconocen. Para agregar uno no hay que programar: sube una muestra,
+      revisa sus textos fijos (las frases que siempre trae) y guarda. Desde ese momento la página de padres lo pide, el escaneo
+      lo reconoce y la revisión lo valida con su plantilla.</p>
+    <table id="plantillas"></table>
+    <p><button id="pl-nueva">Agregar un documento</button></p>
+    <div id="pl-mensaje"></div>
+    <div id="pl-formulario"></div>
+  </div>
   <p class="chico" id="base"></p>
 </main>
 <script>
@@ -265,9 +275,114 @@ document.addEventListener('drop', (e) => {
   subirConstancia(e.dataTransfer.files[0]);
 });
 
+let plantillas = null, muestras = [];
+
+function avisoPlantilla(clase, texto) {
+  $('pl-mensaje').innerHTML = texto ? `<div class="mensaje ${clase}">${esc(texto)}</div>` : '';
+}
+
+function mostrarPlantillas(datos) {
+  plantillas = datos;
+  const si = (v) => (v ? 'Sí' : 'No');
+  $('plantillas').innerHTML = `<tr><th>Documento</th><th>De</th><th>Obligatorio</th><th>Se pide a padres</th><th>Textos fijos</th><th></th></tr>` +
+    datos.plantillas.map((p) => `<tr class="${p.activa ? '' : 'apagada'}">
+      <td>${esc(p.nombre)} ${p.fabrica ? '<span class="chico">(del sistema)</span>' : ''} ${p.activa ? '' : '<span class="insignia rechazado">de baja</span>'}</td>
+      <td>${esc(p.de === 'alumno' ? 'Alumno' : 'Tutor')}</td><td>${si(p.obligatorio)}</td><td>${si(p.para_padres)}</td>
+      <td>${p.textos.length}${p.version ? ` <span class="chico">(versión ${p.version})</span>` : ''}</td>
+      <td><button data-editar="${esc(p.clave)}">Abrir</button>
+        ${p.fabrica ? '' : `<button data-activa="${esc(p.clave)}" data-valor="${p.activa ? '' : '1'}">${p.activa ? 'Dar de baja' : 'Volver a pedir'}</button>`}</td></tr>`).join('');
+  for (const boton of document.querySelectorAll('[data-editar]')) boton.onclick = () => formularioPlantilla(datos.plantillas.find((p) => p.clave === boton.dataset.editar));
+  for (const boton of document.querySelectorAll('[data-activa]')) boton.onclick = async () => {
+    const r = await trabajar('Guardando…', () => motor.plantillaActiva(boton.dataset.activa, !!boton.dataset.valor));
+    if (r) mostrarPlantillas(r);
+  };
+}
+
+function formularioPlantilla(p) {
+  const nueva = !p;
+  p = p || { nombre: '', de: 'alumno', obligatorio: true, para_padres: true, textos: [], minimo: 1, reglas: ['nombre_alumno'], meses: 3 };
+  muestras = [];
+  avisoPlantilla('', '');
+  const fijo = p.fabrica ? 'disabled' : '';
+  $('pl-formulario').innerHTML = `
+    <h3>${nueva ? 'Documento nuevo' : esc(p.nombre)}</h3>
+    ${p.fabrica ? '<p class="chico">Documento del sistema: puedes agregarle textos fijos (por ejemplo, otra compañía de luz o de agua) y decir si es obligatorio. Sus revisiones propias (CURP, franja de la INE, vigencia) no cambian.</p>' : ''}
+    <div class="rejilla">
+      <div><label for="pl-nombre">Nombre del documento (así lo verán los padres)</label><input id="pl-nombre" value="${esc(p.nombre)}" ${fijo} maxlength="80"></div>
+      <div><label for="pl-de">Es de</label><select id="pl-de" ${fijo}>${Object.entries(plantillas.de).map(([k, v]) =>
+        `<option value="${k}" ${k === p.de ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+    </div>
+    <p><label class="casilla"><input type="checkbox" id="pl-obligatorio" ${p.obligatorio ? 'checked' : ''}> Es obligatorio</label>
+       <label class="casilla"><input type="checkbox" id="pl-padres" ${p.para_padres ? 'checked' : ''}> Se pide en la página de padres</label></p>
+    <h3>1. Muestra</h3>
+    <p class="chico">Sube el formato en blanco, o dos o tres llenos de personas distintas: así el sistema separa lo que siempre dice de los datos de cada quien.
+      ${(p.muestras || []).length ? 'Muestras guardadas: ' + p.muestras.map((m) => motor.muestraUrl ? `<a href="${esc(motor.muestraUrl(p.clave, m))}" target="_blank" rel="noopener">${esc(m)}</a>` : esc(m)).join(', ') : ''}</p>
+    <div class="soltar" id="pl-soltar" role="button" tabindex="0">Suelta aquí la muestra (PDF o foto)<br><span class="chico">o da clic para elegirla</span></div>
+    <input type="file" id="pl-elegir" accept=".pdf,image/*" multiple hidden>
+    <h3>2. Textos fijos</h3>
+    <p class="chico">Una frase por renglón. Quita las que tengan datos de una persona (nombres, domicilios). Al revisar se toleran letras mal leídas.</p>
+    <textarea id="pl-textos" rows="7">${esc(p.textos.join('\n'))}</textarea>
+    <p><label for="pl-minimo">¿Cuántos de esos textos debe tener el documento para aceptarlo?</label>
+       <input id="pl-minimo" type="number" min="1" value="${p.minimo}" style="max-width:90px"></p>
+    <h3>3. Qué más se revisa</h3>
+    <p>${Object.entries(plantillas.reglas).map(([k, v]) => `<label class="casilla"><input type="checkbox" data-regla="${k}" ${p.reglas.includes(k) ? 'checked' : ''} ${fijo}> ${esc(v)}</label>`).join('<br>')}</p>
+    <p><label for="pl-meses">Vigencia en meses (si se revisa la fecha)</label><input id="pl-meses" type="number" min="1" max="24" value="${p.meses || 3}" style="max-width:90px" ${fijo}></p>
+    <p><button class="verde" id="pl-guardar">Guardar plantilla</button> <button id="pl-cancelar">Cancelar</button></p>`;
+  $('pl-soltar').onclick = () => $('pl-elegir').click();
+  $('pl-soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('pl-elegir').click(); };
+  $('pl-elegir').onchange = () => { leerMuestras($('pl-elegir').files); $('pl-elegir').value = ''; };
+  $('pl-soltar').addEventListener('drop', (e) => {
+    e.preventDefault(); e.stopPropagation(); document.body.classList.remove('arrastrando'); leerMuestras(e.dataTransfer.files);
+  });
+  $('pl-cancelar').onclick = () => { $('pl-formulario').innerHTML = ''; avisoPlantilla('', ''); };
+  $('pl-guardar').onclick = async () => {
+    const textos = $('pl-textos').value.split('\n').map((t) => t.trim()).filter(Boolean);
+    const datos = { clave: p.clave, nombre: $('pl-nombre').value, de: $('pl-de').value, obligatorio: $('pl-obligatorio').checked,
+      para_padres: $('pl-padres').checked, textos, minimo: Number($('pl-minimo').value),
+      reglas: [...document.querySelectorAll('[data-regla]')].filter((c) => c.checked).map((c) => c.dataset.regla), meses: Number($('pl-meses').value) };
+    try {
+      $('mensaje').textContent = 'Guardando la plantilla…';
+      const r = await motor.plantillaGuardar(datos, muestras);
+      mostrarPlantillas(r);
+      $('pl-formulario').innerHTML = '';
+      avisoPlantilla('bien', `Listo: "${r.guardada.nombre}" quedó guardada (versión ${r.guardada.version}).` +
+        (r.guardada.para_padres ? ' La página de padres ya lo pide.' : ''));
+    } catch (error) {
+      avisoPlantilla('mal', error.message);
+    }
+    $('mensaje').textContent = 'Listo.';
+  };
+  $('pl-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function leerMuestras(archivos) {
+  archivos = [...archivos].filter((a) => a.size);
+  if (!archivos.length) return;
+  avisoPlantilla('ojo', `Leyendo ${archivos.length} muestra(s)…`);
+  try {
+    const r = await motor.plantillaLeer(archivos);
+    muestras = archivos;
+    const actuales = $('pl-textos').value.trim();
+    $('pl-textos').value = (actuales ? actuales + '\n' : '') + r.textos.filter((t) => !actuales.split('\n').includes(t)).join('\n');
+    const total = $('pl-textos').value.split('\n').filter(Boolean).length;
+    $('pl-minimo').value = Math.max(1, Math.ceil(total / 2));
+    const avisos = [];
+    if (r.sin_texto.length) avisos.push('No se pudo leer: ' + r.sin_texto.join(', ') + '. Conecta el cerebro o sube un PDF con texto.');
+    const parecidos = Object.entries(r.parecido);
+    if (parecidos.length) avisos.push('Ojo, la muestra también dice textos de: ' + parecidos.map(([n, c]) => `${n} (${c})`).join(', ') + '.');
+    avisoPlantilla(avisos.length ? 'ojo' : 'bien', avisos.length ? avisos.join(' ') :
+      `Se propusieron ${r.textos.length} textos fijos. Revísalos, quita los que tengan datos de alguien y guarda.`);
+  } catch (error) {
+    avisoPlantilla('mal', error.message);
+  }
+}
+
+$('pl-nueva').onclick = () => formularioPlantilla(null);
+
 async function refrescar() {
   mostrarEstado(await motor.estado());
   mostrarCurps(await motor.curps());
+  mostrarPlantillas(await motor.plantillas());
   const base = await motor.base();
   $('base').textContent = base ? 'Base de datos (39 tablas): ' + Object.entries(base).map(([t, n]) => `${t} ${n}`).join(' · ') : '';
 }

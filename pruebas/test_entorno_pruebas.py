@@ -314,3 +314,99 @@ def test_el_escaneo_sin_nombre_no_se_guarda_y_se_puede_descartar(entorno):
     assert pedir(url, '/api/escaneo/guardar', {'lote': leido['lote'], 'alumno': leido['propuesta']['alumno']}, token)[0] == 400
     assert pedir(url, '/api/escaneo/descartar', {'lote': '../expedientes'}, token)[0] == 400
     assert not app.bandeja.expedientes()
+
+
+CARTA = ['CARTA COMPROMISO DE DOCUMENTOS', 'ESCUELA PRIMARIA BENITO JUAREZ', 'Nombre del alumno: {alumno}',
+         'Me comprometo a entregar los documentos faltantes', 'Firma del padre o tutor: {tutor}', 'Fecha: 01/10/2026']
+
+
+def carta(alumno='LUIS HERNANDEZ RAMOS', tutor='MARIA ELENA RAMOS SOTO'):
+    return pdf_de_texto([r.format(alumno=alumno, tutor=tutor) for r in CARTA])
+
+
+def test_una_plantilla_se_agrega_sin_programar_y_valida_el_documento(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    # 1. Dos muestras llenas de personas distintas: lo que cambia (nombres) no queda como texto fijo.
+    limite = uuid.uuid4().hex
+    cuerpo = b''.join(f'--{limite}\r\nContent-Disposition: form-data; name="archivo"; filename="m{i}.pdf"\r\n\r\n'.encode() + c + b'\r\n'
+                      for i, c in enumerate([carta(), carta('ANA SOFIA BRAVO LEON', 'JORGE BRAVO CRUZ')])) + f'--{limite}--\r\n'.encode()
+    codigo, leido = pedir(url, '/api/plantillas/leer', cuerpo, token, tipo=f'multipart/form-data; boundary={limite}')
+    assert codigo == 200, leido
+    assert 'CARTA COMPROMISO DE DOCUMENTOS' in leido['textos'] and 'ME COMPROMETO A ENTREGAR LOS DOCUMENTOS FALTANTES' in leido['textos']
+    assert not any('LUIS' in t or 'BRAVO' in t for t in leido['textos'])
+    # 2. La persona guarda la plantilla con lo que debe cumplir.
+    datos = {'nombre': 'Carta compromiso', 'de': 'alumno', 'obligatorio': True, 'para_padres': True, 'textos': leido['textos'],
+             'minimo': 2, 'reglas': ['nombre_alumno', 'fecha_reciente'], 'meses': 2}
+    cuerpo, tipo = formulario(datos, [('muestra', 'muestra.pdf', carta())])
+    codigo, guardado = pedir(url, '/api/plantillas/guardar', cuerpo, token, tipo=tipo)
+    assert codigo == 200 and guardado['guardada']['clave'] == 'p_carta_compromiso' and guardado['guardada']['version'] == 1
+    # 3. La página de padres ya lo pide (sin token: es pública en la red de la escuela).
+    documentos = pedir(url, '/api/padres/documentos')[1]['documentos']
+    assert {'clave': 'p_carta_compromiso', 'nombre': 'Carta compromiso', 'de': 'alumno', 'obligatorio': True} in documentos
+    # 4. Un expediente con la carta correcta pasa; con otra cosa en su lugar, o sin ella, no.
+    captura, archivos = expediente_pdf()
+    cuerpo, tipo = formulario(captura, archivos + [('p_carta_compromiso', 'carta.pdf', carta())])
+    assert pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)[1]['estado'] == 'listo para autorizar'
+    cuerpo, tipo = formulario(captura, archivos + [('p_carta_compromiso', 'carta.pdf', pdf_de_texto(['RECIBO', 'LUIS HERNANDEZ RAMOS']))])
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    reglas = {h['regla'] for h in app.bandeja.resultados['0002']['hallazgos']}
+    assert 'plantilla_no_coincide' in reglas
+    cuerpo, tipo = formulario(captura, archivos)
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    assert ('falta_documento', 'Carta compromiso') in {(h['regla'], h['documento']) for h in app.bandeja.resultados['0003']['hallazgos']}
+    # 5. En la base es un tipo de documento más.
+    db = app.bandeja.registro.db
+    assert db.execute("SELECT aplica_a FROM tipo_documento WHERE clave = 'p_carta_compromiso'").fetchone() == ('alumno',)
+    assert db.execute("SELECT count(*) FROM documento WHERE tipo = 'p_carta_compromiso'").fetchone()[0] == 2
+    # 6. Darla de baja es otra versión: deja de pedirse y lo anterior queda.
+    codigo, r = pedir(url, '/api/plantillas/activa', {'clave': 'p_carta_compromiso', 'activa': False}, token)
+    assert codigo == 200 and r['guardada']['version'] == 2 and r['guardada']['muestras'] == ['muestra_v001_1.pdf']
+    assert all(d['clave'] != 'p_carta_compromiso' for d in pedir(url, '/api/padres/documentos')[1]['documentos'])
+    assert sorted(p.name for p in (app.carpeta / 'plantillas' / 'p_carta_compromiso').iterdir()) == ['muestra_v001_1.pdf', 'v001.json', 'v002.json']
+
+
+def test_al_escanear_la_hoja_de_una_plantilla_se_reconoce(entorno):
+    app, url = entorno
+    app.bandeja.plantilla_guardar({'nombre': 'Carta compromiso', 'de': 'alumno', 'obligatorio': False, 'para_padres': False,
+                                   'textos': ['CARTA COMPROMISO DE DOCUMENTOS', 'ME COMPROMETO A ENTREGAR'], 'minimo': 2})
+    import io
+    escritor = pypdf.PdfWriter()
+    for contenido in (pdf_de_texto(generar.acta('LUIS', 'HERNANDEZ', 'RAMOS', '14/03/2018', 'HOMBRE', CURP,
+                                                                               'JUAN PEREZ LOPEZ', 'MARIA ELENA RAMOS SOTO').splitlines()),
+                      carta()):
+        escritor.add_page(pypdf.PdfReader(io.BytesIO(contenido)).pages[0])
+    salida = io.BytesIO()
+    escritor.write(salida)
+    leido = escanear(url, app, salida.getvalue())[1]
+    assert [p['tipo'] for p in leido['paginas']] == ['acta_alumno', 'p_carta_compromiso']
+    assert leido['tipos']['p_carta_compromiso'] == 'Carta compromiso'
+
+
+def test_a_un_documento_del_sistema_se_le_agregan_textos(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    comprobante = next(p for p in pedir(url, '/api/plantillas', cabeceras=token)[1]['plantillas'] if p['clave'] == 'comprobante')
+    assert comprobante['fabrica'] and comprobante['version'] == 0
+    cuerpo, tipo = formulario({**comprobante, 'nombre': 'Otro nombre', 'reglas': [], 'textos': comprobante['textos'] + ['AGUA Y SANEAMIENTO DE TOLUCA']}, [])
+    guardado = pedir(url, '/api/plantillas/guardar', cuerpo, token, tipo=tipo)[1]['guardada']
+    assert guardado['nombre'] == 'Comprobante de domicilio' and guardado['reglas'] == ['domicilio', 'fecha_reciente']
+    assert 'AGUA Y SANEAMIENTO DE TOLUCA' in guardado['textos'] and guardado['version'] == 1
+
+
+def test_la_plantilla_pide_lo_necesario(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+
+    def guardar(datos):
+        cuerpo, tipo = formulario(datos, [])
+        return pedir(url, '/api/plantillas/guardar', cuerpo, token, tipo=tipo)
+    for datos, error in (({'nombre': 'X', 'de': 'alumno', 'textos': ['UNO DOS']}, 'nombre'),
+                         ({'nombre': 'Ficha', 'de': 'nadie', 'textos': ['UNO DOS']}, 'alumno o del tutor'),
+                         ({'nombre': 'Ficha', 'de': 'alumno', 'textos': []}, 'texto fijo'),
+                         ({'nombre': 'Ficha', 'de': 'alumno', 'textos': ['UNO DOS'], 'minimo': 3}, 'de 1 a 1'),
+                         ({'nombre': 'Ficha', 'de': 'alumno', 'textos': ['UNO DOS'], 'reglas': ['fecha_reciente']}, 'meses'),
+                         ({'nombre': 'Certificado médico', 'de': 'alumno', 'textos': ['UNO DOS']}, 'Ya hay')):
+        codigo, respuesta = guardar(datos)
+        assert codigo == 400 and error in respuesta['error'], (datos, respuesta)
+    assert pedir(url, '/api/plantillas', cabeceras={'X-SIDP-Token': 'otro'})[0] == 403

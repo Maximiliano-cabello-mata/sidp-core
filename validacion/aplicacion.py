@@ -132,6 +132,9 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                 if url.path in ESTATICOS:
                     nombre = ESTATICOS[url.path]
                     return self._enviar(200, (INTERFAZ / nombre).read_bytes(), mimetypes.guess_type(nombre)[0] + '; charset=utf-8')
+                if url.path == '/api/padres/documentos':  # Qué documentos pide la página de padres.
+                    with app.candado:
+                        return self._enviar(200, {'documentos': app.bandeja.documentos_padres()})
                 if url.path == '/api/cerebro/datos':
                     if self._cerebro():
                         with app.candado:
@@ -151,6 +154,11 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     if url.path == '/api/configuracion':
                         return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro),
                                                   'direccion_padres': app.direccion_padres()})
+                    if url.path == '/api/plantillas':
+                        return self._enviar(200, app.bandeja.lista_plantillas())
+                    if url.path == '/api/plantillas/muestra':
+                        ruta = app.bandeja.plantilla_muestra(consulta.get('clave', [''])[0], consulta.get('archivo', [''])[0])
+                        return self._enviar(200, ruta.read_bytes(), mimetypes.guess_type(ruta.name)[0] or 'application/octet-stream')
                     if url.path == '/api/escaneo/pagina':
                         ruta = app.bandeja.escaneo_pagina(consulta.get('lote', [''])[0], consulta.get('archivo', [''])[0])
                         return self._enviar(200, ruta.read_bytes(), mimetypes.guess_type(ruta.name)[0] or 'application/octet-stream')
@@ -186,6 +194,14 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
                     with app.candado:
                         return self._enviar(200, app.bandeja.escaneo_leer(archivos))
+                if url.path == '/api/plantillas/leer':  # Muestras de un documento: se proponen sus textos fijos.
+                    archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.plantilla_leer(archivos))
+                if url.path == '/api/plantillas/guardar':  # Los datos de la plantilla (campo "captura") y sus muestras.
+                    datos, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.plantilla_guardar(datos, [(n, c) for _, n, c in archivos]))
                 if url.path == '/api/renapo/constancia':  # El PDF tal cual, arrastrado al panel.
                     contenido = self._cuerpo()
                     with app.candado:
@@ -200,6 +216,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.escaneo_guardar(datos.get('lote', ''), datos))
                     if url.path == '/api/escaneo/descartar':
                         return self._enviar(200, app.bandeja.escaneo_descartar(datos.get('lote', '')))
+                    if url.path == '/api/plantillas/activa':
+                        return self._enviar(200, app.bandeja.plantilla_activa(datos.get('clave', ''), datos.get('activa')))
                     if url.path == '/api/renapo/no_encontrada':
                         return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':

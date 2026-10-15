@@ -208,6 +208,12 @@ schtasks /create /tn "SIDP Cerebro" /tr "\"$PWD\validacion\iniciar_cerebro.bat\"
    Para leer escaneos (PDF que son solo imagen) se necesita el cerebro **conectado** (paso 3), con
    el código actualizado (Parte 1, pasos 1 y 5). Sin cerebro, esta PC solo lee los PDF que traen
    texto, y el panel lo avisa.
+9. **Agregar un documento con plantilla.** Al final del panel, en **Plantillas de documentos**, da
+   **Agregar un documento**. Escribe su nombre, elige si es del alumno o del tutor y suelta una muestra (el
+   formato en blanco, o dos llenos de personas distintas). El sistema propone sus textos fijos: quita los
+   que tengan datos de alguien, elige qué más se revisa y da **Guardar plantilla**. La página de padres lo
+   pide desde ese momento, el escaneo lo reconoce y la revisión lo valida. A los documentos del sistema
+   (por ejemplo, el comprobante) se les pueden agregar textos con **Abrir**.
 
 Si el celular no abre la página, revisa que la red de esta PC también sea **Privada** (paso 4a de
 la Parte 1) y que la regla del firewall exista:

@@ -61,18 +61,19 @@ def validar(pedido, nombre_modelo=modelo.MODELO, url=modelo.URL):
         for archivo in pedido['archivos']:
             nombre = Path(archivo['nombre']).name  # Nunca una ruta: solo el nombre.
             (carpeta / nombre).write_bytes(base64.b64decode(archivo['contenido']))
-        resultado = expediente.revisar(carpeta, hoy, True, nombre_modelo, url)
+        resultado = expediente.revisar(carpeta, hoy, True, nombre_modelo, url, plantillas=pedido.get('plantillas'))
     resultado['procesado_en'] = f'cerebro ({socket.gethostname()})'
     return resultado
 
 
-def validar_en_cerebro(carpeta, hoy, url, clave, espera=900):
+def validar_en_cerebro(carpeta, hoy, url, clave, espera=900, plantillas=None):
     """Lado del .exe: manda la carpeta de un expediente al cerebro y devuelve su resultado."""
     carpeta = Path(carpeta)
     archivos = [{'nombre': a.name, 'contenido': base64.b64encode(a.read_bytes()).decode()}
                 for a in sorted(carpeta.iterdir()) if a.is_file() and a.suffix != '.json' and not a.name.startswith('.')]
     captura = json.loads((carpeta / 'captura.json').read_text(encoding='utf-8'))
-    cuerpo = json.dumps({'id': carpeta.name, 'hoy': hoy.isoformat(), 'captura': captura, 'archivos': archivos}).encode()
+    cuerpo = json.dumps({'id': carpeta.name, 'hoy': hoy.isoformat(), 'captura': captura, 'archivos': archivos,
+                         'plantillas': plantillas}).encode()
     solicitud = urllib.request.Request(url.rstrip('/') + '/validar', cuerpo,
                                        {'Content-Type': 'application/json', 'X-SIDP-Clave': clave})
     with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:

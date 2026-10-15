@@ -173,21 +173,32 @@ def _nombre_ine(texto):
     return None
 
 
-def tipo_de(texto):
-    """Qué documento es una página: el tipo con más textos fijos encontrados, o None."""
+def tipo_de(texto, plantillas=None):
+    """Qué documento es una página: el tipo con más textos fijos encontrados, o None.
+
+    plantillas: las activas (validacion.plantillas). Las que agregó la escuela ganan si la página
+    tiene sus textos fijos: son más específicas (una ficha de inscripción también dice "acta de nacimiento").
+    """
     texto = mayusculas(texto)
     if any(marca in texto for marca in renapo.MARCAS) and 'ACTA DE NACIMIENTO' not in texto:
         return 'constancia_curp'
-    puntos = {tipo: sum(parece(texto, [marca]) for marca in marcas) for tipo, (_, _, marcas) in TIPOS.items() if tipo != 'acta_tutor'}
-    mejor = max(puntos, key=puntos.get)
-    return mejor if puntos[mejor] else None
+    if plantillas is None:
+        plantillas = [{'clave': t, 'textos': marcas, 'minimo': 1, 'fabrica': True} for t, (_, _, marcas) in TIPOS.items()]
+    propias = {p['clave']: sum(parece(texto, [m]) for m in p['textos']) for p in plantillas if not p.get('fabrica')}
+    propias = {clave: n for clave, n in propias.items() if n >= next(p['minimo'] for p in plantillas if p['clave'] == clave)}
+    if propias:
+        return max(propias, key=propias.get)
+    puntos = {p['clave']: sum(parece(texto, [m]) for m in p['textos']) for p in plantillas
+              if p.get('fabrica') and p['clave'] != 'acta_tutor'}
+    mejor = max(puntos, key=puntos.get, default=None)
+    return mejor if mejor and puntos[mejor] else None
 
 
-def agrupar(paginas):
+def agrupar(paginas, plantillas=None):
     """Cada página con su tipo; una página sin tipo (el reverso de una hoja) se junta con la anterior."""
     anterior = None
     for pagina in paginas:
-        tipo = tipo_de(pagina['texto'] + ' ' + ' '.join(pagina.get('qr', [])))
+        tipo = tipo_de(pagina['texto'] + ' ' + ' '.join(pagina.get('qr', [])), plantillas)
         pagina['tipo'] = tipo or anterior or 'otro'
         pagina['reconocido'] = bool(tipo)
         anterior = pagina['tipo']

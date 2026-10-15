@@ -45,14 +45,7 @@
     <input id="t-domicilio" required>
     <h2 style="margin-top:16px">Documentos</h2>
     <p class="chico">PDF o foto clara, hasta 15 MB cada uno. Desde el celular puedes tomar la foto en ese momento.</p>
-    <div class="rejilla">
-      <div><label for="d-acta">Acta de nacimiento del alumno *</label><input id="d-acta" name="acta_alumno" type="file" accept=".pdf,image/*" required></div>
-      <div><label for="d-medico">Certificado médico *</label><input id="d-medico" name="certificado_medico" type="file" accept=".pdf,image/*" required></div>
-      <div><label for="d-boleta">Boleta del ciclo anterior</label><input id="d-boleta" name="boleta" type="file" accept=".pdf,image/*"></div>
-      <div><label for="d-ine">INE del tutor (frente y reverso) *</label><input id="d-ine" name="ine_tutor" type="file" accept=".pdf,image/*" multiple required></div>
-      <div><label for="d-acta-tutor">Acta de nacimiento del tutor</label><input id="d-acta-tutor" name="acta_tutor" type="file" accept=".pdf,image/*"></div>
-      <div><label for="d-comprobante">Comprobante de domicilio (3 meses o menos) *</label><input id="d-comprobante" name="comprobante" type="file" accept=".pdf,image/*" required></div>
-    </div>
+    <div class="rejilla" id="documentos"></div>
     <label style="display:flex;gap:8px;align-items:center;margin-top:14px;color:var(--texto)">
       <input type="checkbox" id="permiso" required style="width:auto">
       <span id="texto-permiso"></span></label>
@@ -81,6 +74,21 @@ if (demo) {
     location.href = `http://${direccion.includes(':') ? direccion : direccion + ':8770'}/padres`;
   };
 }
+// Los documentos que pide la escuela: los de siempre y los que agregó con una plantilla.
+const PISTAS = { ine_tutor: ' (frente y reverso)', comprobante: ' (3 meses o menos)' };
+function mostrarDocumentos(lista) {
+  $('documentos').innerHTML = lista.map((d, i) => `<div><label for="d-${i}">${esc(d.nombre)}${PISTAS[d.clave] || ''}${d.obligatorio ? ' *' : ''}</label>
+    <input id="d-${i}" name="${esc(d.clave)}" type="file" accept=".pdf,image/*" multiple ${d.obligatorio ? 'required' : ''}></div>`).join('');
+}
+mostrarDocumentos([
+  { clave: 'acta_alumno', nombre: 'Acta de nacimiento del alumno', obligatorio: true },
+  { clave: 'certificado_medico', nombre: 'Certificado médico', obligatorio: true },
+  { clave: 'boleta', nombre: 'Boleta del ciclo anterior', obligatorio: false },
+  { clave: 'ine_tutor', nombre: 'INE del tutor', obligatorio: true },
+  { clave: 'acta_tutor', nombre: 'Acta de nacimiento del tutor', obligatorio: false },
+  { clave: 'comprobante', nombre: 'Comprobante de domicilio', obligatorio: true },
+]);
+motor.listo.then(() => motor.documentosPadres()).then(mostrarDocumentos).catch(() => {});
 $('a-curp').addEventListener('input', (e) => (e.target.value = e.target.value.toUpperCase()));
 
 $('formulario').onsubmit = async (evento) => {

@@ -15,6 +15,7 @@ import sqlite3
 from pathlib import Path
 
 from validacion import cerebro_red, comparador, expediente, extraer, lector, modelo, prueba, renapo
+from validacion import plantillas as plantillas_mod
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS decision (
@@ -115,6 +116,9 @@ class Bandeja:
                 self.resultados[identificador] = json.loads(guardado.read_text(encoding='utf-8'))
         self.libro = sqlite3.connect(str(base or self.carpeta / 'decisiones.db'), check_same_thread=False)
         self.libro.executescript(ESQUEMA)
+        self.plantillas = plantillas_mod.Plantillas(self.carpeta / 'plantillas')
+        if self.registro:
+            self.registro.usar_plantillas(self.plantillas.activas())
 
     def expedientes(self):
         carpeta = self.carpeta / 'expedientes'
@@ -142,12 +146,12 @@ class Bandeja:
         resultado = None
         if self.cerebro:
             try:
-                resultado = cerebro_red.validar_en_cerebro(carpeta, self.hoy, *self.cerebro)
+                resultado = cerebro_red.validar_en_cerebro(carpeta, self.hoy, *self.cerebro, plantillas=self.plantillas.activas())
                 resultado['id'] = identificador
             except Exception as error:
                 aviso = f'el cerebro no respondió ({error}); se revisó en esta PC'
         if resultado is None:
-            resultado = expediente.revisar(carpeta, self.hoy, **self.opciones)
+            resultado = expediente.revisar(carpeta, self.hoy, plantillas=self.plantillas.activas(), **self.opciones)
             resultado['procesado_en'] = aviso if self.cerebro else 'esta PC'
         self.resultados[identificador] = resultado
         (carpeta / 'resultado.json').write_text(json.dumps(resultado, ensure_ascii=False), encoding='utf-8')
@@ -171,6 +175,10 @@ class Bandeja:
         for persona in (alumno, tutor):  # El validador compara el nombre completo.
             persona['nombre'] = ' '.join(str(persona.get(c, '')).strip() for c in ('nombres', 'primer_apellido', 'segundo_apellido')).strip()
         alumno['curp'] = str(alumno.get('curp', '')).strip().upper()
+        espacios = set(ESPACIOS) | {d['clave'] for d in self.documentos_padres()}
+        for espacio, nombre, contenido in archivos:  # Todo se revisa antes de crear la carpeta.
+            if espacio not in espacios or Path(nombre).suffix.lower() not in ACEPTADOS or not 0 < len(contenido) <= MAXIMO_ARCHIVO:
+                raise ErrorBandeja(f'Archivo no aceptado: {nombre} (PDF o foto, hasta 15 MB)')
         carpeta_expedientes = self.carpeta / 'expedientes'
         carpeta_expedientes.mkdir(parents=True, exist_ok=True)
         numero = max([int(n) for n in self.expedientes() if n.isdigit()] or [0]) + 1
@@ -180,8 +188,6 @@ class Bandeja:
         guardados, cuenta = [], {}
         for espacio, nombre, contenido in archivos:
             extension = Path(nombre).suffix.lower()
-            if espacio not in ESPACIOS or extension not in ACEPTADOS or not 0 < len(contenido) <= MAXIMO_ARCHIVO:
-                raise ErrorBandeja(f'Archivo no aceptado: {nombre} (PDF o foto, hasta 15 MB)')
             cuenta[espacio] = cuenta.get(espacio, 0) + 1
             archivo = destino / f'{espacio}_{cuenta[espacio]}{extension}'
             archivo.write_bytes(contenido)
@@ -245,7 +251,7 @@ class Bandeja:
         lecturas, procesado_en = self._leer([(p['archivo'], (carpeta / p['archivo']).read_bytes()) for p in paginas])
         for pagina, lectura in zip(paginas, lecturas):
             pagina.update(texto=lectura['texto'], qr=lectura['qr'], problemas=lectura['problemas'])
-        extraer.agrupar(paginas)
+        extraer.agrupar(paginas, self.plantillas.activas())
         propuesta = extraer.proponer(paginas, self.hoy)
         sin_texto = [p['origen'] for p in paginas if len(p['texto'].strip()) < lector.MINIMO_TEXTO]
         if sin_texto:
@@ -253,8 +259,62 @@ class Bandeja:
                                        + ('' if self.cerebro else '. Conecta el cerebro de la PC 4 para leer escaneos.'))
         (carpeta / 'lote.json').write_text(json.dumps({'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo')} for p in paginas],
                                                        'extraidos': propuesta['extraidos']}, ensure_ascii=False), encoding='utf-8')
-        return {'lote': lote, 'procesado_en': procesado_en, 'tipos': extraer.ESPACIOS, 'propuesta': propuesta,
+        return {'lote': lote, 'procesado_en': procesado_en, 'tipos': self._tipos_escaneo(), 'propuesta': propuesta,
                 'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo', 'reconocido')} for p in paginas]}
+
+    def _tipos_escaneo(self):
+        propias = {p['clave']: p['nombre'] for p in self.plantillas.activas() if not p.get('fabrica')}
+        return {**{k: v for k, v in extraer.ESPACIOS.items() if k != 'otro'}, **propias, 'otro': extraer.ESPACIOS['otro']}
+
+    # --- Plantillas de documentos (las agrega un administrativo desde el panel) ---
+
+    def documentos_padres(self):
+        """Lo que la página de padres pide, en orden: los de fábrica y luego los de la escuela."""
+        return [{'clave': p['clave'], 'nombre': p['nombre'], 'de': p['de'], 'obligatorio': p['obligatorio']}
+                for p in self.plantillas.activas() if p['para_padres']]
+
+    def lista_plantillas(self):
+        return {'plantillas': list(self.plantillas.todas().values()), 'reglas': plantillas_mod.REGLAS, 'de': plantillas_mod.DE_QUIEN}
+
+    def _muestras(self, archivos):
+        if not archivos:
+            raise ErrorBandeja('Sube una muestra del documento (PDF o foto)')
+        for nombre, contenido in archivos:
+            if Path(nombre).suffix.lower() not in ACEPTADOS or not 0 < len(contenido) <= plantillas_mod.MAXIMO_MUESTRA:
+                raise ErrorBandeja(f'Muestra no aceptada: {nombre} (PDF o foto, hasta 15 MB)')
+        return [(Path(nombre).name, contenido) for nombre, contenido in archivos]
+
+    def plantilla_leer(self, archivos):
+        """Lee una o varias muestras y propone los textos fijos. No guarda nada."""
+        lecturas, procesado_en = self._leer(self._muestras(archivos))
+        textos = [l['texto'] for l in lecturas]
+        sin_texto = [n for (n, _), t in zip(archivos, textos) if len(t.strip()) < lector.MINIMO_TEXTO]
+        return {'textos': plantillas_mod.proponer_textos([t for t in textos if len(t.strip()) >= lector.MINIMO_TEXTO]),
+                'procesado_en': procesado_en, 'sin_texto': sin_texto,
+                'parecido': {p['nombre']: plantillas_mod.cuantos_dice('\n'.join(textos), p) for p in self.plantillas.activas()
+                             if plantillas_mod.cuantos_dice('\n'.join(textos), p)}}
+
+    def plantilla_guardar(self, datos, archivos=(), quien='administrador'):
+        try:
+            plantilla = self.plantillas.guardar(datos, quien, self._muestras(archivos) if archivos else ())
+        except plantillas_mod.ErrorPlantilla as error:
+            raise ErrorBandeja(str(error))
+        if self.registro:
+            self.registro.usar_plantillas([plantilla])
+        return {'guardada': plantilla, **self.lista_plantillas()}
+
+    def plantilla_muestra(self, clave, archivo):
+        actual = self.plantillas.todas().get(clave)
+        if not actual or Path(archivo).name not in actual.get('muestras', []):
+            raise ErrorBandeja('No existe esa muestra')
+        return self.plantillas.carpeta / clave / Path(archivo).name
+
+    def plantilla_activa(self, clave, activa, quien='administrador'):
+        """Dar de baja (o volver a pedir) un documento. Es otra versión: lo anterior queda."""
+        actual = self.plantillas.todas().get(clave)
+        if not actual:
+            raise ErrorBandeja('No existe esa plantilla')
+        return self.plantilla_guardar({**actual, 'activa': bool(activa)}, quien=quien)
 
     def _lote(self, lote):
         carpeta = self.carpeta / 'escaneos' / str(lote)
@@ -293,10 +353,10 @@ class Bandeja:
         identificador = f'{numero:04d}'
         destino = carpeta_expedientes / identificador
         destino.mkdir()
-        por_tipo = {}
+        por_tipo, validos = {}, self._tipos_escaneo()
         for pagina in guardado['paginas']:
             tipo = tipos.get(pagina['archivo'], pagina['tipo'])
-            por_tipo.setdefault(tipo if tipo in extraer.ESPACIOS else 'otro', []).append(carpeta_lote / pagina['archivo'])
+            por_tipo.setdefault(tipo if tipo in validos else 'otro', []).append(carpeta_lote / pagina['archivo'])
         guardados, documentos = [], {}
         for tipo, rutas in por_tipo.items():
             pdfs = [r for r in rutas if r.suffix == '.pdf']

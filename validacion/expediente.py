@@ -148,13 +148,13 @@ class Revision:
         return resultado
 
 
-def leer_documentos(carpeta):
+def leer_documentos(carpeta, claves=TIPOS):
     """Texto de cada tipo de documento; un tipo puede tener varios archivos (frente y reverso)."""
     documentos = {}
     for archivo in sorted(Path(carpeta).iterdir()):
         if archivo.suffix == '.json' or archivo.name.startswith('.'):  # captura, resultado y registro no son documentos.
             continue
-        tipo = next((t for t in sorted(TIPOS, key=len, reverse=True) if archivo.stem.lower().startswith(t)), None)
+        tipo = next((t for t in sorted(claves, key=len, reverse=True) if archivo.stem.lower().startswith(t)), None)
         lectura = lector.leer(archivo)
         destino = documentos.setdefault(tipo or 'sin_tipo', {'archivos': [], 'texto': '', 'qr': [], 'metodo': set(), 'problemas': []})
         destino['archivos'].append(archivo.name)
@@ -165,8 +165,13 @@ def leer_documentos(carpeta):
     return documentos
 
 
-def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, url=modelo.URL, opinador=None):
-    """Revisa un expediente. Devuelve el resultado con estado, hallazgos, zona gris y lo que no se pudo leer."""
+def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, url=modelo.URL, opinador=None, plantillas=None):
+    """Revisa un expediente. Devuelve el resultado con estado, hallazgos, zona gris y lo que no se pudo leer.
+
+    plantillas: las plantillas activas (validacion.plantillas); sin ellas, solo los documentos de fábrica.
+    """
+    from validacion import plantillas as modulo_plantillas
+    vigentes = {p['clave']: p for p in (plantillas if plantillas is not None else modulo_plantillas.fabrica().values())}
     inicio, hoy, carpeta = time.monotonic(), hoy or datetime.date.today(), Path(carpeta)
     revision = Revision(carpeta.name)
     try:
@@ -175,11 +180,11 @@ def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, ur
         revision.no_leido('captura', 'captura.json', f'no se pudo leer la captura: {error}')
         captura = {}
     alumno, tutor = captura.get('alumno', {}), captura.get('tutor', {})
-    documentos = leer_documentos(carpeta)
+    documentos = leer_documentos(carpeta, vigentes)
 
     for tipo, datos in documentos.items():
         texto = (datos['texto'] + ' ' + ' '.join(datos['qr'])).strip()
-        nombre = TIPOS[tipo][0] if tipo in TIPOS else 'Archivo sin tipo'
+        nombre = vigentes[tipo]['nombre'] if tipo in vigentes else 'Archivo sin tipo'
         revision.resultado['documentos'][tipo] = {'archivos': datos['archivos'], 'metodo': sorted(datos['metodo']),
                                                   'caracteres': len(texto), 'qr': len(datos['qr']), 'problemas': datos['problemas']}
         datos['texto'] = texto
@@ -201,12 +206,14 @@ def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, ur
                     datos['texto'] = texto = texto + '\n' + franja['nombre']
                 if franja.get('vigencia') and franja['vigencia'] < hoy:
                     revision.hallazgo('ine_vencida', nombre, f'la INE venció el {franja["vigencia"].isoformat()}')
-        if not parece(texto, TIPOS[tipo][2]):
+        if not vigentes[tipo].get('fabrica'):  # Documento que agregó la escuela: se valida con su plantilla.
+            modulo_plantillas.aplicar(vigentes[tipo], texto, alumno, tutor, hoy, revision)
+        elif not parece(texto, vigentes[tipo]['textos']):
             revision.hallazgo('tipo_incorrecto', nombre, f'no parece un(a) {nombre.lower()}', 'media')
 
-    for tipo, (nombre, obligatorio, _) in TIPOS.items():
-        if obligatorio and tipo not in documentos:
-            revision.hallazgo('falta_documento', nombre, 'falta el documento')
+    for tipo, plantilla in vigentes.items():
+        if plantilla['obligatorio'] and tipo not in documentos:
+            revision.hallazgo('falta_documento', plantilla['nombre'], 'falta el documento')
 
     def texto_de(tipo):
         datos = documentos.get(tipo)

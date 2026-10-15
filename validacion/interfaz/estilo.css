@@ -48,3 +48,6 @@ body.arrastrando .soltar { background: var(--azul-claro); }
 .mensaje.bien { background: var(--verde); color: #fff; } .mensaje.ojo { background: var(--aviso); color: var(--aviso-texto); } .mensaje.mal { background: var(--rojo); color: #fff; }
 .curp { font-family: ui-monospace, Consolas, monospace; font-size: 15px; letter-spacing: .5px; }
 .validada { background: var(--verde); } .sin_validar, .sin_curp { background: var(--suave); } .no_coincide, .no_encontrada { background: var(--ambar); }
+.casilla { display: inline-flex; gap: 6px; align-items: center; color: var(--texto); font-size: 15px; margin: 4px 16px 4px 0; }
+.casilla input { width: auto; }
+tr.apagada td { color: var(--suave); }
