@@ -166,3 +166,49 @@ en la validación. La guía completa, con todos los comandos, está en
     git push origin claude/project-thread-vp6ab8
     ```
 11. Avísale a Maximiliano que ya se subió y que el cerebro quedó encendido.
+
+## Tarea 006: mejor lectura de fotos y escaneos en la PC 4 (2026-10-15)
+
+En la primera prueba real casi no se leyeron las fotos ni los escaneos. Ya está el lector nuevo:
+convierte las páginas del PDF en imagen, recorta la hoja, quita la perspectiva y las sombras, la
+gira si viene de lado, lee QR y códigos de barras, y la franja `<<<` de la INE. Con 49 fotos
+inventadas, los avisos de "no parece" bajaron de 8 a 0. Esta tarea lo instala y lo mide en la PC 4.
+
+1. Actualiza la rama:
+   ```
+   git checkout claude/project-thread-vp6ab8
+   git pull
+   ```
+2. Instala lo nuevo (PowerShell):
+   ```
+   python --version
+   python -m pip install -r validacion/requisitos.txt
+   python -m pip install -r validacion/requisitos_paddle.txt
+   ```
+   Si PaddleOCR no se instala (por ejemplo, por la versión de Python), anota el error completo y sigue: el lector usa Tesseract.
+3. Comprueba las herramientas. La primera vez PaddleOCR baja sus modelos:
+   ```
+   python -m validacion.lector
+   ```
+4. Crea las fotos inventadas **fuera del repositorio** y mídelas dos veces, con Tesseract y con PaddleOCR:
+   ```
+   python -m validacion.ejemplo.fotos "$env:USERPROFILE\SIDP-fotos"
+   $env:SIDP_SIN_PADDLE = "1"
+   python -m validacion.prueba "$env:USERPROFILE\SIDP-fotos" --hoy 2026-10-14 --sin-modelo
+   Copy-Item "$env:USERPROFILE\SIDP-fotos\resumen_para_repo.md" "$env:USERPROFILE\SIDP-fotos\resumen_tesseract.md"
+   Remove-Item Env:SIDP_SIN_PADDLE
+   python -m validacion.prueba "$env:USERPROFILE\SIDP-fotos" --hoy 2026-10-14 --sin-modelo
+   ```
+5. Reinicia el cerebro para que use el lector nuevo: cierra su ventana y abre otra vez
+   `validacion\iniciar_cerebro.bat`. La clave no cambia.
+6. Escribe `cerebro\laboratorio\resultados\2026-10-15_lectura_pc4.md` con: la versión de Python, lo que dijo
+   `python -m validacion.lector`, los dos resúmenes del paso 4 (el de Tesseract y el de PaddleOCR), cuánto
+   tardó cada uno y cualquier error. No pongas la IP ni la clave.
+7. Sube solo ese archivo:
+   ```
+   git add cerebro/laboratorio/resultados/
+   git commit -m "laboratorio: resultado de la tarea 006"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+8. Avísale a Maximiliano que ya se subió y que el cerebro quedó encendido con el lector nuevo.

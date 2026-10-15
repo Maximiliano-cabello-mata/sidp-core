@@ -79,7 +79,7 @@ def test_lector_sin_herramientas_no_falla(tmp_path, monkeypatch):
     (tmp_path / 'a.pdf').write_bytes(b'%PDF-1.4')
     (tmp_path / 'b.jpg').write_bytes(b'\xff\xd8')
     assert 'falta pypdf' in lector.leer(tmp_path / 'a.pdf')['problemas'][0]
-    assert any('falta Tesseract' in p for p in lector.leer(tmp_path / 'b.jpg')['problemas'])
+    assert any('falta opencv' in p for p in lector.leer(tmp_path / 'b.jpg')['problemas'])
 
 
 def test_prueba_mide_y_el_resumen_no_tiene_datos_personales(ejemplo):
@@ -98,3 +98,52 @@ def test_no_corre_con_documentos_reales_dentro_de_un_repositorio(ejemplo):
     (ejemplo / '.git').mkdir()
     (ejemplo / 'expedientes' / 'E01' / 'ine_tutor_frente.jpg').write_bytes(b'\xff\xd8')
     assert prueba.main([str(ejemplo), '--sin-modelo']) == 2
+
+
+def test_tipo_de_documento_tolera_errores_del_ocr():
+    marcas = expediente.TIPOS['ine_tutor'][2]
+    assert expediente.parece('INSTITUT0 NACI0NAL ELECT0RAL\nMEXICO', marcas)
+    assert expediente.parece('CREDENClAL PARA V0TAR', marcas)
+    assert not expediente.parece('RECIBO DE LUZ CFE', marcas)
+    assert not expediente.parece('CF3 RECIBO', expediente.TIPOS['comprobante'][2][1:2])  # Las marcas cortas van exactas.
+
+
+def test_franja_de_la_ine():
+    from validacion import mrz
+    nacimiento, vigencia = '850101', '241231'
+    renglon = f'{nacimiento}{mrz.digito(nacimiento)}F{vigencia}{mrz.digito(vigencia)}MEX<02<<12345<7'
+    texto = f'IDMEX1234567890<<0123456789012\n{renglon}\nRAMOS<SOTO<<MARIA<ELENA<<<<<<<'
+    datos = mrz.leer(texto)
+    assert datos['nombre'] == 'MARIA ELENA RAMOS SOTO' and datos['sexo'] == 'M'
+    assert datos['nacimiento'] == datetime.date(1985, 1, 1) and datos['vigencia'] == datetime.date(2024, 12, 31)
+    assert not mrz.leer(texto.replace('850101', '850102'))['nacimiento_valido']  # El OCR leyó mal un número.
+    assert mrz.leer('RECIBO DE LUZ') is None
+
+
+def test_ine_vencida_y_nombre_de_la_franja(ejemplo):
+    from validacion import mrz
+    carpeta = ejemplo / 'expedientes' / 'E01'
+    nacimiento, vigencia = '850101', '241231'
+    franja = f'\nIDMEX1234567890<<0123456789012\n{nacimiento}{mrz.digito(nacimiento)}F{vigencia}{mrz.digito(vigencia)}MEX<<<<<<<<<<<4\nRAMOS<SOTO<<MARIA<ELENA<<<<<<<'
+    ine = carpeta / 'ine_tutor.txt'
+    ine.write_text(ine.read_text(encoding='utf-8') + franja, encoding='utf-8')
+    resultado = revisar(carpeta)
+    assert 'ine_vencida' in reglas(resultado)
+    assert resultado['extraidos']['ine_mrz']['nombre'] == 'MARIA ELENA RAMOS SOTO'
+
+
+def test_fotos_chuecas_giradas_y_con_sombra(tmp_path):
+    cv2 = pytest.importorskip('cv2')
+    pytest.importorskip('PIL')
+    if not lector._tesseract():
+        pytest.skip('sin Tesseract')
+    import numpy
+    from validacion.ejemplo import fotos
+    texto = (Path(generar.__file__).parent / 'expedientes' / 'E01' / 'ine_tutor.txt').read_text(encoding='utf-8')
+    for variante in ('girada', 'sombra', 'escaneo'):
+        foto = fotos.deformar(fotos.hoja(texto), variante, cv2, numpy)
+        archivo = tmp_path / f'ine_{variante}.png'
+        cv2.imwrite(str(archivo), foto)
+        leido = lector.leer(archivo)
+        assert expediente.parece(leido['texto'], expediente.TIPOS['ine_tutor'][2]), (variante, leido)
+        assert 'RAMOS' in leido['texto'].upper()

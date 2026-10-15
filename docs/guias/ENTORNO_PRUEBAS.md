@@ -54,8 +54,14 @@ git pull
 
 ```powershell
 python -m pip install -r validacion/requisitos.txt
+python -m pip install -r validacion/requisitos_paddle.txt
 winget install --id UB-Mannheim.TesseractOCR -e --accept-package-agreements --accept-source-agreements
 ```
+
+- `requisitos.txt`: PDF (pypdf, pypdfium2), fotos (opencv, Pillow) y códigos QR y de barras (zxing-cpp).
+- `requisitos_paddle.txt`: PaddleOCR, el lector principal de fotos. Es pesado y la primera vez baja sus
+  modelos (unos 100 MB). Si no se puede instalar, todo sigue funcionando con Tesseract.
+- Tesseract es el respaldo y el que decide si una foto viene de lado.
 
 El instalador de Tesseract solo trae inglés. Agrega el español:
 
@@ -64,13 +70,13 @@ Invoke-WebRequest https://github.com/tesseract-ocr/tessdata_fast/raw/main/spa.tr
   -OutFile "C:\Program Files\Tesseract-OCR\tessdata\spa.traineddata"
 ```
 
-Comprueba. Las cuatro deben decir `True`:
+Comprueba. Todas deben decir `true` (PaddleOCR puede tardar la primera vez):
 
 ```powershell
-python -c "from validacion import lector; print(lector.herramientas())"
+python -m validacion.lector
 ```
 
-Si `tesseract` sale `False`, revisa que exista `C:\Program Files\Tesseract-OCR\tesseract.exe`.
+Para ver qué lee de un documento: `python -m validacion.lector C:\ruta\foto.jpg` (se queda en la pantalla).
 
 ### 3. Revisar que el modelo esté listo
 

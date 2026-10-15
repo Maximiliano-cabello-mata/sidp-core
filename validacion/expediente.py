@@ -18,17 +18,22 @@ import time
 import unicodedata
 from pathlib import Path
 
-from validacion import comparador, lector, modelo
+from validacion import comparador, lector, modelo, mrz
 
-TIPOS = {
-    'acta_alumno': ('Acta de nacimiento del alumno', True, ['ACTA DE NACIMIENTO']),
-    'certificado_medico': ('Certificado médico', True, ['CERTIFICADO MEDICO', 'CONSTANCIA MEDICA', 'CERTIFICADO DE SALUD']),
-    'boleta': ('Boleta del ciclo anterior', False, ['BOLETA', 'REPORTE DE EVALUACION', 'EDUCACION PRIMARIA', 'EDUCACION PREESCOLAR']),
-    'ine_tutor': ('INE del tutor', True, ['INSTITUTO NACIONAL ELECTORAL', 'CREDENCIAL PARA VOTAR', 'INSTITUTO FEDERAL ELECTORAL']),
-    'acta_tutor': ('Acta de nacimiento del tutor', False, ['ACTA DE NACIMIENTO']),
+TIPOS = {  # (nombre, obligatorio, textos fijos que dice ese documento; se buscan con tolerancia a errores de OCR)
+    'acta_alumno': ('Acta de nacimiento del alumno', True, ['ACTA DE NACIMIENTO', 'REGISTRO CIVIL', 'IDENTIDAD DE LA PERSONA REGISTRADA']),
+    'certificado_medico': ('Certificado médico', True, ['CERTIFICADO MEDICO', 'CONSTANCIA MEDICA', 'CERTIFICADO DE SALUD',
+                                                        'CEDULA PROFESIONAL', 'ESTADO DE SALUD']),
+    'boleta': ('Boleta del ciclo anterior', False, ['BOLETA', 'REPORTE DE EVALUACION', 'EDUCACION PRIMARIA', 'EDUCACION PREESCOLAR',
+                                                    'CALIFICACIONES', 'CICLO ESCOLAR']),
+    'ine_tutor': ('INE del tutor', True, ['INSTITUTO NACIONAL ELECTORAL', 'CREDENCIAL PARA VOTAR', 'INSTITUTO FEDERAL ELECTORAL',
+                                          'CLAVE DE ELECTOR', 'IDMEX']),
+    'acta_tutor': ('Acta de nacimiento del tutor', False, ['ACTA DE NACIMIENTO', 'REGISTRO CIVIL', 'IDENTIDAD DE LA PERSONA REGISTRADA']),
     'comprobante': ('Comprobante de domicilio', True, ['COMISION FEDERAL DE ELECTRICIDAD', 'CFE', 'TELMEX', 'TELEFONOS DE MEXICO',
-                                                        'AGUA', 'PREDIAL', 'IZZI', 'TOTALPLAY', 'MEGACABLE', 'NATURGY', 'GAS']),
+                                                        'AGUA', 'PREDIAL', 'IZZI', 'TOTALPLAY', 'MEGACABLE', 'NATURGY', 'GAS',
+                                                        'SUMINISTRADOR DE SERVICIOS BASICOS', 'TOTAL A PAGAR']),
 }
+PARECIDO = 0.82  # Qué tanto debe parecerse un pedazo del texto a un texto fijo (el OCR cambia letras).
 PADRES = {'madre', 'padre'}
 MESES = {'ENE': 1, 'ENERO': 1, 'FEB': 2, 'FEBRERO': 2, 'MAR': 3, 'MARZO': 3, 'ABR': 4, 'ABRIL': 4, 'MAY': 5, 'MAYO': 5,
          'JUN': 6, 'JUNIO': 6, 'JUL': 7, 'JULIO': 7, 'AGO': 8, 'AGOSTO': 8, 'SEP': 9, 'SEPT': 9, 'SEPTIEMBRE': 9,
@@ -43,6 +48,22 @@ ETIQUETAS_NOMBRE = {'NOMBRE', 'NOMBRES', 'S', 'PRIMER', 'SEGUNDO', 'APELLIDO', '
 def mayusculas(texto):
     texto = unicodedata.normalize('NFD', (texto or '').upper())
     return ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
+
+
+def parece(texto, marcas):
+    """¿El documento dice alguno de sus textos fijos? Tolera letras cambiadas por el OCR (0 por O, 1 por I)."""
+    palabras = re.sub(r'[^A-Z0-9]+', ' ', mayusculas(texto)).split()
+    junto = ' '.join(palabras)
+    for marca in marcas:
+        if marca in junto:
+            return True
+        largo = len(marca.split())
+        if len(marca) < 5:  # Las marcas cortas (CFE, GAS) solo cuentan escritas exactas.
+            continue
+        for inicio in range(len(palabras) - largo + 1):
+            if difflib.SequenceMatcher(None, marca, ' '.join(palabras[inicio:inicio + largo])).ratio() >= PARECIDO:
+                return True
+    return False
 
 
 def fechas(texto):
@@ -171,7 +192,16 @@ def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, ur
             continue
         if comparador.SOSPECHOSO.search(texto):
             revision.hallazgo('texto_sospechoso', nombre, 'el documento trae texto que parece una orden')
-        if not any(f in mayusculas(texto) for f in TIPOS[tipo][2]):
+        if tipo == 'ine_tutor':  # Reverso de la INE: la franja con '<' trae nombre y fechas comprobables.
+            franja = mrz.leer(texto)
+            if franja:
+                revision.resultado['extraidos']['ine_mrz'] = {k: (v.isoformat() if hasattr(v, 'isoformat') else v)
+                                                              for k, v in franja.items()}
+                if franja.get('nombre'):
+                    datos['texto'] = texto = texto + '\n' + franja['nombre']
+                if franja.get('vigencia') and franja['vigencia'] < hoy:
+                    revision.hallazgo('ine_vencida', nombre, f'la INE venció el {franja["vigencia"].isoformat()}')
+        if not parece(texto, TIPOS[tipo][2]):
             revision.hallazgo('tipo_incorrecto', nombre, f'no parece un(a) {nombre.lower()}', 'media')
 
     for tipo, (nombre, obligatorio, _) in TIPOS.items():

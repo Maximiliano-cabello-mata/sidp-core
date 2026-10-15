@@ -189,7 +189,8 @@ def main(argumentos=None):
     disponibles = lector.herramientas()
     entorno = {'Fecha': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'Equipo': platform.node(),
                'Python': platform.python_version(), 'Modelo': 'sin modelo' if args.sin_modelo else args.modelo,
-               'Herramientas': ', '.join(f'{k}: {"sí" if v else "no"}' for k, v in disponibles.items())}
+               'Herramientas': ', '.join(f'{k}: {v if isinstance(v, str) else "sí" if v else "no"}'
+                                                 for k, v in disponibles.items())}
     resultados = []
     for numero, carpeta_expediente in enumerate(expedientes, 1):
         print(f'[{numero}/{len(expedientes)}] revisando...', flush=True)
