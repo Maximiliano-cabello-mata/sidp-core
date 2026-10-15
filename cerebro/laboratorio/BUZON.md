@@ -226,7 +226,7 @@ y reinicia; no hay que medir ni subir nada.
    ```
 2. Reinicia el cerebro: cierra su ventana y abre otra vez `validacion\iniciar_cerebro.bat`. La clave y la
    dirección no cambian.
-3. Comprueba que responde (debe decir `"ok": true`):
+3. Comprueba que está encendido. Sin la clave responde `clave incorrecta`, y eso basta:
    ```
    curl.exe http://127.0.0.1:8771/salud
    ```
