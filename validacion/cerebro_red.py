@@ -213,7 +213,7 @@ def main(argumentos=None):
     print(f'Cerebro escuchando en http://{ip_local()}:{args.puerto}  (modelo {args.modelo})')
     if base:
         resumen = base.resumen()
-        print(f'Base de datos: {resumen["motor"]} con {resumen["alumnos"]} alumnos en el padrón.')
+        print(f'Base de datos: {resumen["motor"]} con {resumen["alumnos"]} alumnos inscritos.')
     else:
         print(f'Sin base de datos ({problema}): funciona igual, sin comparar contra el padrón.')
     print(f'Clave para SIDP-Validador.exe: {clave}')

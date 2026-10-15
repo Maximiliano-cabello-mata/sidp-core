@@ -405,33 +405,9 @@ class Bandeja:
             hojas.append(('escrita', texto))
         if not hojas:
             raise ErrorBandeja('Sube la lista escaneada o escribe los nombres, uno por renglón')
-        inicio_ciclo = int(ciclo_de(self.hoy)[0][:4])
-        leidas = [(nombre, t, extraer.lista_de_grupo(t, apellidos_primero)) for nombre, t in hojas]
-        con_curp = any(sum(bool(f['curp']) for f in filas) >= 3 for _, _, filas in leidas)
-        grupos, vistas = [], set()
-        for nombre, t, filas in leidas:
-            if con_curp:  # Lista oficial con CURP: las hojas sin CURP son instrucciones o avisos.
-                filas = [f for f in filas if f['curp']]
-            filas = [f for f in filas if not f['curp'] or f['curp'] not in vistas]  # Un alumno en dos hojas, una vez.
-            vistas.update(f['curp'] for f in filas if f['curp'])
-            if not filas:
-                continue
-            escrito, letra = extraer.grado_y_grupo(t)
-            por_edad = extraer.grado_por_edad([f['curp'] for f in filas if not f['dudoso']], inicio_ciclo)
-            grado = por_edad or escrito
-            letra = letra if escrito == grado else None  # Si el número de la hoja no es el grado, su letra tampoco cuenta.
-            anterior = grupos[-1] if grupos else None
-            if anterior and (grado is None or (grado, letra) == (anterior['grado'], anterior['letra'])):
-                anterior['filas'] += filas  # La lista sigue en la hoja siguiente.
-                anterior['hojas'].append(nombre)
-            else:
-                grupos.append({'grado': grado, 'letra': letra, 'filas': filas, 'hojas': [nombre], 'letra_supuesta': letra is None})
+        grupos = extraer.grupos_de_hojas(hojas, int(ciclo_de(self.hoy)[0][:4]), apellidos_primero)
         if not grupos:
             raise ErrorBandeja('No se encontraron nombres de alumnos. Revisa que sea la lista del grupo o escribe los nombres.')
-        for grupo in grupos:  # Sin letra en la hoja: A, B, C... en orden, por grado.
-            if grupo['letra'] is None and grupo['grado']:
-                usadas = {g['letra'] for g in grupos if g['grado'] == grupo['grado'] and g['letra']}
-                grupo['letra'] = next(l for l in 'ABCDEFGH' if l not in usadas)
         primero = grupos[0]
         return {'grupos': grupos, 'filas': primero['filas'], 'grado': primero['grado'],
                 'letra': None if primero['letra_supuesta'] else primero['letra'],

@@ -298,3 +298,53 @@ al informe.
    ```
 10. Avísale a Maximiliano que la base quedó lista. Él abre **Ajustes** en el panel y da **Conectar**: el panel debe
     decir `Padrón en la base del cerebro (PostgreSQL ...): N alumnos`.
+
+## Tarea 009: base de datos completa y carga de todos los alumnos (2026-10-15)
+
+La base de la PC 4 pasa a la versión 2: el expediente completo (alumnos, grupos, tutores, inscripciones,
+documentos, revisiones, lecturas y bitácora) con sus procesos dentro de PostgreSQL. Explicación en
+`docs/arquitectura/base_cerebro.md`. Después se cargan todos los alumnos desde la lista oficial de la SEP.
+
+**La lista oficial tiene datos de menores: nunca va dentro de la carpeta del repositorio, nunca se sube y
+sus nombres o CURP nunca van al informe.** Los comandos de esta tarea solo imprimen números.
+
+No hace falta PowerShell de administrador.
+
+1. Actualiza la rama:
+   ```
+   git checkout claude/project-thread-vp6ab8
+   git pull
+   ```
+2. Maximiliano te da el PDF de la lista oficial (USB o carpeta compartida). Guárdalo **fuera del
+   repositorio**, en `C:\SIDP-datos\lista_oficial.pdf`:
+   ```
+   New-Item -ItemType Directory -Force C:\SIDP-datos | Out-Null
+   ```
+3. Actualiza la base a la versión 2. Lo que ya había pasa solo y nada se borra:
+   ```
+   python -m validacion.base_cerebro
+   ```
+   Debe decir `Base lista: PostgreSQL 17..., esquema 2, ...`.
+4. Carga la lista oficial:
+   ```
+   python -m validacion.base_cerebro cargar C:\SIDP-datos\lista_oficial.pdf --ciclo 2026-2027
+   ```
+   Deben salir 6 grupos, de 1° A a 6° A, con sus alumnos, y al final cuántos son nuevos. Si lo corres otra
+   vez, debe decir que ese archivo ya se había cargado.
+5. Saca el informe (solo números):
+   ```
+   python -m validacion.base_cerebro informe
+   ```
+6. Reinicia el cerebro: cierra su ventana y abre otra vez `validacion\iniciar_cerebro.bat`. Debe decir
+   `Base de datos: PostgreSQL 17... con N alumnos inscritos`. La clave y la dirección no cambian.
+7. Escribe `cerebro\laboratorio\resultados\2026-10-15_base_v2_pc4.md` con lo que imprimieron los pasos 3, 4,
+   5 y 6 (sin la clave) y cualquier error completo. Antes de subirlo, revisa que no tenga ningún nombre ni
+   CURP. No pongas contraseñas ni la IP.
+8. Sube solo ese archivo:
+   ```
+   git add cerebro/laboratorio/resultados/
+   git commit -m "laboratorio: resultado de la tarea 009"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+9. Avísale a Maximiliano que la base quedó cargada.

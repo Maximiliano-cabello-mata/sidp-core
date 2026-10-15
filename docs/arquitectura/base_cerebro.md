@@ -1,0 +1,74 @@
+# Base de datos de la PC 4 (PostgreSQL)
+
+Decisión de Maximiliano (2026-10-15): la PC 4 tiene su propia base de datos, PostgreSQL, para hacer
+mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `sidp`, versión 2) y
+`validacion/base_cerebro.py`. La instalación fue la Tarea 008 del buzón; la carga de los alumnos, la 009.
+
+## Dónde vive cada cosa
+
+- **PC 4:** PostgreSQL escucha solo en 127.0.0.1. Nadie de la red entra a la base: todo pasa por el
+  cerebro (puerto 8771, con su clave). La contraseña de la base vive en `%USERPROFILE%\.sidp\`.
+- **PC del administrador:** SIDP-Validador.exe sigue guardando los archivos (PDF y fotos) y su SQLite.
+  A la PC 4 llega solo la huella (sha256) de cada archivo, no el archivo.
+- **Repositorio:** solo el código y números. La lista oficial y los datos de los alumnos nunca se suben.
+
+## Tablas
+
+| Tabla | Qué guarda |
+|---|---|
+| `ciclo`, `grupo` | Ciclos (agosto a julio) y grupos por grado y letra |
+| `alumno` | CURP, nombre, fecha, sexo y entidad (salen de la CURP), si la CURP cuadra su dígito, qué dijo RENAPO |
+| `tutor`, `alumno_tutor` | Padres o tutores; un solo tutor principal vigente por alumno |
+| `inscripcion` | Un alumno en un grupo por ciclo: incompleta, completa, baja (con motivo) o cancelada |
+| `tipo_documento` | Los 10 documentos del expediente, cuáles son obligatorios, desde qué grado y cuánto duran |
+| `documento`, `revision_documento` | Cada documento recibido (versiones sin borrar) y quién lo validó o rechazó |
+| `importacion` | Cada archivo cargado, por su huella: el mismo archivo no se carga dos veces |
+| `lectura` | Lo que leyó el cerebro en cada página y qué tan cerca quedó de un alumno |
+| `sugerencia_ia` | Lo que propone la IA; solo una persona lo acepta o lo corrige |
+| `bitacora` | Cada alta y cambio, con el antes, el después y quién lo hizo |
+
+## Defensas en el motor
+
+- No se borra nada: `DELETE` y `TRUNCATE` fallan; se usan estados.
+- La bitácora no se puede cambiar ni borrar.
+- Cada cambio sube la versión de 1 en 1; un cambio que no cambia nada no se guarda.
+- Revisar un documento pide una persona (no "IA" ni "cerebro"); rechazar pide motivo; dar de baja también.
+- Ningún proceso da de baja a un alumno solo: si falta en una lista, se cuenta en `no_vinieron` y decide una persona.
+
+## Procesos (funciones del esquema `sidp`)
+
+- **CURP:** `curp_digito`, `curp_valida`, `curp_fecha`. Revisan igual que el código de Python.
+- **Edades:** `edad_al`, `grado_esperado` (6 años cumplidos al 31 de diciembre para 1°) y `ciclo_de`.
+- **Cargas:** `cargar_alumnos` (reconoce al alumno por su CURP o por su nombre idéntico, cambia de grupo y
+  rechaza renglones malos con su motivo) e `importar` (lo mismo, una sola vez por archivo).
+- **Búsqueda:** `curp_cercana` (hasta 2 letras distintas), `nombre_cercano` (faltas de ortografía y otro
+  orden) y `buscar` (para el panel).
+- **Expediente:** `registrar_documento` (la versión anterior queda reemplazada), `revisar_documento`,
+  `vencer_documentos` (el comprobante dura 3 meses), `marcar_renapo`, `cambiar_grupo` y `dar_baja`.
+- **Vistas:**
+  - `v_alumnos` y `v_inscritos`;
+  - `v_faltantes` (qué documento obligatorio falta validar);
+  - `v_matricula_911` (por grado, sexo y edad);
+  - `v_resumen_grupo`;
+  - `v_alertas`:
+    - CURP que no cuadra;
+    - fecha distinta a la de la CURP;
+    - RENAPO no la encontró;
+    - sin CURP;
+    - extraedad o menor edad;
+    - posible duplicado;
+    - RENAPO pendiente.
+- **Resumen:** `resumen()`, solo números, para copiar a un informe.
+
+## Comandos (en la PC 4, desde la raíz del repositorio)
+
+```
+python -m validacion.base_cerebro                                  # crea o actualiza la base y dice cómo está
+python -m validacion.base_cerebro cargar C:\SIDP-datos\lista.pdf   # la lista oficial de la SEP
+python -m validacion.base_cerebro informe                          # 911, grupos, alertas y faltantes, sin nombres
+```
+
+La versión 1 (tabla `padron_alumno`) se pasa sola a la 2 la primera vez. La tabla vieja se queda
+renombrada como `padron_alumno_v1`. El cerebro y el .exe se comunican igual que antes:
+- el .exe manda el padrón en `/padron` al conectarse y al guardar listas;
+- en `/leer`, cada página regresa con las sugerencias de la base.

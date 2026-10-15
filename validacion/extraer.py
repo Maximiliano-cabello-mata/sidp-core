@@ -335,6 +335,40 @@ def grado_por_edad(curps_grupo, inicio_ciclo):
     return grado if 1 <= grado <= 6 else None
 
 
+def grupos_de_hojas(hojas, inicio_ciclo, apellidos_primero=True):
+    """Hojas [(nombre, texto)] de una o varias listas -> grupos [{grado, letra, filas, hojas, letra_supuesta}].
+
+    Un PDF puede traer varios grupos (la lista oficial de la SEP trae toda la escuela, una hoja por grupo).
+    El grado sale de lo escrito en la hoja o, si hay CURP, de la edad de la mayoría; una hoja sin grado
+    propio sigue la lista del grupo anterior. Sin letra en la hoja, se ponen A, B, C... por grado.
+    """
+    leidas = [(nombre, t, lista_de_grupo(t, apellidos_primero)) for nombre, t in hojas]
+    con_curp = any(sum(bool(f['curp']) for f in filas) >= 3 for _, _, filas in leidas)
+    grupos, vistas = [], set()
+    for nombre, t, filas in leidas:
+        if con_curp:  # Lista oficial con CURP: las hojas sin CURP son instrucciones o avisos.
+            filas = [f for f in filas if f['curp']]
+        filas = [f for f in filas if not f['curp'] or f['curp'] not in vistas]  # Un alumno en dos hojas, una vez.
+        vistas.update(f['curp'] for f in filas if f['curp'])
+        if not filas:
+            continue
+        escrito, letra = grado_y_grupo(t)
+        por_edad = grado_por_edad([f['curp'] for f in filas if not f['dudoso']], inicio_ciclo)
+        grado = por_edad or escrito
+        letra = letra if escrito == grado else None  # Si el número de la hoja no es el grado, su letra tampoco cuenta.
+        anterior = grupos[-1] if grupos else None
+        if anterior and (grado is None or (grado, letra) == (anterior['grado'], anterior['letra'])):
+            anterior['filas'] += filas  # La lista sigue en la hoja siguiente.
+            anterior['hojas'].append(nombre)
+        else:
+            grupos.append({'grado': grado, 'letra': letra, 'filas': filas, 'hojas': [nombre], 'letra_supuesta': letra is None})
+    for grupo in grupos:
+        if grupo['letra'] is None and grupo['grado']:
+            usadas = {g['letra'] for g in grupos if g['grado'] == grupo['grado'] and g['letra']}
+            grupo['letra'] = next(l for l in 'ABCDEFGH' if l not in usadas)
+    return grupos
+
+
 def lista_de_grupo(texto, apellidos_primero=True):
     """Los alumnos de una lista de grupo, un renglón por alumno: [{nombres, primer_apellido, segundo_apellido, curp, dudoso}].
 

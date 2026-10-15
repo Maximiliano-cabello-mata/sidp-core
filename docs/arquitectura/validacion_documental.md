@@ -230,5 +230,6 @@ mejores procesos. Después solo se escanean los documentos físicos de cada alum
   si la CURP leída no es de nadie pero está a una o dos letras de la de un alumno, o no se leyó la CURP y
   el nombre se parece a uno solo, el panel propone ese alumno **con un aviso**; la persona compara con el
   acta y decide. Dos alumnos igual de parecidos (hermanos) no se proponen.
-- **Dónde vive cada cosa.** El .exe del administrador sigue guardando todo en su SQLite (las 39 tablas);
-  la base de la PC 4 es para procesar mejor, no es la oficial. La instalación es la Tarea 008 del buzón.
+- **Dónde vive cada cosa.** El .exe del administrador sigue guardando los archivos y su SQLite; la base
+  de la PC 4 es para procesar mejor. Desde la versión 2 guarda el expediente completo con sus procesos:
+  ver [base_cerebro.md](base_cerebro.md). Instalación: Tarea 008; carga de los alumnos: Tarea 009.
