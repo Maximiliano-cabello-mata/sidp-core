@@ -114,3 +114,27 @@ Lo construido hasta hoy, en versión de prueba:
 - **Cerebro** (PC 4): valida por IP con clave y opina en la zona gris.
 
 Cómo se arma: [ENTORNO_PRUEBAS.md](../guias/ENTORNO_PRUEBAS.md). Resultados y errores: [bitácora del 2026-10-15](../bitacoras/2026-10-15.md).
+
+## CURP ante RENAPO, asistida por una persona (2026-10-15)
+
+Decisión de Maximiliano: el sistema no tiene que estar automatizado al 100%. No hay bots ni se
+resuelve el captcha de forma automática. Así funciona:
+
+1. Toda CURP entra "Sin validar" (`alumno.curp_confirmada = 0`).
+2. En el panel, la persona copia la CURP y abre gob.mx/curp. Ahí la pega, resuelve el captcha,
+   descarga la constancia en PDF y la arrastra al panel.
+3. `validacion/renapo.py` lee la constancia: busca la frase de RENAPO, la CURP con su dígito
+   verificador correcto y el nombre.
+4. El alumno se encuentra por la CURP, sin elegirlo a mano. Si el nombre coincide,
+   `sp_validar_curp_renapo` guarda la constancia como documento `curp` validado y pone
+   `curp_confirmada = 1`. La revisión y la bitácora registran quién y cuándo.
+5. Si el nombre no coincide, o si la constancia trae otra CURP pero el nombre de un alumno, el
+   documento queda rechazado y el motivo se muestra para hablar con el padre.
+6. "RENAPO no la encontró" queda anotado en la bitácora.
+
+Pendiente: confirmar con una constancia real que su texto se lee con pypdf. Solo se probó con
+constancias inventadas, porque gob.mx no se puede abrir desde el entorno en la nube.
+
+Además, desde ese mismo día el vínculo tutor–alumno se aplica solo cuando el administrador
+autoriza el expediente. Antes se aplicaba al recibirlo, y cualquiera que escribiera la CURP de un
+alumno quedaba como su tutor principal.

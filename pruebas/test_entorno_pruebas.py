@@ -152,3 +152,99 @@ def test_la_pagina_publica_solo_lleva_codigo_y_expedientes_inventados(tmp_path):
     ejemplo = json.loads((destino / 'ejemplo.json').read_text(encoding='utf-8'))
     assert 'expedientes/E01/captura.json' in ejemplo
     assert all(r.endswith(('.txt', '.json', '.csv')) and not r.endswith('resultado.json') for r in ejemplo)
+
+
+def constancia(curp=CURP, nombre='LUIS HERNANDEZ RAMOS'):
+    """Una constancia de la CURP inventada, con las frases que trae la de RENAPO."""
+    return pdf_de_texto(['CONSTANCIA DE LA CLAVE UNICA DE REGISTRO DE POBLACION', f'Clave: {curp}', f'Nombre: {nombre}',
+                         'Entidad de registro: MEXICO', 'Registro Nacional de Poblacion'])
+
+
+def subir_constancia(url, app, contenido):
+    cabeceras = {'X-SIDP-Token': app.token, 'X-SIDP-Nombre': 'constancia.pdf'}
+    return pedir(url, '/api/renapo/constancia', contenido, cabeceras, tipo='application/pdf')
+
+
+def estado_curp(url, app):
+    return pedir(url, '/api/curps', cabeceras={'X-SIDP-Token': app.token})[1]['alumnos']
+
+
+def test_la_curp_pasa_de_sin_validar_a_validada_con_la_constancia(entorno):
+    app, url = entorno
+    cuerpo, tipo = formulario(*expediente_pdf())
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    assert [(a['curp'], a['estado']) for a in estado_curp(url, app)] == [(CURP, 'sin_validar')]
+    assert pedir(url, '/api/curps')[0] == 403  # Solo el panel.
+    codigo, respuesta = subir_constancia(url, app, constancia())
+    assert codigo == 200 and respuesta['estado'] == 'validada' and 'Luis' in respuesta['mensaje']
+    assert estado_curp(url, app)[0]['estado'] == 'validada'
+    db = app.bandeja.registro.db
+    assert db.execute('SELECT curp_confirmada FROM alumno').fetchone()[0] == 1
+    assert db.execute("SELECT estado, origen FROM documento WHERE tipo = 'curp'").fetchall() == [('validado', 'escaneo')]
+    assert db.execute("SELECT count(*) FROM bitacora WHERE accion = 'alumno.renapo_validada'").fetchone()[0] == 1
+    assert len(list((app.carpeta / 'renapo').glob('constancia_*.pdf'))) == 1
+    # Arrastrarla otra vez no duplica nada.
+    assert subir_constancia(url, app, constancia())[1]['mensaje'].endswith('ya estaba validada.')
+    assert db.execute("SELECT count(*) FROM documento WHERE tipo = 'curp'").fetchone()[0] == 1
+
+
+def test_la_constancia_con_otro_nombre_queda_por_revisar(entorno):
+    app, url = entorno
+    cuerpo, tipo = formulario(*expediente_pdf())
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    codigo, respuesta = subir_constancia(url, app, constancia(nombre='LUIS HERNANDEZ RAMIREZ'))
+    assert codigo == 200 and respuesta['estado'] == 'no_coincide' and 'RAMOS' in respuesta['mensaje']
+    fila = estado_curp(url, app)[0]
+    assert fila['estado'] == 'no_coincide' and 'RAMOS' in fila['detalle']
+    assert app.bandeja.registro.db.execute('SELECT curp_confirmada FROM alumno').fetchone()[0] == 0
+
+
+def test_la_constancia_de_otra_curp_avisa_cual_escribio_el_padre(entorno):
+    app, url = entorno
+    cuerpo, tipo = formulario(*expediente_pdf())
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    correcta = generar.curp('HERL180314HMCRMSB')
+    respuesta = subir_constancia(url, app, constancia(curp=correcta))[1]
+    assert respuesta['estado'] == 'no_coincide' and correcta in respuesta['mensaje'] and CURP in respuesta['mensaje']
+
+
+def test_lo_que_no_es_constancia_no_cambia_nada(entorno):
+    app, url = entorno
+    cuerpo, tipo = formulario(*expediente_pdf())
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    codigo, respuesta = subir_constancia(url, app, b'no soy un pdf')
+    assert codigo == 400 and 'no es un PDF' in respuesta['error']
+    codigo, respuesta = subir_constancia(url, app, pdf_de_texto(['RECIBO DE LUZ', CURP]))
+    assert codigo == 400 and 'no parece la constancia' in respuesta['error']
+    otra = generar.curp('SOTM900101MMCTRRA')
+    codigo, respuesta = subir_constancia(url, app, constancia(curp=otra, nombre='MARTA SOTO TORRES'))
+    assert codigo == 400 and otra in respuesta['error']
+    assert estado_curp(url, app)[0]['estado'] == 'sin_validar'
+    assert not (app.carpeta / 'renapo').exists()  # Nada se guardó.
+
+
+def test_renapo_no_la_encontro_queda_anotado(entorno):
+    app, url = entorno
+    cuerpo, tipo = formulario(*expediente_pdf())
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    alumno = estado_curp(url, app)[0]['alumno']
+    codigo, respuesta = pedir(url, '/api/renapo/no_encontrada', {'alumno': alumno}, {'X-SIDP-Token': app.token})
+    assert codigo == 200 and respuesta['alumnos'][0]['estado'] == 'no_encontrada'
+
+
+def test_el_tutor_queda_vinculado_solo_al_autorizar(entorno):
+    app, url = entorno
+    db = app.bandeja.registro.db
+    token = {'X-SIDP-Token': app.token}
+    captura, archivos = expediente_pdf()
+    cuerpo, tipo = formulario(captura, archivos)
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    assert db.execute('SELECT count(*) FROM alumno_tutor').fetchone()[0] == 0
+    pedir(url, '/api/decidir', {'id': '0001', 'decision': 'autorizado'}, token)
+    # Otra persona manda un expediente con la misma CURP: no le quita nada a la madre.
+    extrano = {**captura, 'tutor': {'nombres': 'Extraño', 'primer_apellido': 'Pérez', 'parentesco': 'otro', 'domicilio': 'X'}}
+    cuerpo, tipo = formulario(extrano, archivos)
+    pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)
+    pedir(url, '/api/decidir', {'id': '0002', 'decision': 'rechazado', 'motivo': 'No es su tutor'}, token)
+    filas = db.execute('SELECT t.nombres, a.principal, a.puede_recoger FROM alumno_tutor a JOIN tutor t ON t.id = a.tutor_id').fetchall()
+    assert filas == [('María Elena', 1, 1)]

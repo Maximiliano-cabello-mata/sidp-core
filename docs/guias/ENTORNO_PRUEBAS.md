@@ -185,6 +185,14 @@ schtasks /create /tn "SIDP Cerebro" /tr "\"$PWD\validacion\iniciar_cerebro.bat\"
    capturan los datos y se toman las fotos o se suben los PDF.
 5. Cada envío aparece en el panel con su resultado. Tú autorizas o rechazas; al rechazar, el panel
    muestra el reporte que recibiría el padre.
+6. **CURP ante RENAPO.** En el cuadro "CURP: validar en RENAPO" aparece cada alumno con su CURP
+   "Sin validar". Da **Copiar CURP y abrir RENAPO**, pega la CURP en la página oficial (Ctrl + V),
+   resuelve el captcha, descarga el PDF y arrástralo a cualquier parte del panel. El sistema
+   encuentra al alumno por la CURP, compara el nombre y la marca **Validada en RENAPO**; la
+   constancia se guarda en `SIDP-prueba\renapo\`. Si el nombre no coincide, queda "Revisar: no
+   coincide" con lo que falta. Si RENAPO no la encuentra, da **RENAPO no la encontró**.
+7. El tutor queda vinculado al alumno (principal y puede recoger) **solo cuando autorizas** su
+   expediente.
 
 Si el celular no abre la página, revisa que la red de esta PC también sea **Privada** (paso 4a de
 la Parte 1) y que la regla del firewall exista:

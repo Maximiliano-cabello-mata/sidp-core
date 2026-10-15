@@ -6,11 +6,12 @@ SQLite en la carpeta (`decisiones.db`): solo se agregan, nunca se cambian ni se 
 última de cada expediente es la que cuenta.
 """
 import datetime
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
 
-from validacion import cerebro_red, expediente, lector, modelo, prueba
+from validacion import cerebro_red, expediente, lector, modelo, prueba, renapo
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS decision (
@@ -207,6 +208,35 @@ class Bandeja:
                 raise ErrorBandeja(f'Documento no válido: {nombre}')
             (carpeta / nombre).write_text(texto, encoding='utf-8')
         return self.revisar(identificador)
+
+    def curps(self):
+        """La lista de CURP por validar ante RENAPO (vacía sin la base de 39 tablas)."""
+        return {'pagina_oficial': renapo.PAGINA_OFICIAL, 'alumnos': self.registro.curps() if self.registro else []}
+
+    def constancia_renapo(self, nombre, contenido):
+        """La constancia que la persona descargó de RENAPO y arrastró al panel. Se guarda sin sobrescribir."""
+        if not self.registro:
+            raise ErrorBandeja('Aquí no hay base de datos de alumnos')
+        def guardar():
+            carpeta = self.carpeta / 'renapo'
+            carpeta.mkdir(exist_ok=True)
+            archivo = carpeta / f'constancia_{hashlib.sha256(contenido).hexdigest()[:16]}.pdf'
+            if not archivo.exists():
+                archivo.write_bytes(contenido)
+            return archivo.relative_to(self.carpeta).as_posix()
+        try:
+            return self.registro.validar_constancia(contenido, guardar)
+        except renapo.ErrorConstancia as error:
+            raise ErrorBandeja(str(error)) from error
+
+    def renapo_no_encontrada(self, alumno_id):
+        if not self.registro:
+            raise ErrorBandeja('Aquí no hay base de datos de alumnos')
+        try:
+            self.registro.renapo_no_encontrada(alumno_id)
+        except renapo.ErrorConstancia as error:
+            raise ErrorBandeja(str(error)) from error
+        return self.curps()
 
     def base(self):
         """Filas en la base de las 39 tablas, para ver que los datos sí llegaron."""

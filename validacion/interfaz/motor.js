@@ -34,6 +34,15 @@ function motorLocal() {
     guardarConfiguracion: (datos) => api('/api/configuracion', datos),
     base: () => api('/api/base'),
     enviar: (formulario) => api('/api/padres/enviar', formulario),
+    curps: () => api('/api/curps'),
+    constancia: async (archivo) => {
+      const respuesta = await fetch('/api/renapo/constancia', { method: 'POST', body: archivo,
+        headers: { 'X-SIDP-Token': SIDP.token || '', 'Content-Type': 'application/pdf', 'X-SIDP-Nombre': encodeURIComponent(archivo.name) } });
+      const datos = await respuesta.json();
+      if (!respuesta.ok || datos.error) throw new Error(datos.error || respuesta.statusText);
+      return datos;
+    },
+    renapoNoEncontrada: (alumno) => api('/api/renapo/no_encontrada', { alumno }),
   };
 }
 
@@ -49,6 +58,11 @@ bandeja = Bandeja('/demo', hoy=datetime.date(2026, 10, 14), usar_modelo=False, b
 def llamar(nombre, argumentos):
     try:
         return json.dumps({'ok': getattr(bandeja, nombre)(*json.loads(argumentos))}, ensure_ascii=False, default=str)
+    except ErrorBandeja as error:
+        return json.dumps({'error': str(error)}, ensure_ascii=False)
+def constancia(nombre, contenido):
+    try:
+        return json.dumps({'ok': bandeja.constancia_renapo(nombre, base64.b64decode(contenido))}, ensure_ascii=False, default=str)
     except ErrorBandeja as error:
         return json.dumps({'error': str(error)}, ensure_ascii=False)
 def recibir(captura, archivos):
@@ -105,6 +119,14 @@ def recibir(captura, archivos):
     configuracion: null,
     guardarConfiguracion: null,
     base: () => llamar('base'),
+    curps: () => llamar('curps'),
+    constancia: async (archivo) => {
+      await listo;
+      const datos = JSON.parse(py.globals.get('constancia')(archivo.name, base64(await archivo.arrayBuffer())));
+      if (datos.error) throw new Error(datos.error);
+      return datos.ok;
+    },
+    renapoNoEncontrada: (alumno) => llamar('renapo_no_encontrada', alumno),
     enviar: async (formulario) => {
       await listo;
       const archivos = [];

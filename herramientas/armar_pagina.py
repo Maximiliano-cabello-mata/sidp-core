@@ -16,7 +16,7 @@ INTERFAZ = RAIZ / 'validacion' / 'interfaz'
 EJEMPLO = RAIZ / 'validacion' / 'ejemplo'
 PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
 CODIGO = ['validacion/__init__.py', 'validacion/comparador.py', 'validacion/modelo.py', 'validacion/lector.py',
-          'validacion/expediente.py', 'validacion/prueba.py', 'validacion/cerebro_red.py', 'validacion/registro.py',
+          'validacion/expediente.py', 'validacion/prueba.py', 'validacion/cerebro_red.py', 'validacion/registro.py', 'validacion/renapo.py',
           'validacion/servicio.py', 'database/__init__.py', 'database/procedimientos.py', 'database/diseno_integral.sql']
 
 

@@ -41,3 +41,10 @@ h2 { font-size: 17px; margin: 4px 0 10px; } h3 { font-size: 15px; margin: 14px 0
 .rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
 .oculto { display: none; }
 pre { white-space: pre-wrap; background: var(--fondo); border-radius: 8px; padding: 10px; font-size: 13px; }
+.pasos { margin: 6px 0 10px; padding-left: 22px; font-size: 16px; } .pasos li { margin: 4px 0; }
+.soltar { border: 2px dashed var(--azul); border-radius: 12px; padding: 22px; text-align: center; font-size: 17px; cursor: pointer; margin: 10px 0; }
+body.arrastrando .soltar { background: var(--azul-claro); }
+.mensaje { border-radius: 10px; padding: 10px 14px; margin: 8px 0; font-size: 16px; }
+.mensaje.bien { background: var(--verde); color: #fff; } .mensaje.ojo { background: var(--aviso); color: var(--aviso-texto); } .mensaje.mal { background: var(--rojo); color: #fff; }
+.curp { font-family: ui-monospace, Consolas, monospace; font-size: 15px; letter-spacing: .5px; }
+.validada { background: var(--verde); } .sin_validar, .sin_curp { background: var(--suave); } .no_coincide, .no_encontrada { background: var(--ambar); }

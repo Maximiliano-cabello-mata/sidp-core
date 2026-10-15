@@ -396,6 +396,41 @@ def sp_asignar_tutor(db, alumno_id, tutor_id, parentesco, actor, principal=True,
         _anotar(db, fecha, actor, 'alumno_tutor.asignado', 'alumno_tutor', f'{alumno_id}/{tutor_id}', actual, despues)
 
 
+def sp_validar_curp_renapo(db, alumno_id, archivo_sha256, resultado, actor, version, motivo=None, *, ahora=None):
+    """Guarda la constancia de RENAPO que trajo una persona y, si coincide, confirma la CURP del alumno.
+
+    La constancia queda como documento 'curp' revisado (validado o rechazado con su motivo); con
+    'validado', alumno.curp_confirmada pasa a 1. Quién y cuándo quedan en la revisión y la bitácora.
+    """
+    fecha = _ahora(ahora)
+    with _transaccion(db):
+        _persona(db, actor)
+        _opcion(resultado, ('validado', 'rechazado'), 'Resultado')
+        alumno = _uno(db, 'SELECT curp, curp_confirmada, version FROM alumno WHERE id = ?', (alumno_id,))
+        if alumno is None:
+            raise ProcedimientoError('El alumno no existe.')
+        _misma_version(alumno, version, 'El alumno')
+        if not _uno(db, 'SELECT 1 FROM archivo WHERE sha256 = ?', (archivo_sha256,)):
+            raise ProcedimientoError(f'El archivo físico con hash {archivo_sha256} no está registrado.')
+        motivo = motivo.strip() if motivo and motivo.strip() else None
+        if resultado == 'rechazado' and motivo is None:
+            raise ProcedimientoError('Es obligatorio especificar por qué no coincide la constancia.')
+        documento_id = _uid()
+        db.execute('INSERT INTO documento(id, tipo, alumno_id, archivo_sha256, origen, estado, motivo_rechazo, recibio, recibido) '
+                   "VALUES(?, 'curp', ?, ?, 'escaneo', ?, ?, ?, ?)",
+                   (documento_id, alumno_id, archivo_sha256, resultado, motivo if resultado == 'rechazado' else None, actor, fecha))
+        db.execute('INSERT INTO revision_documento(id, documento_id, resultado, motivo, reviso, fecha) VALUES(?,?,?,?,?,?)',
+                   (_uid(), documento_id, resultado, motivo or 'Constancia de la CURP descargada de RENAPO', actor, fecha))
+        despues = {'documento_id': documento_id, 'curp': alumno['curp'], 'fuente': 'constancia RENAPO'}
+        if resultado == 'validado':
+            _actualizar(db, 'alumno', alumno_id, {'curp_confirmada': 1})
+            _anotar(db, fecha, actor, 'alumno.renapo_validada', 'alumno', alumno_id,
+                    {'curp_confirmada': alumno['curp_confirmada']}, {**despues, 'curp_confirmada': 1})
+        else:
+            _anotar(db, fecha, actor, 'alumno.renapo_no_coincide', 'alumno', alumno_id, None, {**despues, 'motivo': motivo})
+    return documento_id
+
+
 def sp_capturar_calificacion(db, inscripcion_id, periodo_id, campo, valor, actor, version=None, observaciones=None,
                              *, ahora=None):
     """Captura o cambia la calificación de un campo formativo en un periodo abierto."""

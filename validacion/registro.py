@@ -3,7 +3,11 @@
 Cuando un padre sube su expediente, se registran el alumno, el tutor, cada archivo (por su
 sha256, sin sobrescribir) y cada documento. Lo que el validador extrajo queda en
 sugerencia_ia como propuesta: la CURP no se confirma sola. La decisión del administrador
-pasa por sp_revisardocumento, que deja la revisión y la bitácora.
+pasa por sp_revisardocumento, que deja la revisión y la bitácora. El vínculo del tutor con el
+alumno se aplica solo al autorizar.
+
+La CURP se valida ante RENAPO con la constancia que descarga una persona (validacion/renapo.py):
+al coincidir, alumno.curp_confirmada pasa a 1 con sp_validar_curp_renapo.
 """
 import datetime
 import hashlib
@@ -14,7 +18,7 @@ import uuid
 from pathlib import Path
 
 from database import procedimientos as sp
-from validacion import comparador
+from validacion import comparador, renapo
 
 RAIZ = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))  # Dentro del .exe, los datos incluidos.
 DISENO = RAIZ / 'database' / 'diseno_integral.sql'
@@ -81,8 +85,9 @@ class Registro:
         alumno = self._persona('alumno', captura['alumno'], captura['alumno'].get('curp', '').upper())
         tutor = self._persona('tutor', captura['tutor'])
         parentesco = captura['tutor'].get('parentesco', 'otro')
-        sp.sp_asignar_tutor(self.db, alumno, tutor, parentesco if parentesco in ('madre', 'padre', 'tutor_legal', 'abuelo') else 'otro',
-                            self.actor)
+        # El vínculo con el alumno es solo una solicitud: se aplica cuando el administrador autoriza.
+        # Así nadie queda como tutor de un niño con solo escribir su CURP.
+        parentesco = parentesco if parentesco in ('madre', 'padre', 'tutor_legal', 'abuelo') else 'otro'
         documentos = []
         for espacio, ruta, contenido in archivos:
             tipo, dueno = TIPO_DISENO.get(espacio, (None, None))
@@ -109,7 +114,7 @@ class Registro:
                     self.db.execute("INSERT INTO documento(id, tipo, tutor_id, archivo_sha256, origen, estado, recibido) "
                                     "VALUES(?,?,?,?,'buzon','recibido',?)", (identificador, tipo, tutor, sha, _ahora()))
                 documentos.append(identificador)
-        return {'alumno': alumno, 'tutor': tutor, 'documentos': documentos}
+        return {'alumno': alumno, 'tutor': tutor, 'parentesco': parentesco, 'documentos': documentos}
 
     def proponer(self, ids, resultado):
         """Lo que encontró el validador queda como propuesta (C10): la decide una persona."""
@@ -130,6 +135,81 @@ class Registro:
         with self.db:
             self.db.execute("UPDATE sugerencia_ia SET estado = ?, decidio = ? WHERE objeto_id = ? AND estado = 'propuesta'",
                             ('aceptada' if decision == 'autorizado' else 'rechazada', self.actor, ids['alumno']))
+        if decision == 'autorizado' and 'parentesco' in ids:  # Expedientes anteriores ya traían el vínculo.
+            sp.sp_asignar_tutor(self.db, ids['alumno'], ids['tutor'], ids['parentesco'], self.actor)
+
+    def _ultimo_renapo(self, alumno_id):
+        fila = self.db.execute("SELECT accion, despues, fecha FROM bitacora WHERE objeto_tipo = 'alumno' AND objeto_id = ? "
+                               "AND accion LIKE 'alumno.renapo_%' ORDER BY secuencia DESC LIMIT 1", (alumno_id,)).fetchone()
+        return (fila[0].split('renapo_', 1)[1], json.loads(fila[1] or '{}'), fila[2]) if fila else (None, {}, None)
+
+    def curps(self):
+        """Cada alumno con el estado de su CURP ante RENAPO; primero lo que falta por hacer."""
+        orden = {'no_coincide': 0, 'sin_validar': 1, 'no_encontrada': 2, 'sin_curp': 3, 'validada': 4}
+        filas = []
+        for identificador, curp, confirmada, *nombre in self.db.execute(
+                'SELECT id, curp, curp_confirmada, nombres, primer_apellido, segundo_apellido FROM alumno'):
+            ultimo, detalle, fecha = self._ultimo_renapo(identificador)
+            estado = 'validada' if confirmada else 'sin_curp' if not curp else ultimo if ultimo in ('no_coincide', 'no_encontrada') else 'sin_validar'
+            filas.append({'alumno': identificador, 'curp': curp, 'nombre': ' '.join(n for n in nombre if n), 'estado': estado,
+                          'texto': renapo.ESTADOS[estado], 'detalle': detalle.get('motivo') if estado == 'no_coincide' else None,
+                          'fecha': fecha if estado != 'sin_validar' else None})
+        return sorted(filas, key=lambda f: (orden[f['estado']], f['nombre']))
+
+    def validar_constancia(self, contenido, guardar):
+        """La constancia de RENAPO que arrastró la persona: encuentra al alumno por la CURP y compara el nombre.
+
+        guardar(): guarda el PDF y devuelve su ruta; solo se llama si la constancia es de un alumno.
+        """
+        lectura = renapo.leer_constancia(contenido)
+        alumnos = {f['curp']: f for f in self.curps() if f['curp']}
+        encontrados = [alumnos[c] for c in lectura['curps'] if c in alumnos]
+        if not encontrados:
+            parecidos = [f for f in alumnos.values() if not renapo.faltan_del_nombre(lectura['texto'], f['nombre'])]
+            curp = lectura['curps'][0]
+            if len(parecidos) == 1:
+                alumno = parecidos[0]
+                self._guardar_archivo(guardar(), contenido)
+                motivo = (f'La constancia trae la CURP {curp}, pero el padre escribió {alumno["curp"]}. '
+                          'Confirma con el padre cuál es la correcta.')
+                self._constancia(alumno['alumno'], contenido, 'rechazado', motivo)
+                return {'estado': 'no_coincide', 'alumno': alumno['nombre'], 'mensaje': motivo}
+            raise renapo.ErrorConstancia(f'Ningún alumno tiene la CURP {curp}. Revisa que hayas buscado la CURP correcta.')
+        alumno = encontrados[0]
+        if alumno['estado'] == 'validada':
+            return {'estado': 'validada', 'alumno': alumno['nombre'], 'mensaje': f'La CURP de {alumno["nombre"]} ya estaba validada.'}
+        self._guardar_archivo(guardar(), contenido)
+        faltan = renapo.faltan_del_nombre(lectura['texto'], alumno['nombre'])
+        if faltan:
+            motivo = (f'En la constancia de RENAPO no aparece {", ".join(faltan)}. '
+                      f'Revisa con el padre cómo está escrito el nombre ({alumno["nombre"]}).')
+            self._constancia(alumno['alumno'], contenido, 'rechazado', motivo)
+            return {'estado': 'no_coincide', 'alumno': alumno['nombre'], 'mensaje': motivo}
+        self._constancia(alumno['alumno'], contenido, 'validado')
+        return {'estado': 'validada', 'alumno': alumno['nombre'],
+                'mensaje': f'Listo: la CURP de {alumno["nombre"]} quedó validada en RENAPO.'}
+
+    def _guardar_archivo(self, ruta, contenido):
+        with self.db:
+            self.db.execute('INSERT OR IGNORE INTO archivo(sha256, tamano, tipo_mime, ruta_relativa, creado) VALUES(?,?,?,?,?)',
+                            (hashlib.sha256(contenido).hexdigest(), len(contenido), 'application/pdf', ruta, _ahora()))
+
+    def _constancia(self, alumno_id, contenido, resultado, motivo=None):
+        version = self.db.execute('SELECT version FROM alumno WHERE id = ?', (alumno_id,)).fetchone()[0]
+        try:
+            sp.sp_validar_curp_renapo(self.db, alumno_id, hashlib.sha256(contenido).hexdigest(), resultado, self.actor, version, motivo)
+        except sp.ProcedimientoError as error:
+            raise renapo.ErrorConstancia(str(error)) from error
+
+    def renapo_no_encontrada(self, alumno_id):
+        """La persona buscó la CURP en RENAPO y no apareció: queda anotado para hablar con el padre."""
+        fila = self.db.execute('SELECT curp FROM alumno WHERE id = ?', (alumno_id,)).fetchone()
+        if not fila:
+            raise renapo.ErrorConstancia('No existe ese alumno.')
+        with self.db:
+            self.db.execute('INSERT INTO bitacora(fecha, actor, accion, objeto_tipo, objeto_id, despues) VALUES(?,?,?,?,?,?)',
+                            (_ahora(), self.actor, 'alumno.renapo_no_encontrada', 'alumno', alumno_id,
+                             json.dumps({'curp': fila[0]}, ensure_ascii=False)))
 
     def resumen(self):
         """Cuántas filas hay en las tablas que toca el entorno de pruebas."""

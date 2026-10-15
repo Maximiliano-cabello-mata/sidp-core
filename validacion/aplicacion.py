@@ -113,6 +113,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
 
         def _cuerpo(self):
             largo = int(self.headers.get('Content-Length') or 0)
+            if largo < 0:
+                raise ErrorBandeja('Envío no válido')
             if largo > MAXIMO_ENVIO:
                 raise ErrorBandeja('El envío es demasiado grande (máximo 100 MB)')
             return self.rfile.read(largo)
@@ -144,6 +146,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.detalle(consulta.get('id', [''])[0]))
                     if url.path == '/api/base':
                         return self._enviar(200, app.bandeja.base())
+                    if url.path == '/api/curps':
+                        return self._enviar(200, app.bandeja.curps())
                     if url.path == '/api/configuracion':
                         return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro),
                                                   'direccion_padres': app.direccion_padres()})
@@ -175,12 +179,18 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     return
                 if not self._admin():
                     return
+                if url.path == '/api/renapo/constancia':  # El PDF tal cual, arrastrado al panel.
+                    contenido = self._cuerpo()
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.constancia_renapo(self.headers.get('X-SIDP-Nombre', ''), contenido))
                 datos = json.loads(self._cuerpo() or b'{}')
                 with app.candado:
                     if url.path == '/api/revisar_todo':
                         return self._enviar(200, app.bandeja.revisar_todo())
                     if url.path == '/api/decidir':
                         return self._enviar(200, app.bandeja.decidir(datos.get('id', ''), datos.get('decision', ''), datos.get('motivo', '')))
+                    if url.path == '/api/renapo/no_encontrada':
+                        return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
                         return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'problema': problema,

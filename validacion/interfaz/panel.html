@@ -30,6 +30,23 @@
     <p><button id="cerebro-guardar">Conectar</button> <span class="chico" id="cerebro-estado"></span></p>
     <p class="chico" id="padres-ip"></p>
   </div>
+  <div class="panel" id="panel-renapo" style="margin-bottom:14px">
+    <h2>CURP: validar en RENAPO</h2>
+    <p id="renapo-cuenta"></p>
+    <ol class="pasos">
+      <li>En la lista de abajo, da clic en <b>Copiar CURP y abrir RENAPO</b>. Se abre la página oficial en otra pestaña.</li>
+      <li>En la página de RENAPO, da clic en el cuadro de la CURP y pega con <b>Ctrl + V</b>.</li>
+      <li>Marca <b>"No soy un robot"</b>, resuelve lo que te pida y da clic en <b>Buscar</b>.</li>
+      <li>Descarga el <b>PDF</b> de la constancia.</li>
+      <li>Regresa a esta pestaña y <b>arrastra el PDF a cualquier parte de esta página</b>. Puedes arrastrarlo directo
+        desde las descargas del navegador (la flecha de arriba a la derecha). No tienes que decir de qué alumno es:
+        el sistema lo encuentra solo.</li>
+    </ol>
+    <div class="soltar" id="soltar" role="button" tabindex="0">Suelta aquí la constancia (PDF)<br><span class="chico">o da clic para elegirla</span></div>
+    <input type="file" id="elegir-constancia" accept=".pdf,application/pdf" hidden>
+    <div id="renapo-mensaje"></div>
+    <table id="curps"></table>
+  </div>
   <div class="columnas">
     <div class="panel"><h2>Expedientes</h2><ul class="lista" id="lista"></ul></div>
     <div class="panel" id="detalle"><p class="chico">Elige un expediente.</p></div>
@@ -67,8 +84,86 @@ function mostrarEstado(estado) {
   for (const li of $('lista').querySelectorAll('li[data-id]')) li.onclick = () => abrir(li.dataset.id);
 }
 
+function copiar(texto) {
+  // Primero la forma que funciona dentro del mismo clic; la pestaña nueva se abre después.
+  const campo = document.createElement('textarea');
+  campo.value = texto;
+  campo.setAttribute('readonly', '');
+  campo.style.position = 'fixed'; campo.style.opacity = '0';
+  document.body.appendChild(campo);
+  campo.select();
+  let copiado = false;
+  try { copiado = document.execCommand('copy'); } catch (e) { copiado = false; }
+  campo.remove();
+  if (!copiado && navigator.clipboard) navigator.clipboard.writeText(texto).catch(() => {});
+}
+
+function avisoRenapo(clase, texto) {
+  $('renapo-mensaje').innerHTML = texto ? `<div class="mensaje ${clase}">${esc(texto)}</div>` : '';
+}
+
+function mostrarCurps(datos) {
+  const alumnos = datos.alumnos;
+  const pendientes = alumnos.filter((a) => a.estado !== 'validada').length;
+  $('renapo-cuenta').innerHTML = alumnos.length
+    ? `<b>${alumnos.length - pendientes} de ${alumnos.length}</b> CURP validadas en RENAPO. Faltan <b>${pendientes}</b>.`
+    : 'Todavía no hay alumnos. Cuando los padres suban sus documentos, aparecerán aquí.';
+  $('curps').innerHTML = alumnos.length ? '<tr><th>Alumno</th><th>CURP</th><th>Estado</th><th>Qué hacer</th></tr>' + alumnos.map((a) => {
+    let accion = '';
+    if (a.estado === 'validada') accion = `<span class="chico">Validada el ${esc((a.fecha || '').replace('T', ' a las '))}</span>`;
+    else if (a.estado === 'sin_curp') accion = 'El padre no escribió una CURP válida. Pídesela.';
+    else accion = `<button class="principal" data-copiar="${esc(a.curp)}">Copiar CURP y abrir RENAPO</button>
+        <button data-no-encontrada="${esc(a.alumno)}" title="Usa este botón si RENAPO dice que la CURP no existe">RENAPO no la encontró</button>`;
+    if (a.detalle) accion += `<div class="chico">${esc(a.detalle)}</div>`;
+    return `<tr><td>${esc(a.nombre)}</td><td class="curp">${esc(a.curp || '—')}</td>
+      <td><span class="insignia ${esc(a.estado)}">${esc(a.texto)}</span></td><td>${accion}</td></tr>`;
+  }).join('') : '';
+  for (const boton of $('curps').querySelectorAll('[data-copiar]')) boton.onclick = () => {
+    copiar(boton.dataset.copiar);
+    window.open(datos.pagina_oficial, '_blank', 'noopener');
+    avisoRenapo('ojo', `CURP copiada: ${boton.dataset.copiar}. En la página de RENAPO pégala con Ctrl + V.`);
+  };
+  for (const boton of $('curps').querySelectorAll('[data-no-encontrada]')) boton.onclick = async () => {
+    if (!confirm('¿RENAPO dijo que esta CURP no existe? Quedará anotado para pedirle al padre la CURP correcta.')) return;
+    if (await trabajar('Guardando…', () => motor.renapoNoEncontrada(boton.dataset.noEncontrada)))
+      avisoRenapo('ojo', 'Anotado: hay que pedirle al padre la CURP correcta.');
+  };
+}
+
+async function subirConstancia(archivo) {
+  if (!archivo) return;
+  if (!/\.pdf$/i.test(archivo.name) && archivo.type !== 'application/pdf') {
+    avisoRenapo('mal', 'Ese archivo no es un PDF. Arrastra el PDF que descargaste de la página de RENAPO.');
+    return;
+  }
+  avisoRenapo('', '');
+  $('mensaje').textContent = 'Leyendo la constancia…';
+  try {
+    const r = await motor.constancia(archivo);
+    avisoRenapo(r.estado === 'validada' ? 'bien' : 'ojo', r.mensaje);
+    await refrescar();
+    $('mensaje').textContent = 'Listo.';
+  } catch (error) {
+    avisoRenapo('mal', error.message);
+    $('mensaje').textContent = 'Listo.';
+  }
+}
+
+$('soltar').onclick = () => $('elegir-constancia').click();
+$('soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('elegir-constancia').click(); };
+$('elegir-constancia').onchange = () => { subirConstancia($('elegir-constancia').files[0]); $('elegir-constancia').value = ''; };
+// El PDF se puede soltar en cualquier parte de la página: así el navegador no lo abre por su cuenta.
+document.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('arrastrando'); });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('arrastrando'); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  document.body.classList.remove('arrastrando');
+  subirConstancia(e.dataTransfer.files[0]);
+});
+
 async function refrescar() {
   mostrarEstado(await motor.estado());
+  mostrarCurps(await motor.curps());
   const base = await motor.base();
   $('base').textContent = base ? 'Base de datos (39 tablas): ' + Object.entries(base).map(([t, n]) => `${t} ${n}`).join(' · ') : '';
 }
