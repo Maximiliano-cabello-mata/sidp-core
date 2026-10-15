@@ -80,7 +80,7 @@ class Registro:
             if fila:
                 return fila[0]
         buscado = comparador.normalizar(nombre or '')
-        iguales = [i for i, n, p, s in self.db.execute('SELECT id, nombres, primer_apellido, segundo_apellido FROM alumno WHERE curp IS NULL')
+        iguales = [i for i, n, p, s in self.db.execute("SELECT id, nombres, primer_apellido, segundo_apellido FROM alumno WHERE curp IS NULL AND estado = 'activo'")
                    if comparador.normalizar(' '.join(x for x in (n, p, s) if x)) == buscado] if buscado else []
         return iguales[0] if len(iguales) == 1 else None
 
@@ -162,7 +162,16 @@ class Registro:
         if alumno_id:  # El alumno de la lista de su grupo que eligió la persona.
             alumno = self.completar_alumno(alumno_id, {**captura['alumno'], 'curp': captura['alumno'].get('curp', '').upper()})
         else:
-            alumno = self._persona('alumno', captura['alumno'], captura['alumno'].get('curp', '').upper())
+            datos_alumno = {**captura['alumno'], 'curp': captura['alumno'].get('curp', '').upper()}
+            nombre = ' '.join(filter(None, (datos_alumno.get('nombres'), datos_alumno.get('primer_apellido'), datos_alumno.get('segundo_apellido'))))
+            # Si ya está en la lista de su grupo con el mismo nombre (o la misma CURP), se usa ese alumno y solo se
+            # llenan los datos que le faltan; el nombre de la lista no cambia.
+            alumno = self.alumno_por(datos_alumno['curp'], nombre)
+            if alumno:
+                self.completar_alumno(alumno, {k: datos_alumno.get(k) for k in ('curp', 'fecha_nacimiento', 'sexo')},
+                                      'escaneo' if captura.get('origen') == 'escaneo' else 'pagina_padres')
+            else:
+                alumno = self._persona('alumno', datos_alumno, datos_alumno['curp'])
         datos_tutor = captura.get('tutor') or {}
         tutor = self._persona('tutor', datos_tutor, str(datos_tutor.get('curp') or '').upper()) if datos_tutor.get('nombres') else None
         parentesco = datos_tutor.get('parentesco', 'otro')

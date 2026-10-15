@@ -498,6 +498,11 @@ def test_el_expediente_escaneado_se_liga_al_alumno_de_la_lista(entorno):
     ana = db.execute("SELECT id FROM alumno WHERE nombres = 'ANA MARIA'").fetchone()[0]
     codigo, respuesta = pedir(url, '/api/escaneo/guardar', {'lote': otro['lote'], 'alumno': otro['propuesta']['alumno'], 'alumno_id': ana}, token)
     assert codigo == 400 and 'otro alumno' in respuesta['error']
+    # Un alumno que no venía en la lista se guarda como nuevo y queda en el grupo que se eligió.
+    nuevo = {**otro['propuesta']['alumno'], 'nombres': 'PEDRO', 'curp': ''}
+    codigo, guardado = pedir(url, '/api/escaneo/guardar', {'lote': otro['lote'], 'alumno': nuevo, 'grupo_id': grupo['id']}, token)
+    assert codigo == 200 and guardado['grupo'] == '3° A', guardado
+    assert pedir(url, '/api/grupos', cabeceras=token)[1]['grupos'][0]['alumnos'] == 3
 
 
 def test_el_analisis_cuenta_por_grado_y_exporta_a_excel(entorno):
@@ -529,3 +534,38 @@ def test_el_analisis_cuenta_por_grado_y_exporta_a_excel(entorno):
     assert conteo.splitlines()[-1] == 'Total,2,1,1,1,3'
     with pytest.raises(urllib.error.HTTPError):
         descargar(url, '/api/exportar?que=otra&formato=xlsx', app.token)
+
+
+def test_lo_que_suben_los_padres_queda_en_su_grupo(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'A', 'filas': [
+        {'nombres': 'LUIS', 'primer_apellido': 'HERNANDEZ', 'segundo_apellido': 'RAMOS'}]}, token)
+    pedir(url, '/api/listas/guardar', {'grado': 2, 'letra': 'B', 'filas': [
+        {'nombres': 'ANA', 'primer_apellido': 'GARCIA', 'segundo_apellido': 'LOPEZ'}]}, token)
+    db = app.bandeja.registro.db
+    # 1. El padre escribe el nombre igual que en la lista (con acentos): se usa el alumno de la lista y recibe su CURP.
+    cuerpo, tipo = formulario(*expediente_pdf())
+    assert pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)[0] == 200
+    assert db.execute('SELECT COUNT(*) FROM alumno').fetchone()[0] == 2
+    assert db.execute("SELECT curp, nombres FROM alumno WHERE primer_apellido = 'HERNANDEZ'").fetchone() == (CURP, 'LUIS')
+    detalle = pedir(url, '/api/expediente?id=0001', cabeceras=token)[1]
+    assert (detalle['alumno'], detalle['grupo'], detalle['parecidos']) == ('LUIS HERNANDEZ RAMOS', '3° A', [])
+    # 2. Otro padre escribe "Anna" y no coincide exacto: queda sin grupo, con el parecido de la lista para ubicarlo.
+    captura, archivos = expediente_pdf()
+    captura['alumno'] = {'nombres': 'Anna', 'primer_apellido': 'García', 'segundo_apellido': 'López', 'curp': SOFIA}
+    cuerpo, tipo = formulario(captura, archivos)
+    assert pedir(url, '/api/padres/enviar', cuerpo, tipo=tipo)[0] == 200
+    detalle = pedir(url, '/api/expediente?id=0002', cabeceras=token)[1]
+    assert detalle['grupo'] is None and detalle['parecidos'][0]['nombre'] == 'ANA GARCIA LOPEZ'
+    lista_ana = detalle['parecidos'][0]['id']
+    codigo, ubicado = pedir(url, '/api/grupos/ubicar', {'alumno_id': detalle['alumno_id'], 'mismo_que': lista_ana}, token)
+    assert codigo == 200 and ubicado['grupo'] == '2° B', ubicado
+    assert pedir(url, '/api/grupos/ubicar', {'alumno_id': detalle['alumno_id'], 'mismo_que': lista_ana}, token)[0] == 400
+    grupos = {g['nombre']: g for g in pedir(url, '/api/grupos', cabeceras=token)[1]['grupos']}
+    assert (grupos['2° B']['alumnos'], grupos['2° B']['con_documentos']) == (1, 1)
+    assert db.execute('SELECT estado FROM alumno WHERE id = ?', (lista_ana,)).fetchone() == ('archivado',)  # No se borra.
+    assert db.execute("SELECT COUNT(*) FROM bitacora WHERE accion = 'alumno.unido'").fetchone()[0] == 1
+    # El buscador encuentra por parte del nombre o por CURP.
+    assert [p['nombre'] for p in pedir(url, '/api/buscar_alumno?nombre=luis%20hern', cabeceras=token)[1]['parecidos']] == ['LUIS HERNANDEZ RAMOS']
+    assert pedir(url, f'/api/buscar_alumno?nombre={SOFIA}', cabeceras=token)[1]['parecidos'][0]['grupo'] == '2° B'

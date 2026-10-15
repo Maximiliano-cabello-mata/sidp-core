@@ -69,7 +69,7 @@ class Grupos:
         """Los grupos del ciclo actual con cuántos alumnos tienen y cuántos ya tienen documentos."""
         ciclo, nombre = self.ciclo()
         filas = self.db.execute(
-            "SELECT g.id, g.grado, g.letra, COUNT(i.id), "
+            "SELECT g.id, g.grado, g.letra, COUNT(DISTINCT i.id), "
             "COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN i.alumno_id END), "
             "COUNT(DISTINCT CASE WHEN a.curp IS NULL THEN i.alumno_id END) "
             "FROM grupo g LEFT JOIN inscripcion i ON i.grupo_id = g.id AND i.estado IN ('incompleta','completa') "
@@ -159,24 +159,62 @@ class Grupos:
             agregados += 1
         return {'agregados': agregados, 'ya_estaban': ya_estaban, **self.alumnos(grupo_id)}
 
-    def parecidos(self, nombre, curp=None):
+    def ubicar(self, alumno_id, grupo_id=None, mismo_que=None):
+        """Pone en su grupo a un alumno que llegó por la página de padres y no estaba en las listas.
+
+        mismo_que: el alumno de la lista que es la misma persona. Ese renglón de la lista (sin documentos)
+        se cancela y este alumno toma su lugar en el grupo; nada se borra y queda en la bitácora.
+        """
+        ciclo, _ = self.ciclo()
+        if not self.db.execute("SELECT 1 FROM alumno WHERE id = ? AND estado = 'activo'", (alumno_id,)).fetchone():
+            raise ErrorGrupo('Ese alumno no existe.')
+        if self.ubicacion(alumno_id):
+            raise ErrorGrupo(f'Ese alumno ya está en {self.ubicacion(alumno_id)}.')
+        if mismo_que:
+            fila = self.db.execute("SELECT id, grupo_id FROM inscripcion WHERE alumno_id = ? AND ciclo_id = ? AND estado IN ('incompleta','completa')",
+                                   (mismo_que, ciclo)).fetchone()
+            if not fila or mismo_que == alumno_id:
+                raise ErrorGrupo('Ese alumno de la lista ya no está en un grupo: vuelve a cargar.')
+            if self.db.execute('SELECT 1 FROM documento WHERE alumno_id = ?', (mismo_que,)).fetchone():
+                raise ErrorGrupo('El alumno de la lista ya tiene documentos propios: no se pueden juntar aquí. Avisa a quien administra el sistema.')
+            inscripcion, grupo_id = fila
+        else:
+            self._grupo(grupo_id or '')
+        grado = self._grupo(grupo_id)[0]
+        if mismo_que:
+            with self.db:
+                self.db.execute("UPDATE inscripcion SET estado = 'cancelada', version = version + 1 WHERE id = ?", (inscripcion,))
+                self.db.execute("UPDATE alumno SET estado = 'archivado', version = version + 1 WHERE id = ?", (mismo_que,))
+                self.db.execute('INSERT INTO bitacora(fecha, actor, accion, objeto_tipo, objeto_id, antes, despues) VALUES(?,?,?,?,?,?,?)',
+                                (_ahora(), self.registro.actor, 'alumno.unido', 'alumno', alumno_id,
+                                 json.dumps({'renglon_de_lista': mismo_que}), json.dumps({'alumno': alumno_id, 'grupo': grupo_id})))
+        sp.sp_inscribir_alumno(self.db, alumno_id, ciclo, grupo_id, 'nuevo_ingreso' if grado == 1 else 'reinscripcion',
+                               self.registro.actor, origen='captura')
+        return self.ubicacion(alumno_id)
+
+    def parecidos(self, nombre, curp=None, buscar=False):
         """Alumnos de las listas que podrían ser esta persona, del más parecido al menos."""
         if not nombre and not curp:
             return []
         ciclo, _ = self.ciclo()
         candidatos = []
-        for i, n, p, s, c, grado, letra in self.db.execute(
-                "SELECT a.id, a.nombres, a.primer_apellido, a.segundo_apellido, a.curp, g.grado, g.letra FROM inscripcion x "
+        busqueda = comparador.normalizar(nombre or '').split() if buscar else []
+        for i, n, p, s, c, grado, letra, grupo_id in self.db.execute(
+                "SELECT a.id, a.nombres, a.primer_apellido, a.segundo_apellido, a.curp, g.grado, g.letra, g.id FROM inscripcion x "
                 "JOIN alumno a ON a.id = x.alumno_id JOIN grupo g ON g.id = x.grupo_id "
                 "WHERE x.ciclo_id = ? AND x.estado IN ('incompleta','completa')", (ciclo,)):
             completo = nombre_completo(n, p, s)
             puntos = 1.0 if curp and c == curp else parecido(nombre, completo)
+            if busqueda:  # Al buscar, "luis hern" encuentra a LUIS HERNANDEZ RAMOS.
+                palabras = comparador.normalizar(completo).split()
+                if all(any(p.startswith(b) for p in palabras) for b in busqueda):
+                    puntos = max(puntos, 0.8)
             if c and curp and c != curp:
                 puntos = min(puntos, 0.5)  # Las dos CURP existen y son distintas: no es la misma persona.
             if puntos >= PARECIDO_MINIMO:
-                candidatos.append({'id': i, 'nombre': completo, 'curp': c, 'grupo': f'{grado}° {letra}', 'parecido': puntos,
-                                   'seguro': puntos >= PARECIDO_SEGURO})
-        return sorted(candidatos, key=lambda c: -c['parecido'])[:5]
+                candidatos.append({'id': i, 'nombre': completo, 'curp': c, 'grupo': f'{grado}° {letra}', 'grupo_id': grupo_id,
+                                   'parecido': puntos, 'seguro': puntos >= PARECIDO_SEGURO})
+        return sorted(candidatos, key=lambda c: (-c['parecido'], c['nombre']))[:8 if buscar else 5]
 
     def ubicacion(self, alumno_id):
         """'3° A' del alumno en el ciclo actual, o None."""

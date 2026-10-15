@@ -289,8 +289,10 @@ class Bandeja:
         if not alumno or not self.registro:
             captura = self.carpeta / 'expedientes' / identificador / 'captura.json'
             datos = json.loads(captura.read_text(encoding='utf-8')).get('alumno', {}) if captura.exists() else {}
-            return {'alumno': datos.get('nombre') or ' '.join(filter(None, (datos.get('nombres'), datos.get('primer_apellido')))) or None,
-                    'grupo': None, 'alumno_id': None}
+            nombre = datos.get('nombre') or ' '.join(filter(None, (datos.get('nombres'), datos.get('primer_apellido')))) or None
+            # Un expediente sin registro en la base (los del ejemplo) muestra su grupo si el nombre está igual en una lista.
+            en_lista = self.registro.alumno_por(None, nombre) if self.registro and nombre else None
+            return {'alumno': nombre, 'grupo': en_lista and self.grupos.ubicacion(en_lista), 'alumno_id': None}
         fila = self.registro.db.execute('SELECT nombres, primer_apellido, segundo_apellido FROM alumno WHERE id = ?', (alumno,)).fetchone()
         return {'alumno': ' '.join(x for x in (fila or ()) if x) or None, 'grupo': self.grupos.ubicacion(alumno), 'alumno_id': alumno}
 
@@ -342,7 +344,13 @@ class Bandeja:
         return self.grupos.lista()
 
     def buscar_alumno(self, nombre, curp=None):
-        return {'parecidos': self._con_grupos(lambda: self.grupos.parecidos(nombre, (curp or '').upper() or None))}
+        nombre, curp = str(nombre or '').strip(), str(curp or '').strip().upper()
+        if not curp and len(nombre) == 18 and comparador.desglose_curp(nombre.upper()):
+            nombre, curp = '', nombre.upper()  # En el buscador se puede escribir la CURP.
+        return {'parecidos': self._con_grupos(lambda: self.grupos.parecidos(nombre, curp or None, buscar=True))}
+
+    def ubicar_alumno(self, alumno_id, grupo_id=None, mismo_que=None):
+        return {'grupo': self._con_grupos(lambda: self.grupos.ubicar(str(alumno_id or ''), grupo_id or None, mismo_que or None))}
 
     # --- Análisis: lo que se exporta para el 911, el SAID y la escuela ---
 
@@ -466,6 +474,9 @@ class Bandeja:
         if alumno_id and alumno['curp'] and self.registro.db.execute('SELECT 1 FROM alumno WHERE curp = ? AND id != ?',
                                                                      (alumno['curp'], alumno_id)).fetchone():
             raise ErrorBandeja(f'La CURP {alumno["curp"]} ya es de otro alumno: revisa que elegiste al alumno correcto')
+        grupo_id = None if alumno_id else str(datos.get('grupo_id') or '') or None  # Alumno nuevo: el grupo donde va.
+        if grupo_id and not (self.registro and self.registro.db.execute('SELECT 1 FROM grupo WHERE id = ?', (grupo_id,)).fetchone()):
+            raise ErrorBandeja('Ese grupo ya no existe: elígelo otra vez')
         captura = {'alumno': alumno, 'tutor': tutor if tutor.get('nombres') and tutor.get('primer_apellido') else {}, 'origen': 'escaneo'}
         carpeta_expedientes = self.carpeta / 'expedientes'
         carpeta_expedientes.mkdir(parents=True, exist_ok=True)
@@ -496,9 +507,11 @@ class Bandeja:
         if self.registro:
             ids = self.registro.registrar(captura, guardados, resultado['extraidos'], alumno_id=alumno_id)
             (destino / 'registro.json').write_text(json.dumps(ids), encoding='utf-8')
+            if grupo_id and not self.grupos.ubicacion(ids['alumno']):
+                self._con_grupos(lambda: self.grupos.ubicar(ids['alumno'], grupo_id))
         self.decidir(identificador, 'autorizado', 'Validado en papel por la escuela (escaneo)', quien)
         shutil.rmtree(carpeta_lote, ignore_errors=True)
-        return {'expediente': identificador, 'alumno': alumno['nombre']}
+        return {'expediente': identificador, 'alumno': alumno['nombre'], **self._quien(identificador)}
 
     def revisar_todo(self):
         for identificador in self.expedientes():
@@ -540,8 +553,13 @@ class Bandeja:
             captura = {}
         archivos = [a.name for a in sorted(carpeta.iterdir()) if a.is_file() and a.suffix != '.json' and not a.name.startswith('.')]
         textos = {a: (carpeta / a).read_text(encoding='utf-8', errors='replace') for a in archivos if a.endswith('.txt')} if self.editable else {}
+        quien = self._quien(identificador)
+        # Un alumno que llegó por la página de padres y no está en las listas: se proponen los parecidos para ubicarlo.
+        parecidos = (self.grupos.parecidos(quien['alumno'], (captura.get('alumno') or {}).get('curp') or None)
+                     if self.grupos and quien['alumno_id'] and not quien['grupo'] else [])
         return {'id': identificador, 'captura': captura, 'archivos': archivos, 'textos': textos,
-                'resultado': self.resultados.get(identificador), 'decision': self.decisiones().get(identificador)}
+                'resultado': self.resultados.get(identificador), 'decision': self.decisiones().get(identificador),
+                **quien, 'parecidos': parecidos}
 
     def reescribir(self, identificador, captura, textos):
         """Solo en la demostración: cambia la captura o el texto de un documento y vuelve a revisar."""

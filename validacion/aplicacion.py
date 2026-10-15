@@ -243,6 +243,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.escaneo_descartar(datos.get('lote', '')))
                     if url.path == '/api/listas/guardar':
                         return self._enviar(200, app.bandeja.lista_guardar(datos))
+                    if url.path == '/api/grupos/ubicar':
+                        return self._enviar(200, app.bandeja.ubicar_alumno(datos.get('alumno_id'), datos.get('grupo_id'), datos.get('mismo_que')))
                     if url.path == '/api/grupos/crear':
                         return self._enviar(200, app.bandeja.grupo_crear(datos.get('grado'), datos.get('letra')))
                     if url.path == '/api/plantillas/activa':

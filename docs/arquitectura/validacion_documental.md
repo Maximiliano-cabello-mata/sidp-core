@@ -183,3 +183,23 @@ plantilla. Una plantilla (`validacion/plantillas.py`) es solo datos:
 - **Límite honesto.** La plantilla reconoce un documento por lo que dice, no por cómo se ve: un documento
   falso que copie las frases pasa este filtro. Para eso siguen la persona que autoriza y, después, el modelo
   que ve (borrador en `propuestas/`).
+
+## Listas de grupo y panel por pestañas (2026-10-15)
+
+Pedido de Maximiliano: un solo panel, por pestañas, con el diseño de Paola, y los expedientes divididos
+por grado y grupo. El trabajo empieza por las listas de cada grupo y después va el expediente de cada niño.
+
+- **Listas de grupo** (`validacion/grupos.py`). La lista escaneada o escrita se lee renglón por renglón
+  (`extraer.lista_de_grupo`, `extraer.grado_y_grupo`); una CURP mal leída no se mete al nombre y el
+  renglón queda como duda. La persona corrige y guarda; cada alumno se inscribe en su grupo del ciclo
+  (agosto a julio) con `sp_inscribir_alumno`. Guardar otra vez no duplica (misma CURP, o mismo nombre sin CURP).
+- **Ligar expedientes.** Al escanear, el sistema propone los alumnos parecidos de las listas (nombre sin
+  orden ni acentos) y **la persona elige**; nunca se liga solo. El alumno de la lista recibe CURP, fecha y
+  sexo, con versión y bitácora (`alumno.completado`). Lo de la página de padres cae solo en su grupo cuando
+  el nombre es idéntico o la CURP ya está; si no, el panel propone el parecido y la persona lo ubica
+  (`alumno.unido`: el renglón de la lista, sin documentos, se cancela y se archiva; nada se borra).
+- **Análisis.** Matrícula por grado y sexo, faltantes por alumno y descargas a Excel (`validacion/hoja.py`,
+  `.xlsx` sin instalar nada) y CSV con protección contra fórmulas.
+- **Panel** (`validacion/interfaz/panel.html`): Inicio, 1 Listas de grupo, 2 Escanear expediente
+  (validación manual), 3 Fila de revisión (validación automática, por grupo y estado), 4 CURP y RENAPO,
+  Análisis 911 y SAID, Plantillas y Ajustes. Funciona sin internet (sin Tailwind ni Font Awesome) y en celular.

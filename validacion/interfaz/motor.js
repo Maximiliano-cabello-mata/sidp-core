@@ -76,6 +76,7 @@ function motorLocal() {
     },
     listaGuardar: (datos) => api('/api/listas/guardar', datos),
     grupoCrear: (grado, letra) => api('/api/grupos/crear', { grado, letra }),
+    ubicar: (alumnoId, grupoId, mismoQue) => api('/api/grupos/ubicar', { alumno_id: alumnoId, grupo_id: grupoId, mismo_que: mismoQue }),
     analisis: () => api('/api/analisis'),
     descargar: async (que, formato) => {
       const enlace = document.createElement('a');
@@ -96,6 +97,13 @@ from validacion.registro import Registro
 from validacion.servicio import Bandeja, ErrorBandeja
 bandeja = Bandeja('/demo', hoy=datetime.date(2026, 10, 14), usar_modelo=False, base=':memory:', editable=True,
                   registro=Registro(':memory:'))
+# Dos listas de grupo inventadas, con los mismos niños de los expedientes de ejemplo y algunos sin expediente.
+for _grado, _letra, _nombres in ((3, 'A', ['HERNANDEZ RAMOS LUIS', 'CASTRO NAVA DIEGO', 'LOPEZ GIL MATEO', 'SOTO REYES EMILIO',
+                                           'PRADO LUNA JULIAN', 'GOMEZ VARGAS ANDREA', 'NUÑEZ ORTIZ SANTIAGO']),
+                                 (2, 'B', ['BRAVO LEON ANA SOFIA', 'RUIZ PAZ SOFIA', 'MORA DIAZ VALERIA', 'TORRES ARIAS REGINA',
+                                           'HERRERA DIAZ PAULA', 'MENDEZ CRUZ CAMILA'])):
+    bandeja.lista_guardar({'grado': _grado, 'letra': _letra, 'filas': [
+        dict(zip(('primer_apellido', 'segundo_apellido', 'nombres'), _n.split(' ', 2))) for _n in _nombres]})
 def llamar(nombre, argumentos):
     try:
         return json.dumps({'ok': getattr(bandeja, nombre)(*json.loads(argumentos))}, ensure_ascii=False, default=str)
@@ -230,6 +238,7 @@ def recibir(captura, archivos):
     },
     listaGuardar: (datos) => llamar('lista_guardar', datos),
     grupoCrear: (grado, letra) => llamar('grupo_crear', grado, letra),
+    ubicar: (alumnoId, grupoId, mismoQue) => llamar('ubicar_alumno', alumnoId, grupoId, mismoQue),
     analisis: () => llamar('analisis'),
     descargar: async (que, formato) => {
       await listo;

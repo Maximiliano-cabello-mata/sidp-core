@@ -3,184 +3,546 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SIDP · Validación de expedientes</title>
+<title>SIDP · Validación y administración</title>
 <link rel="stylesheet" href="estilo.css">
 <script>/*SIDP_CONFIG*/</script>
 <script src="motor.js"></script>
 </head>
-<body>
-<header>
-  <h1>SIDP · Validación de expedientes</h1>
-  <span class="modo" id="modo"></span>
-  <a href="padres.html" id="enlace-padres">Página de padres</a>
-</header>
-<main>
-  <div class="aviso" id="aviso"></div>
-  <div class="tarjetas" id="tarjetas"></div>
-  <div class="barra">
-    <button class="principal" id="revisar">Revisar todo</button>
-    <span class="chico" id="mensaje">Cargando…</span>
-  </div>
-  <div class="panel oculto" id="panel-cerebro" style="margin-bottom:14px">
-    <h2>Cerebro de la PC 4</h2>
-    <div class="rejilla">
-      <div><label for="cerebro-url">Dirección (por ejemplo http://192.168.1.40:8771)</label><input id="cerebro-url"></div>
-      <div><label for="cerebro-clave">Clave que muestra el cerebro al arrancar</label><input id="cerebro-clave"></div>
+<body class="app">
+<aside class="lateral">
+  <div class="logo"><span data-icono="escuela"></span> SIDP</div>
+  <nav class="menu" id="menu" aria-label="Pestañas"></nav>
+  <div class="pie-lateral" id="modo"></div>
+</aside>
+<div class="cuerpo">
+  <header class="superior">
+    <div class="titulo" id="titulo"></div>
+    <div class="buscador">
+      <span data-icono="buscar"></span>
+      <input id="buscar" type="search" placeholder="Buscar alumno (nombre o CURP)" autocomplete="off" aria-label="Buscar alumno">
+      <div class="flotante oculto" id="buscar-resultados"></div>
     </div>
-    <p><button id="cerebro-guardar">Conectar</button> <span class="chico" id="cerebro-estado"></span></p>
-    <p class="chico" id="padres-ip"></p>
-  </div>
-  <div class="panel" id="panel-escaneo" style="margin-bottom:14px">
-    <h2>Escanear expediente (ya revisado en papel)</h2>
-    <ol class="pasos">
-      <li>Escanea los documentos de <b>un alumno</b>: todos en un PDF o en varios, como salgan del escáner.</li>
-      <li>Arrástralos a este cuadro (o da clic para elegirlos). El sistema reconoce cada hoja y llena los datos solo.</li>
-      <li>Revisa los datos. Si algo salió mal o falta, corrígelo ahí mismo.</li>
-      <li>Da <b>Guardar expediente</b>. Queda guardado y validado en papel. Sigue con el próximo alumno.</li>
-    </ol>
-    <div class="soltar" id="soltar-escaneo" role="button" tabindex="0">Suelta aquí los escaneos de un alumno (PDF o fotos)<br><span class="chico">o da clic para elegirlos</span></div>
-    <input type="file" id="elegir-escaneo" accept=".pdf,image/*" multiple hidden>
-    <div id="escaneo-mensaje"></div>
-    <div id="escaneo-formulario"></div>
-  </div>
-  <div class="panel" id="panel-renapo" style="margin-bottom:14px">
-    <h2>CURP: validar en RENAPO</h2>
-    <p id="renapo-cuenta"></p>
-    <ol class="pasos">
-      <li>En la lista de abajo, da clic en <b>Copiar CURP y abrir RENAPO</b>. Se abre la página oficial en otra pestaña.</li>
-      <li>En la página de RENAPO, da clic en el cuadro de la CURP y pega con <b>Ctrl + V</b>.</li>
-      <li>Marca <b>"No soy un robot"</b>, resuelve lo que te pida y da clic en <b>Buscar</b>.</li>
-      <li>Descarga el <b>PDF</b> de la constancia.</li>
-      <li>Regresa a esta pestaña y <b>arrastra el PDF a cualquier parte de esta página</b> (menos al cuadro de escaneo). Puedes arrastrarlo directo
-        desde las descargas del navegador (la flecha de arriba a la derecha). No tienes que decir de qué alumno es:
-        el sistema lo encuentra solo.</li>
-    </ol>
-    <div class="soltar" id="soltar" role="button" tabindex="0">Suelta aquí la constancia (PDF)<br><span class="chico">o da clic para elegirla</span></div>
-    <input type="file" id="elegir-constancia" accept=".pdf,application/pdf" hidden>
-    <div id="renapo-mensaje"></div>
-    <table id="curps"></table>
-  </div>
-  <div class="columnas">
-    <div class="panel"><h2>Expedientes</h2><ul class="lista" id="lista"></ul></div>
-    <div class="panel" id="detalle"><p class="chico">Elige un expediente.</p></div>
-  </div>
-  <div class="panel" id="panel-plantillas" style="margin-top:14px">
-    <h2>Plantillas de documentos</h2>
-    <p class="chico">Qué documentos pide la escuela y cómo se reconocen. Para agregar uno no hay que programar: sube una muestra,
-      revisa sus textos fijos (las frases que siempre trae) y guarda. Desde ese momento la página de padres lo pide, el escaneo
-      lo reconoce y la revisión lo valida con su plantilla.</p>
-    <table id="plantillas"></table>
-    <p><button id="pl-nueva">Agregar un documento</button></p>
-    <div id="pl-mensaje"></div>
-    <div id="pl-formulario"></div>
-  </div>
-  <p class="chico" id="base"></p>
-</main>
+    <span class="estado-linea" id="mensaje" role="status">Cargando…</span>
+  </header>
+  <main class="contenido">
+    <div class="aviso" id="aviso"></div>
+
+    <!-- ============ INICIO ============ -->
+    <section class="pestana" data-pestana="inicio">
+      <h1>Resumen de la escuela</h1>
+      <p class="subtitulo" id="inicio-sub"></p>
+      <div class="kpis" id="inicio-kpis"></div>
+      <div class="seccion-titulo">Cómo se trabaja, paso a paso</div>
+      <div class="flujo" id="inicio-flujo"></div>
+      <div class="seccion-titulo">Pendientes</div>
+      <div class="alertas" id="inicio-alertas"></div>
+    </section>
+
+    <!-- ============ 1. LISTAS DE GRUPO ============ -->
+    <section class="pestana" data-pestana="listas">
+      <h1>Listas de grupo</h1>
+      <p class="subtitulo">Paso 1. Antes de los expedientes, sube la lista de cada grupo. Así cada expediente queda en su grado y grupo.</p>
+      <div class="barra">
+        <button class="principal" id="ls-nueva">Subir la lista de un grupo</button>
+        <span class="espacio"></span><span class="chico" id="ls-ciclo"></span>
+      </div>
+      <div class="panel oculto" id="ls-subir" style="margin-bottom:16px">
+        <h2>Subir la lista de un grupo</h2>
+        <ol class="pasos">
+          <li>Escanea la lista del grupo (o tómale foto) y suéltala en el cuadro. También puedes escribir o pegar los nombres, uno por renglón.</li>
+          <li>Da <b>Leer la lista</b>. El sistema separa nombres y apellidos.</li>
+          <li>Revisa la tabla y corrige lo que esté mal. Los renglones en amarillo son dudosos: revísalos con la hoja en la mano.</li>
+          <li>Revisa el grado y el grupo y da <b>Guardar lista</b>.</li>
+        </ol>
+        <div class="soltar" id="ls-soltar" role="button" tabindex="0">Suelta aquí la lista escaneada (PDF o foto)<br><span class="chico">o da clic para elegirla</span></div>
+        <input type="file" id="ls-elegir" accept=".pdf,image/*" multiple hidden>
+        <p class="chico" id="ls-archivos"></p>
+        <label for="ls-texto">O escribe o pega los nombres, uno por renglón</label>
+        <textarea id="ls-texto" placeholder="HERNANDEZ RAMOS LUIS&#10;GARCIA LOPEZ ANA MARIA"></textarea>
+        <label class="casilla"><input type="checkbox" id="ls-apellidos" checked> Los apellidos van primero (como en las listas de la SEP)</label>
+        <p><button class="principal" id="ls-leer">Leer la lista</button> <button id="ls-cancelar">Cancelar</button></p>
+        <div id="ls-mensaje"></div>
+        <div id="ls-revisar"></div>
+      </div>
+      <div id="ls-grupos"></div>
+      <div class="panel oculto" id="ls-detalle" style="margin-top:16px"></div>
+    </section>
+
+    <!-- ============ 2. ESCANEAR EXPEDIENTE (validación manual) ============ -->
+    <section class="pestana" data-pestana="escanear">
+      <h1>Escanear expediente</h1>
+      <p class="subtitulo">Paso 2 · Validación manual: expedientes que la escuela ya revisó en papel. Un alumno a la vez.</p>
+      <div class="panel">
+        <ol class="pasos">
+          <li>Elige el grupo y el alumno. Si no lo eliges, el sistema lo busca por el nombre que lea en el acta.</li>
+          <li>Escanea sus documentos y suéltalos en el cuadro: todos en un PDF o en varios, como salgan del escáner.</li>
+          <li>Revisa los datos que propone el sistema. Si algo se leyó mal (letra a mano, sello encima), corrígelo ahí mismo.</li>
+          <li>Da <b>Guardar expediente</b>. Queda validado en papel y el sistema te pone al siguiente alumno del grupo.</li>
+        </ol>
+        <div class="rejilla">
+          <div><label for="es-grupo">Grupo</label><select id="es-grupo"></select></div>
+          <div><label for="es-alumno">Alumno</label><select id="es-alumno"><option value="">Que el sistema lo busque por su nombre</option></select></div>
+        </div>
+        <div class="soltar" id="es-soltar" role="button" tabindex="0">Suelta aquí los escaneos del alumno (PDF o fotos)<br><span class="chico">o da clic para elegirlos</span></div>
+        <input type="file" id="es-elegir" accept=".pdf,image/*" multiple hidden>
+        <div id="escaneo-mensaje"></div>
+        <div id="escaneo-formulario"></div>
+      </div>
+    </section>
+
+    <!-- ============ 3. FILA DE REVISIÓN (validación automática) ============ -->
+    <section class="pestana" data-pestana="revision">
+      <h1>Fila de revisión</h1>
+      <p class="subtitulo">Paso 3 · Validación automática: lo que suben los padres. El sistema y el cerebro revisan solos; una persona autoriza o rechaza.</p>
+      <div class="barra">
+        <button class="principal" id="revisar">Revisar todo</button>
+        <select id="fi-grupo" aria-label="Grupo"></select>
+        <select id="fi-estado" aria-label="Qué mostrar">
+          <option value="pendientes">Por decidir</option>
+          <option value="revision">A revisión manual</option>
+          <option value="listo">Listos para autorizar</option>
+          <option value="autorizado">Autorizados</option>
+          <option value="rechazado">Rechazados</option>
+          <option value="papel">Escaneados en la escuela</option>
+          <option value="todos">Todos</option>
+        </select>
+        <span class="espacio"></span><span class="chico" id="fi-cuenta"></span>
+      </div>
+      <div class="tarjetas" id="tarjetas"></div>
+      <div class="columnas">
+        <div class="panel"><ul class="lista" id="lista"></ul></div>
+        <div class="panel" id="detalle"><p class="chico">Elige un expediente de la lista.</p></div>
+      </div>
+    </section>
+
+    <!-- ============ 4. CURP Y RENAPO ============ -->
+    <section class="pestana" data-pestana="curp">
+      <h1>CURP y RENAPO</h1>
+      <p class="subtitulo">Paso 4. Cada CURP se confirma en la página oficial. Una persona resuelve el captcha; el sistema hace lo demás.</p>
+      <div class="panel">
+        <p id="renapo-cuenta"></p>
+        <ol class="pasos">
+          <li>En la lista de abajo, da clic en <b>Copiar CURP y abrir RENAPO</b>. Se abre la página oficial en otra pestaña.</li>
+          <li>En la página de RENAPO, da clic en el cuadro de la CURP y pega con <b>Ctrl + V</b>.</li>
+          <li>Marca <b>"No soy un robot"</b>, resuelve lo que te pida y da clic en <b>Buscar</b>.</li>
+          <li>Descarga el <b>PDF</b> de la constancia.</li>
+          <li>Regresa aquí y <b>suelta el PDF en cualquier parte de esta pestaña</b>. No tienes que decir de qué alumno es: el sistema lo encuentra solo.</li>
+        </ol>
+        <div class="soltar" id="soltar" role="button" tabindex="0">Suelta aquí la constancia (PDF)<br><span class="chico">o da clic para elegirla</span></div>
+        <input type="file" id="elegir-constancia" accept=".pdf,application/pdf" hidden>
+        <div id="renapo-mensaje"></div>
+        <div class="tabla-envoltura"><table id="curps"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ ANÁLISIS, 911 Y SAID ============ -->
+    <section class="pestana" data-pestana="analisis">
+      <h1>Análisis, 911 y SAID</h1>
+      <p class="subtitulo">Los números que piden los reportes oficiales. El SIDP los prepara; los directivos los capturan en el sistema oficial.</p>
+      <div class="kpis" id="an-kpis"></div>
+      <div class="panel">
+        <h2>Matrícula por grado y sexo <span class="chico">(base de la estadística 911)</span></h2>
+        <div class="tabla-envoltura"><table id="an-conteo"></table></div>
+      </div>
+      <div class="panel">
+        <h2>Datos que faltan</h2>
+        <div class="alertas" id="an-faltan"></div>
+      </div>
+      <div class="panel">
+        <h2>Descargar para Excel</h2>
+        <p class="chico">Los archivos se guardan en la carpeta de Descargas de esta PC. Tienen datos personales: no los mandes por correo ni los subas a internet.</p>
+        <div class="barra">
+          <button class="principal" data-descargar="alumnos" data-formato="xlsx"><span data-icono="descargar"></span> Lista de alumnos (Excel, una hoja por grupo)</button>
+          <button data-descargar="alumnos" data-formato="csv">Lista de alumnos (CSV)</button>
+          <button class="principal" data-descargar="conteo" data-formato="xlsx"><span data-icono="descargar"></span> Matrícula por grado (Excel)</button>
+          <button data-descargar="conteo" data-formato="csv">Matrícula por grado (CSV)</button>
+        </div>
+        <div id="an-mensaje"></div>
+      </div>
+      <div class="panel">
+        <h2>Para el 911 y el SAID completos</h2>
+        <p>La base todavía no guarda todo lo que piden: la clave del centro de trabajo (CCT), alumnos repetidores y promovidos,
+          lengua indígena, datos del personal (sexo y estudios) y el folio del SAID. La lista completa está en
+          <b>docs/investigacion/reportes_oficiales.md</b>. Esos datos se agregan en las siguientes fases.</p>
+      </div>
+    </section>
+
+    <!-- ============ PLANTILLAS ============ -->
+    <section class="pestana" data-pestana="plantillas">
+      <h1>Plantillas de documentos</h1>
+      <p class="subtitulo">Qué documentos pide la escuela y cómo se reconocen. Para agregar uno no hay que programar: sube una muestra,
+        revisa sus textos fijos (las frases que siempre trae) y guarda. Desde ese momento la página de padres lo pide, el escaneo
+        lo reconoce y la revisión lo valida con su plantilla.</p>
+      <div class="panel">
+        <div class="tabla-envoltura"><table id="plantillas"></table></div>
+        <p><button class="principal" id="pl-nueva">Agregar un documento</button></p>
+        <div id="pl-mensaje"></div>
+        <div id="pl-formulario"></div>
+      </div>
+    </section>
+
+    <!-- ============ AJUSTES ============ -->
+    <section class="pestana" data-pestana="ajustes">
+      <h1>Ajustes</h1>
+      <p class="subtitulo">Conexión con el cerebro de la PC 4, página de padres y estado de la base de datos.</p>
+      <div class="panel oculto" id="panel-cerebro">
+        <h2>Cerebro de la PC 4</h2>
+        <div class="rejilla">
+          <div><label for="cerebro-url">Dirección (por ejemplo http://192.168.1.40:8771)</label><input id="cerebro-url"></div>
+          <div><label for="cerebro-clave">Clave que muestra el cerebro al arrancar</label><input id="cerebro-clave"></div>
+        </div>
+        <p><button class="principal" id="cerebro-guardar">Conectar</button> <span class="chico" id="cerebro-estado"></span></p>
+      </div>
+      <div class="panel">
+        <h2>Página de padres</h2>
+        <p id="padres-ip">Los padres suben sus documentos desde la <a href="padres.html" id="enlace-padres">página de padres</a>.</p>
+      </div>
+      <div class="panel">
+        <h2>Base de datos</h2>
+        <p class="chico">Cuántos registros hay en cada tabla. Nada se borra: los cambios quedan en la bitácora.</p>
+        <div class="tabla-envoltura"><table id="base"></table></div>
+      </div>
+    </section>
+  </main>
+</div>
 <script>
 const motor = crearMotor();
 const $ = (id) => document.getElementById(id);
-let actual = null;
 const PAGINA_PUBLICA = 'https://maximiliano-cabello-mata.github.io/sidp-core/';
+
+// --- Íconos (dibujos simples, sin internet) ---
+const ICONOS = {
+  escuela: '<path d="M2 10l10-6 10 6-10 6z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>',
+  inicio: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  listas: '<path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/>',
+  escanear: '<path d="M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4"/><path d="M7 12h10"/>',
+  revision: '<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/>',
+  curp: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c1-2 5-2 6 0M14 10h4M14 14h4"/>',
+  analisis: '<path d="M5 20V11M11 20V5M17 20v-6M3 20h18"/>',
+  plantillas: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h8"/>',
+  ajustes: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
+  buscar: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>',
+  alumnos: '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M16 4a4 4 0 010 8M22 21c0-3-2-5-4-6"/>',
+  bien: '<path d="M5 12l5 5 9-10"/>',
+  alerta: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+  descargar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+};
+const icono = (nombre) => `<svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS[nombre] || ''}</svg>`;
+for (const e of document.querySelectorAll('[data-icono]')) e.outerHTML = icono(e.dataset.icono);
+
+// --- Pestañas ---
+const PESTANAS = [
+  { id: 'inicio', nombre: 'Inicio', icono: 'inicio' },
+  { separador: 'Validación' },
+  { id: 'listas', nombre: 'Listas de grupo', icono: 'listas', paso: 1 },
+  { id: 'escanear', nombre: 'Escanear expediente', icono: 'escanear', paso: 2, titulo: 'Escanear expediente · validación manual' },
+  { id: 'revision', nombre: 'Fila de revisión', icono: 'revision', paso: 3, titulo: 'Fila de revisión · validación automática' },
+  { id: 'curp', nombre: 'CURP y RENAPO', icono: 'curp', paso: 4 },
+  { separador: 'Administración' },
+  { id: 'analisis', nombre: 'Análisis, 911 y SAID', icono: 'analisis' },
+  { id: 'plantillas', nombre: 'Plantillas', icono: 'plantillas', titulo: 'Plantillas de documentos' },
+  { id: 'ajustes', nombre: 'Ajustes', icono: 'ajustes' },
+];
+let pestana = 'inicio';
+$('menu').innerHTML = PESTANAS.map((p) => p.separador ? `<div class="separador">${esc(p.separador)}</div>`
+  : `<button data-ir="${p.id}">${icono(p.icono)} <span>${esc(p.nombre)}</span><span class="contador oculto" data-contador="${p.id}"></span>${p.paso ? `<span class="numero-paso">${p.paso}</span>` : ''}</button>`).join('');
+document.addEventListener('click', (e) => {
+  const boton = e.target.closest('[data-ir]');
+  if (boton) irA(boton.dataset.ir);
+});
+function irA(id) {
+  const p = PESTANAS.find((x) => x.id === id) || PESTANAS[0];
+  pestana = p.id;
+  for (const s of document.querySelectorAll('.pestana')) s.classList.toggle('activa', s.dataset.pestana === p.id);
+  for (const b of $('menu').querySelectorAll('button')) b.classList.toggle('activo', b.dataset.ir === p.id);
+  $('titulo').textContent = p.titulo || p.nombre;
+  if (location.hash.slice(1) !== p.id) history.replaceState(null, '', '#' + p.id);
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', () => irA(location.hash.slice(1)));
+irA(location.hash.slice(1) || 'inicio');
 
 $('modo').textContent = SIDP.modo === 'demo' ? 'Demostración con datos inventados' : 'Entorno de pruebas · esta PC';
 $('aviso').textContent = SIDP.modo === 'demo'
-  ? 'Página pública: solo expedientes inventados. No escribas ni subas datos reales. Todo corre en tu navegador y no se envía a ningún lado. Fecha de la demostración: 14/10/2026.'
+  ? 'Página pública: solo datos inventados. No escribas ni subas datos reales. Todo corre en tu navegador y no se envía a ningún lado. Fecha de la demostración: 14/10/2026.'
   : 'Este panel tiene datos personales y solo se abre en esta PC. El sistema y el cerebro solo proponen: autoriza o rechaza una persona.';
 
-function insignia(estado) {
-  if (!estado) return '<span class="insignia pendiente">sin revisar</span>';
-  if (estado === 'validado en papel') return '<span class="insignia listo">escaneado</span>';
-  return estado === 'listo para autorizar' ? '<span class="insignia listo">listo</span>' : '<span class="insignia revision">revisión</span>';
-}
+// --- Datos compartidos por todas las pestañas ---
+let datos = { estado: null, curps: null, plantillas: null, grupos: { ciclo: '', grupos: [] }, analisis: null };
 
-function mostrarEstado(estado) {
-  const m = estado.medidas;
-  const tarjetas = [[m.revisados, 'Revisados'], [m.listos, 'Listos para autorizar'], [m.revision, 'A revisión manual'], [m.en_papel, 'Escaneados (validados en papel)'],
-                    [m.autorizados, 'Autorizados'], [m.rechazados, 'Rechazados']];
-  if (m.etiquetados) tarjetas.push([`${m.falsos_detectados}/${m.falsos}`, 'Falsos detectados'], [m.falsos_pasaron, 'Falsos que pasaron'],
-                                   [m.falsos_autorizados, 'Falsos autorizados por una persona']);
-  $('tarjetas').innerHTML = tarjetas.map(([n, t]) => `<div class="tarjeta"><div class="numero">${esc(n)}</div><div class="etiqueta">${esc(t)}</div></div>`).join('');
-  $('lista').innerHTML = estado.expedientes.map((e) => `<li data-id="${esc(e.id)}" class="${e.id === actual ? 'activo' : ''}">
-      <b>${esc(e.id)}</b> ${insignia(e.estado)}
-      ${e.decision ? `<span class="insignia ${esc(e.decision.decision)}">${esc(e.decision.decision)}</span>` : ''}
-      ${e.etiqueta ? `<span class="chico">${esc(e.etiqueta)}${e.trampa ? ': ' + esc(e.trampa) : ''}</span>` : ''}</li>`).join('')
-    || '<li class="chico">Todavía no hay expedientes. Abre la página de padres para subir uno.</li>';
-  for (const li of $('lista').querySelectorAll('li[data-id]')) li.onclick = () => abrir(li.dataset.id);
-}
+function avisoEn(id, clase, texto) { $(id).innerHTML = texto ? `<div class="mensaje ${clase}">${esc(texto)}</div>` : ''; }
 
-function copiar(texto) {
-  // Primero la forma que funciona dentro del mismo clic; la pestaña nueva se abre después.
-  const campo = document.createElement('textarea');
-  campo.value = texto;
-  campo.setAttribute('readonly', '');
-  campo.style.position = 'fixed'; campo.style.opacity = '0';
-  document.body.appendChild(campo);
-  campo.select();
-  let copiado = false;
-  try { copiado = document.execCommand('copy'); } catch (e) { copiado = false; }
-  campo.remove();
-  if (!copiado && navigator.clipboard) navigator.clipboard.writeText(texto).catch(() => {});
-}
-
-function avisoRenapo(clase, texto) {
-  $('renapo-mensaje').innerHTML = texto ? `<div class="mensaje ${clase}">${esc(texto)}</div>` : '';
-}
-
-function mostrarCurps(datos) {
-  const alumnos = datos.alumnos;
-  const pendientes = alumnos.filter((a) => a.estado !== 'validada').length;
-  $('renapo-cuenta').innerHTML = alumnos.length
-    ? `<b>${alumnos.length - pendientes} de ${alumnos.length}</b> CURP validadas en RENAPO. Faltan <b>${pendientes}</b>.`
-    : 'Todavía no hay alumnos. Cuando los padres suban sus documentos, aparecerán aquí.';
-  $('curps').innerHTML = alumnos.length ? '<tr><th>Alumno</th><th>CURP</th><th>Estado</th><th>Qué hacer</th></tr>' + alumnos.map((a) => {
-    let accion = '';
-    if (a.estado === 'validada') accion = `<span class="chico">Validada el ${esc((a.fecha || '').replace('T', ' a las '))}</span>`;
-    else if (a.estado === 'sin_curp') accion = 'El padre no escribió una CURP válida. Pídesela.';
-    else accion = `<button class="principal" data-copiar="${esc(a.curp)}">Copiar CURP y abrir RENAPO</button>
-        <button data-no-encontrada="${esc(a.alumno)}" title="Usa este botón si RENAPO dice que la CURP no existe">RENAPO no la encontró</button>`;
-    if (a.detalle) accion += `<div class="chico">${esc(a.detalle)}</div>`;
-    return `<tr><td>${esc(a.nombre)}</td><td class="curp">${esc(a.curp || '—')}</td>
-      <td><span class="insignia ${esc(a.estado)}">${esc(a.texto)}</span></td><td>${accion}</td></tr>`;
-  }).join('') : '';
-  for (const boton of $('curps').querySelectorAll('[data-copiar]')) boton.onclick = () => {
-    copiar(boton.dataset.copiar);
-    window.open(datos.pagina_oficial, '_blank', 'noopener');
-    avisoRenapo('ojo', `CURP copiada: ${boton.dataset.copiar}. En la página de RENAPO pégala con Ctrl + V.`);
-  };
-  for (const boton of $('curps').querySelectorAll('[data-no-encontrada]')) boton.onclick = async () => {
-    if (!confirm('¿RENAPO dijo que esta CURP no existe? Quedará anotado para pedirle al padre la CURP correcta.')) return;
-    if (await trabajar('Guardando…', () => motor.renapoNoEncontrada(boton.dataset.noEncontrada)))
-      avisoRenapo('ojo', 'Anotado: hay que pedirle al padre la CURP correcta.');
-  };
-}
-
-async function subirConstancia(archivo) {
-  if (!archivo) return;
-  if (!/\.pdf$/i.test(archivo.name) && archivo.type !== 'application/pdf') {
-    avisoRenapo('mal', 'Ese archivo no es un PDF. Arrastra el PDF que descargaste de la página de RENAPO.');
-    return;
-  }
-  avisoRenapo('', '');
-  $('mensaje').textContent = 'Leyendo la constancia…';
+async function trabajar(texto, accion, avisar) {
+  const botones = [...document.querySelectorAll('button')];
+  botones.forEach((b) => (b.disabled = true));
+  $('mensaje').textContent = texto;
   try {
-    const r = await motor.constancia(archivo);
-    avisoRenapo(r.estado === 'validada' ? 'bien' : 'ojo', r.mensaje);
+    const resultado = await accion();
     await refrescar();
     $('mensaje').textContent = 'Listo.';
+    return resultado;
   } catch (error) {
-    avisoRenapo('mal', error.message);
-    $('mensaje').textContent = 'Listo.';
+    $('mensaje').textContent = 'Error: ' + error.message;
+    if (avisar) avisar('mal', error.message);
+  } finally {
+    botones.forEach((b) => (b.disabled = false));
   }
 }
 
-let escaneo = null;
+async function refrescar() {
+  const [estado, curps, plantillasActuales, grupos, analisis] = await Promise.all([
+    motor.estado(), motor.curps(), motor.plantillas(),
+    motor.grupos().catch(() => ({ ciclo: '', grupos: [] })), motor.analisis().catch(() => null)]);
+  datos = { estado, curps, plantillas: plantillasActuales, grupos, analisis };
+  mostrarInicio();
+  mostrarGrupos();
+  opcionesEscaneo();
+  mostrarEstado(estado);
+  mostrarCurps(curps);
+  mostrarPlantillas(plantillasActuales);
+  mostrarAnalisis();
+  if (grupoAbierto) await abrirGrupo(grupoAbierto, null, false);
+  const base = await motor.base();
+  $('base').innerHTML = base ? '<tr><th>Tabla</th><th class="cifra">Registros</th></tr>' +
+    Object.entries(base).map(([t, n]) => `<tr><td>${esc(t)}</td><td class="cifra">${esc(n)}</td></tr>`).join('') : '';
+}
 
-function avisoEscaneo(clase, texto) {
-  $('escaneo-mensaje').innerHTML = texto ? `<div class="mensaje ${clase}">${esc(texto)}</div>` : '';
+function contador(id, n) {
+  const e = document.querySelector(`[data-contador="${id}"]`);
+  e.textContent = n; e.classList.toggle('oculto', !n);
+}
+
+function kpi(color, ic, numero, texto) {
+  return `<div class="tarjeta kpi"><div class="ficha ${color}">${icono(ic)}</div>
+    <div><div class="numero">${esc(numero)}</div><div class="etiqueta">${esc(texto)}</div></div></div>`;
+}
+
+// ================= INICIO =================
+function porDecidir(e) { return !e.decision && e.estado !== 'validado en papel'; }
+
+function mostrarInicio() {
+  const { estado, curps, grupos } = datos;
+  const alumnos = grupos.grupos.reduce((s, g) => s + g.alumnos, 0);
+  const conDocumentos = grupos.grupos.reduce((s, g) => s + g.con_documentos, 0);
+  const sinCurp = grupos.grupos.reduce((s, g) => s + g.sin_curp, 0);
+  const pendientes = estado.expedientes.filter(porDecidir);
+  const aRevision = pendientes.filter((e) => e.estado && e.estado !== 'listo para autorizar');
+  const listos = pendientes.filter((e) => e.estado === 'listo para autorizar');
+  const sinGrupo = estado.expedientes.filter((e) => !e.grupo);
+  const validadas = curps.alumnos.filter((a) => a.estado === 'validada').length;
+  contador('revision', pendientes.length);
+  $('inicio-sub').textContent = `Ciclo escolar ${grupos.ciclo || ''} · ${new Date(estado.hoy + 'T12:00').toLocaleDateString('es-MX', { dateStyle: 'long' })}`;
+  $('inicio-kpis').innerHTML = kpi('azul', 'alumnos', alumnos, `Alumnos en ${grupos.grupos.length} grupos`)
+    + kpi('verde', 'bien', `${conDocumentos} de ${alumnos}`, 'Alumnos con expediente')
+    + kpi('ambar', 'revision', pendientes.length, 'Expedientes de padres por decidir')
+    + kpi('morado', 'curp', `${validadas} de ${curps.alumnos.length}`, 'CURP validadas en RENAPO');
+  const paso = (n, id, que, cuanto, hecho) => `<button class="paso ${hecho ? 'hecho' : ''}" data-ir="${id}">
+      <div class="cual">${n ? `Paso ${n}` : 'Después'}${hecho ? ' · hecho' : ''}</div><div class="que">${esc(que)}</div><div class="cuanto">${esc(cuanto)}</div></button>`;
+  $('inicio-flujo').innerHTML =
+    paso(1, 'listas', 'Subir las listas de grupo', alumnos ? `${grupos.grupos.length} grupos · ${alumnos} alumnos` : 'Todavía no hay listas', alumnos > 0)
+    + paso(2, 'escanear', 'Escanear los expedientes', `${conDocumentos} de ${alumnos} alumnos con expediente`, alumnos > 0 && conDocumentos >= alumnos)
+    + paso(3, 'revision', 'Revisar lo que suben los padres', pendientes.length ? `${pendientes.length} por decidir` : 'Nada pendiente', !pendientes.length)
+    + paso(4, 'curp', 'Validar CURP en RENAPO', `${validadas} de ${curps.alumnos.length} validadas`, curps.alumnos.length > 0 && validadas >= curps.alumnos.length)
+    + paso(0, 'analisis', 'Análisis, 911 y SAID', 'Descargar a Excel', false);
+  const alertas = [];
+  const alerta = (clase, texto, boton, ir) => alertas.push(`<div class="alerta ${clase}"><div>${icono(clase === 'verde' ? 'bien' : 'alerta')} ${texto}</div>
+      ${boton ? `<button data-ir="${ir}">${esc(boton)}</button>` : ''}</div>`);
+  if (!grupos.grupos.length) alerta('amarilla', '<b>Primero:</b> sube la lista de cada grupo. Así los expedientes quedan por grado y grupo.', 'Subir listas', 'listas');
+  if (aRevision.length) alerta('roja', `<b>${aRevision.length}</b> expediente(s) de padres necesitan revisión manual.`, 'Revisar', 'revision');
+  if (listos.length) alerta('amarilla', `<b>${listos.length}</b> expediente(s) listos: falta que una persona los autorice.`, 'Autorizar', 'revision');
+  if (alumnos && conDocumentos < alumnos) alerta('amarilla', `<b>${alumnos - conDocumentos}</b> alumno(s) de las listas aún no tienen expediente.`, 'Escanear', 'escanear');
+  if (sinGrupo.length && grupos.grupos.length) alerta('amarilla', `<b>${sinGrupo.length}</b> expediente(s) no están en ningún grupo.`, 'Ubicarlos', 'revision');
+  if (sinCurp) alerta('amarilla', `<b>${sinCurp}</b> alumno(s) sin CURP. Se llena sola al escanear su acta.`, 'Ver listas', 'listas');
+  if (curps.alumnos.length > validadas) alerta('amarilla', `<b>${curps.alumnos.length - validadas}</b> CURP por validar en RENAPO.`, 'Validar', 'curp');
+  if (!alertas.length) alerta('verde', 'Todo al día.');
+  $('inicio-alertas').innerHTML = alertas.join('');
+}
+
+// ================= 1. LISTAS DE GRUPO =================
+const GRADOS = ['1°', '2°', '3°', '4°', '5°', '6°'];
+const NOMBRE_GRADO = ['', 'Primer grado', 'Segundo grado', 'Tercer grado', 'Cuarto grado', 'Quinto grado', 'Sexto grado'];
+let grupoAbierto = null, listaArchivos = [], listaFilas = null;
+
+function mostrarGrupos() {
+  const { grupos } = datos;
+  $('ls-ciclo').textContent = grupos.ciclo ? `Ciclo escolar ${grupos.ciclo}` : '';
+  if (!grupos.grupos.length) {
+    $('ls-grupos').innerHTML = '<div class="panel"><p>Todavía no hay grupos. Da <b>Subir la lista de un grupo</b> para empezar.</p></div>';
+    return;
+  }
+  const porGrado = {};
+  for (const g of grupos.grupos) (porGrado[g.grado] = porGrado[g.grado] || []).push(g);
+  $('ls-grupos').innerHTML = Object.entries(porGrado).map(([grado, lista]) => `
+    <div class="seccion-titulo">${esc(NOMBRE_GRADO[grado])}</div>
+    <div class="grupos">${lista.map((g) => `<button class="grupo-tarjeta ${g.id === grupoAbierto ? 'activo' : ''}" data-grupo="${esc(g.id)}">
+      <span class="nombre-grupo">${esc(g.nombre)}</span>
+      <span class="chico">${g.alumnos} alumnos · ${g.con_documentos} con expediente</span>
+      ${g.sin_curp ? `<span class="chico">${g.sin_curp} sin CURP</span>` : ''}
+      <div class="barrita"><span style="width:${g.alumnos ? Math.round(100 * g.con_documentos / g.alumnos) : 0}%"></span></div></button>`).join('')}</div>`).join('');
+  for (const b of $('ls-grupos').querySelectorAll('[data-grupo]')) b.onclick = () => abrirGrupo(b.dataset.grupo);
+}
+
+function insigniaCurp(a) {
+  if (!a.curp) return '<span class="insignia sin_curp">sin CURP</span>';
+  return `<span class="curp">${esc(a.curp)}</span> ${a.curp_confirmada ? '<span class="insignia validada">RENAPO</span>' : ''}`;
+}
+
+async function abrirGrupo(id, resaltar = null, desplazar = true) {
+  let r;
+  try { r = await motor.grupo(id); } catch (error) { grupoAbierto = null; $('ls-detalle').classList.add('oculto'); return; }
+  grupoAbierto = id;
+  for (const b of $('ls-grupos').querySelectorAll('[data-grupo]')) b.classList.toggle('activo', b.dataset.grupo === id);
+  const faltan = r.alumnos.filter((a) => !a.expedientes.length).length;
+  $('ls-detalle').classList.remove('oculto');
+  $('ls-detalle').innerHTML = `
+    <div class="barra"><h2 style="margin:0">${esc(r.grupo.nombre)} · ${r.alumnos.length} alumnos</h2><span class="espacio"></span>
+      <button data-agregar>Agregar alumnos a este grupo</button>
+      ${faltan ? `<button class="principal" data-escanear-grupo>Escanear expedientes de este grupo (faltan ${faltan})</button>` : ''}</div>
+    <div class="tabla-envoltura"><table><tr><th>#</th><th>Alumno</th><th>CURP</th><th>Sexo</th><th>Nacimiento</th><th>Expediente</th><th>Tutor</th><th></th></tr>
+    ${r.alumnos.map((a, i) => `<tr class="${a.id === resaltar ? 'resaltado' : ''}" data-fila="${esc(a.id)}">
+      <td>${i + 1}</td><td><b>${esc(a.primer_apellido)} ${esc(a.segundo_apellido)}</b> ${esc(a.nombres)}</td>
+      <td>${insigniaCurp(a)}</td><td>${esc(a.sexo || '—')}</td><td>${esc(a.fecha_nacimiento || '—')}</td>
+      <td>${a.expedientes.length ? a.expedientes.map((x) => insignia(x.estado)).join(' ') + ` <span class="chico">${a.documentos} doc.</span>`
+        : '<span class="insignia pendiente">falta</span>'}</td>
+      <td>${esc(a.tutor || '—')}${a.telefono ? `<div class="chico">${esc(a.telefono)}</div>` : ''}</td>
+      <td>${a.expedientes.length ? '' : `<button class="chico-boton" data-escanear="${esc(a.id)}">Escanear</button>`}</td></tr>`).join('')}
+    </table></div>`;
+  $('ls-detalle').querySelector('[data-agregar]').onclick = () => nuevaLista(r.grupo.grado, r.grupo.letra);
+  const todo = $('ls-detalle').querySelector('[data-escanear-grupo]');
+  if (todo) todo.onclick = () => irEscanear(id, r.alumnos.find((a) => !a.expedientes.length).id);
+  for (const b of $('ls-detalle').querySelectorAll('[data-escanear]')) b.onclick = () => irEscanear(id, b.dataset.escanear);
+  if (resaltar) $('ls-detalle').querySelector(`[data-fila="${CSS.escape(resaltar)}"]`)?.scrollIntoView({ block: 'center' });
+  else if (desplazar) $('ls-detalle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function nuevaLista(grado = null, letra = null) {
+  listaArchivos = []; listaFilas = null;
+  $('ls-subir').classList.remove('oculto');
+  $('ls-subir').dataset.grado = grado || ''; $('ls-subir').dataset.letra = letra || '';
+  $('ls-texto').value = ''; $('ls-archivos').textContent = ''; $('ls-revisar').innerHTML = '';
+  avisoEn('ls-mensaje', grado ? 'ojo' : '', grado ? `Los alumnos se agregarán a ${grado}° ${letra}. Los que ya están no se repiten.` : '');
+  $('ls-subir').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('ls-nueva').onclick = () => nuevaLista();
+$('ls-cancelar').onclick = () => { $('ls-subir').classList.add('oculto'); listaArchivos = []; listaFilas = null; };
+$('ls-soltar').onclick = () => $('ls-elegir').click();
+$('ls-soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('ls-elegir').click(); };
+$('ls-elegir').onchange = () => { agregarArchivosLista($('ls-elegir').files); $('ls-elegir').value = ''; };
+
+function agregarArchivosLista(archivos) {
+  if ($('ls-subir').classList.contains('oculto')) nuevaLista();
+  listaArchivos.push(...[...archivos].filter((a) => a.size));
+  $('ls-archivos').textContent = listaArchivos.length ? 'Archivos: ' + listaArchivos.map((a) => a.name).join(', ') + '. Ahora da Leer la lista.' : '';
+}
+
+$('ls-leer').onclick = async () => {
+  avisoEn('ls-mensaje', 'ojo', listaArchivos.length ? 'Leyendo la lista… con escaneos puede tardar unos segundos por hoja.' : 'Leyendo…');
+  try {
+    $('mensaje').textContent = 'Leyendo la lista…';
+    const r = await motor.listaLeer(listaArchivos, $('ls-texto').value, $('ls-apellidos').checked);
+    listaFilas = r.filas.map((f) => ({ ...f }));
+    const grado = Number($('ls-subir').dataset.grado) || r.grado, letra = $('ls-subir').dataset.letra || r.letra;
+    const avisos = [];
+    if (r.sin_texto.length) avisos.push(`No se pudo leer: ${r.sin_texto.join(', ')}. Conecta el cerebro (Ajustes) o escribe los nombres.`);
+    const dudosos = listaFilas.filter((f) => f.dudoso).length;
+    if (dudosos) avisos.push(`${dudosos} renglón(es) en amarillo: revísalos con la hoja en la mano.`);
+    if (!grado || !letra) avisos.push('No se encontró el grado o el grupo en la hoja: elígelos abajo.');
+    avisoEn('ls-mensaje', avisos.length ? 'ojo' : 'bien', avisos.length ? avisos.join(' ') : `Se leyeron ${listaFilas.length} alumnos. Revisa y guarda.`);
+    tablaLista(grado, letra);
+  } catch (error) {
+    avisoEn('ls-mensaje', 'mal', error.message);
+  }
+  $('mensaje').textContent = 'Listo.';
+};
+
+function tablaLista(grado, letra) {
+  const letras = 'ABCDEFGH'.split('');
+  $('ls-revisar').innerHTML = `
+    <h3>Revisa los alumnos</h3>
+    <div class="rejilla" style="max-width:420px">
+      <div><label for="ls-grado">Grado</label><select id="ls-grado"><option value="">Elige</option>${GRADOS.map((g, i) => `<option value="${i + 1}" ${i + 1 === grado ? 'selected' : ''}>${g}</option>`).join('')}</select></div>
+      <div><label for="ls-letra">Grupo</label><select id="ls-letra"><option value="">Elige</option>${letras.map((l) => `<option ${l === letra ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div class="tabla-envoltura"><table><tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Nombre(s)</th><th>CURP (si la trae)</th><th></th></tr>
+    ${listaFilas.map((f, i) => `<tr class="${f.dudoso ? 'dudoso' : ''}"><td>${i + 1}</td>
+      <td><input data-i="${i}" data-campo="primer_apellido" value="${esc(f.primer_apellido)}" aria-label="Primer apellido"></td>
+      <td><input data-i="${i}" data-campo="segundo_apellido" value="${esc(f.segundo_apellido)}" aria-label="Segundo apellido"></td>
+      <td><input data-i="${i}" data-campo="nombres" value="${esc(f.nombres)}" aria-label="Nombres"></td>
+      <td><input data-i="${i}" data-campo="curp" value="${esc(f.curp)}" maxlength="18" class="curp" aria-label="CURP"></td>
+      <td><button class="chico-boton" data-quitar="${i}" title="Quitar este renglón">Quitar</button></td></tr>`).join('')}</table></div>
+    <p><button data-agregar-renglon>Agregar un renglón</button>
+       <button class="verde" id="ls-guardar">Guardar lista (${listaFilas.length} alumnos)</button></p>`;
+  for (const entrada of $('ls-revisar').querySelectorAll('input[data-i]')) entrada.oninput = () => { listaFilas[entrada.dataset.i][entrada.dataset.campo] = entrada.value; };
+  const actual = () => [Number($('ls-grado').value) || null, $('ls-letra').value || null];
+  for (const b of $('ls-revisar').querySelectorAll('[data-quitar]')) b.onclick = () => { listaFilas.splice(Number(b.dataset.quitar), 1); tablaLista(...actual()); };
+  $('ls-revisar').querySelector('[data-agregar-renglon]').onclick = () => {
+    listaFilas.push({ nombres: '', primer_apellido: '', segundo_apellido: '', curp: '', dudoso: false }); tablaLista(...actual());
+  };
+  $('ls-guardar').onclick = async () => {
+    const [g, l] = actual();
+    if (!g || !l) { avisoEn('ls-mensaje', 'mal', 'Elige el grado y el grupo.'); return; }
+    const r = await trabajar('Guardando la lista…', () => motor.listaGuardar({ grado: g, letra: l, filas: listaFilas }),
+                             (c, t) => avisoEn('ls-mensaje', c, t));
+    if (!r) return;
+    $('ls-subir').classList.add('oculto');
+    listaArchivos = []; listaFilas = null;
+    await abrirGrupo(r.grupo.id);
+    $('ls-detalle').insertAdjacentHTML('afterbegin', `<div class="mensaje bien">Listo: ${r.agregados} alumno(s) agregados a ${esc(r.grupo.nombre)}` +
+      (r.ya_estaban ? `; ${r.ya_estaban} ya estaban.` : '.') + ' Sigue con la lista del próximo grupo, o escanea los expedientes de este.</div>');
+  };
+}
+
+// ================= 2. ESCANEAR EXPEDIENTE =================
+let escaneo = null, alumnosEscaneo = [];
+
+function opcionesEscaneo() {
+  const elegido = $('es-grupo').value;
+  $('es-grupo').innerHTML = '<option value="">Sin elegir grupo</option>' + datos.grupos.grupos.map((g) =>
+    `<option value="${esc(g.id)}" ${g.id === elegido ? 'selected' : ''}>${esc(g.nombre)} (${g.con_documentos} de ${g.alumnos} con expediente)</option>`).join('');
+}
+
+async function cargarAlumnosEscaneo(elegir = null) {
+  const grupo = $('es-grupo').value;
+  alumnosEscaneo = grupo ? (await motor.grupo(grupo)).alumnos : [];
+  $('es-alumno').innerHTML = '<option value="">Que el sistema lo busque por su nombre</option>' + alumnosEscaneo.map((a) =>
+    `<option value="${esc(a.id)}">${esc(a.primer_apellido)} ${esc(a.segundo_apellido)} ${esc(a.nombres)}${a.expedientes.length ? ' · ya tiene expediente' : ''}</option>`).join('');
+  if (elegir) $('es-alumno').value = elegir;
+}
+$('es-grupo').onchange = () => cargarAlumnosEscaneo();
+
+async function irEscanear(grupo, alumno) {
+  irA('escanear');
+  $('es-grupo').value = grupo;
+  await cargarAlumnosEscaneo(alumno);
 }
 
 function campo(id, etiqueta, valor, extra = '') {
   return `<div><label for="${id}">${etiqueta}</label><input id="${id}" value="${esc(valor || '')}" ${extra}></div>`;
+}
+
+function cajaAlumno(r) {
+  // ¿De qué alumno de las listas es este expediente? Nunca se liga solo: la persona elige.
+  if (!datos.grupos.grupos.length) return '<input type="hidden" name="es-quien" value="">';
+  const elegido = $('es-alumno').value;
+  const a = r.propuesta.alumno || {};
+  const leido = [a.nombres, a.primer_apellido, a.segundo_apellido].filter(Boolean).join(' ');
+  const opciones = [];
+  let marcado = elegido || (r.parecidos[0] && r.parecidos[0].seguro ? r.parecidos[0].id : '');
+  if (elegido) {
+    const alumno = alumnosEscaneo.find((x) => x.id === elegido);
+    const seParece = r.parecidos.some((p) => p.id === elegido);
+    opciones.push({ id: elegido, texto: `${alumno ? alumno.nombre : 'El alumno elegido'} (${$('es-grupo').selectedOptions[0].textContent.split(' (')[0]})`,
+                    nota: !leido || seParece ? 'El que elegiste arriba' : `Ojo: en los documentos dice "${leido}", que no se parece. Revisa que sea el alumno correcto.` });
+  }
+  for (const p of r.parecidos) if (p.id !== elegido) opciones.push({ id: p.id, texto: `${p.nombre} (${p.grupo})`, nota: p.seguro ? 'Se parece mucho' : 'Se parece un poco' });
+  if (!opciones.length) marcado = 'nuevo';
+  return `<div class="caja-alumno"><b>¿De qué alumno es?</b> ${leido ? `<span class="chico">En los documentos dice: ${esc(leido)}</span>` : ''}
+    <div class="eleccion">${opciones.map((o) => `<label><input type="radio" name="es-quien" value="${esc(o.id)}" ${o.id === marcado ? 'checked' : ''}>
+      <span>${esc(o.texto)}${o.nota ? `<br><span class="chico">${esc(o.nota)}</span>` : ''}</span></label>`).join('')}
+      <label><input type="radio" name="es-quien" value="nuevo" ${marcado === 'nuevo' ? 'checked' : ''}>
+        <span>No está en las listas: es un alumno nuevo. Va en el grupo
+          <select id="es-nuevo-grupo" style="width:auto">${datos.grupos.grupos.map((g) => `<option value="${esc(g.id)}" ${g.id === $('es-grupo').value ? 'selected' : ''}>${esc(g.nombre)}</option>`).join('')}</select></span></label>
+    </div></div>`;
 }
 
 function mostrarEscaneo(r) {
@@ -192,6 +554,7 @@ function mostrarEscaneo(r) {
   $('escaneo-formulario').innerHTML = `
     ${r.propuesta.avisos.length ? `<div class="mensaje ojo">${r.propuesta.avisos.map(esc).join('<br>')}</div>` : '<div class="mensaje bien">Se leyó todo. Revisa los datos y guarda.</div>'}
     <p class="chico">Leído en: ${esc(r.procesado_en)}</p>
+    ${cajaAlumno(r)}
     <h3>Alumno</h3>
     <div class="rejilla">${campo('es-a-nombres', 'Nombre(s)', a.nombres)}${campo('es-a-ap1', 'Primer apellido', a.primer_apellido)}
       ${campo('es-a-ap2', 'Segundo apellido', a.segundo_apellido)}${campo('es-a-curp', 'CURP', a.curp, 'maxlength="18" class="curp"')}
@@ -206,103 +569,314 @@ function mostrarEscaneo(r) {
       ${campo('es-t-curp', 'CURP (si se ve)', t.curp, 'maxlength="18" class="curp"')}${campo('es-t-telefono', 'Teléfono', t.telefono)}
       ${campo('es-t-domicilio', 'Domicilio', t.domicilio)}</div>
     <h3>Hojas escaneadas</h3>
-    <table><tr><th>Hoja</th><th>Qué documento es</th></tr>${r.paginas.map((p) => `<tr>
+    <div class="tabla-envoltura"><table><tr><th>Hoja</th><th>Qué documento es</th></tr>${r.paginas.map((p) => `<tr>
       <td>${motor.paginaUrl ? `<a href="${esc(motor.paginaUrl(r.lote, p.archivo))}" target="_blank" rel="noopener">${esc(p.origen)}</a>` : esc(p.origen)}
         ${p.reconocido ? '' : '<span class="chico">(no reconocida)</span>'}</td>
-      <td><select data-hoja="${esc(p.archivo)}">${opciones(p.tipo)}</select></td></tr>`).join('')}</table>
+      <td><select data-hoja="${esc(p.archivo)}" aria-label="Tipo de documento">${opciones(p.tipo)}</select></td></tr>`).join('')}</table></div>
     <p><button class="verde" id="es-guardar">Guardar expediente</button> <button id="es-descartar">Descartar</button></p>`;
   $('es-guardar').onclick = guardarEscaneo;
   $('es-descartar').onclick = async () => {
     await trabajar('Descartando…', () => motor.escaneoDescartar(escaneo.lote));
-    escaneo = null; $('escaneo-formulario').innerHTML = ''; avisoEscaneo('', '');
+    escaneo = null; $('escaneo-formulario').innerHTML = ''; avisoEn('escaneo-mensaje', '', '');
   };
 }
 
 async function guardarEscaneo() {
   const valor = (id) => $(id).value.trim();
-  const datos = {
+  const quien = document.querySelector('input[name="es-quien"]:checked') || document.querySelector('input[name="es-quien"][type="hidden"]');
+  if (!quien) { avisoEn('escaneo-mensaje', 'mal', 'Elige de qué alumno es el expediente (arriba de los datos).'); return; }
+  const guardar = {
     alumno: { nombres: valor('es-a-nombres'), primer_apellido: valor('es-a-ap1'), segundo_apellido: valor('es-a-ap2'),
               curp: valor('es-a-curp').toUpperCase(), fecha_nacimiento: valor('es-a-fecha'), sexo: valor('es-a-sexo') },
     tutor: { nombres: valor('es-t-nombres'), primer_apellido: valor('es-t-ap1'), segundo_apellido: valor('es-t-ap2'),
              parentesco: valor('es-t-parentesco'), curp: valor('es-t-curp').toUpperCase(), telefono: valor('es-t-telefono'),
              domicilio: valor('es-t-domicilio') },
     paginas: Object.fromEntries([...document.querySelectorAll('select[data-hoja]')].map((s) => [s.dataset.hoja, s.value])),
+    alumno_id: quien.value && quien.value !== 'nuevo' ? quien.value : '',
+    grupo_id: quien.value === 'nuevo' && $('es-nuevo-grupo') ? $('es-nuevo-grupo').value : '',
   };
-  const r = await trabajar('Guardando el expediente…', () => motor.escaneoGuardar(escaneo.lote, datos));
-  if (!r) { avisoEscaneo('mal', $('mensaje').textContent.replace(/^Error: /, '')); return; }
+  const r = await trabajar('Guardando el expediente…', () => motor.escaneoGuardar(escaneo.lote, guardar), (c, t) => avisoEn('escaneo-mensaje', c, t));
+  if (!r) return;
   escaneo = null;
   $('escaneo-formulario').innerHTML = '';
-  avisoEscaneo('bien', `Listo: el expediente ${r.expediente} de ${r.alumno} quedó guardado. Ya puedes soltar los escaneos del siguiente alumno.`);
+  let siguiente = '';
+  if ($('es-grupo').value) {
+    await cargarAlumnosEscaneo();
+    const proximo = alumnosEscaneo.find((x) => !x.expedientes.length);
+    if (proximo) { $('es-alumno').value = proximo.id; siguiente = ` Sigue: ${proximo.primer_apellido} ${proximo.segundo_apellido} ${proximo.nombres}.`; }
+    else siguiente = ' Ya están todos los de este grupo.';
+  }
+  avisoEn('escaneo-mensaje', 'bien', `Listo: el expediente ${r.expediente} de ${r.alumno}${r.grupo ? ` (${r.grupo})` : ''} quedó guardado.${siguiente}`);
 }
 
 async function subirEscaneo(archivos) {
   archivos = [...archivos].filter((a) => a.size);
   if (!archivos.length) return;
   if (escaneo && !confirm('Hay un expediente escaneado sin guardar. ¿Lo descartas y lees el nuevo?')) return;
-  avisoEscaneo('ojo', `Leyendo ${archivos.length} archivo(s)… Con escaneos puede tardar unos segundos por hoja.`);
+  avisoEn('escaneo-mensaje', 'ojo', `Leyendo ${archivos.length} archivo(s)… Con escaneos puede tardar unos segundos por hoja.`);
   $('escaneo-formulario').innerHTML = '';
   try {
     $('mensaje').textContent = 'Leyendo los escaneos…';
     const r = await motor.escaneoLeer(archivos);
-    avisoEscaneo('', '');
+    avisoEn('escaneo-mensaje', '', '');
     mostrarEscaneo(r);
-    $('mensaje').textContent = 'Listo.';
   } catch (error) {
-    avisoEscaneo('mal', error.message);
-    $('mensaje').textContent = 'Listo.';
+    avisoEn('escaneo-mensaje', 'mal', error.message);
   }
+  $('mensaje').textContent = 'Listo.';
+}
+$('es-soltar').onclick = () => $('es-elegir').click();
+$('es-soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('es-elegir').click(); };
+$('es-elegir').onchange = () => { subirEscaneo($('es-elegir').files); $('es-elegir').value = ''; };
+
+// ================= 3. FILA DE REVISIÓN =================
+let actual = null;
+
+function insignia(estado) {
+  if (!estado) return '<span class="insignia pendiente">sin revisar</span>';
+  if (estado === 'validado en papel') return '<span class="insignia listo">escaneado</span>';
+  return estado === 'listo para autorizar' ? '<span class="insignia listo">listo</span>' : '<span class="insignia revision">revisión</span>';
 }
 
-$('soltar-escaneo').onclick = () => $('elegir-escaneo').click();
-$('soltar-escaneo').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('elegir-escaneo').click(); };
-$('elegir-escaneo').onchange = () => { subirEscaneo($('elegir-escaneo').files); $('elegir-escaneo').value = ''; };
-$('panel-escaneo').addEventListener('drop', (e) => {
-  e.preventDefault();
-  e.stopPropagation();  // Lo que se suelta aquí son escaneos, no la constancia de RENAPO.
-  document.body.classList.remove('arrastrando');
-  subirEscaneo(e.dataTransfer.files);
-});
+function pasaFiltro(e) {
+  const grupo = $('fi-grupo').value, que = $('fi-estado').value;
+  if (grupo === 'sin' && e.grupo) return false;
+  if (grupo && grupo !== 'sin' && e.grupo !== grupo) return false;
+  const decision = e.decision && e.decision.decision;
+  return { pendientes: porDecidir(e), revision: porDecidir(e) && e.estado && e.estado !== 'listo para autorizar',
+           listo: porDecidir(e) && e.estado === 'listo para autorizar', autorizado: decision === 'autorizado' && e.estado !== 'validado en papel',
+           rechazado: decision === 'rechazado', papel: e.estado === 'validado en papel', todos: true }[que];
+}
 
+function mostrarEstado(estado) {
+  const m = estado.medidas;
+  const tarjetas = [[m.revisados, 'Revisados'], [m.listos, 'Listos para autorizar'], [m.revision, 'A revisión manual'], [m.en_papel, 'Escaneados en la escuela'],
+                    [m.autorizados, 'Autorizados'], [m.rechazados, 'Rechazados']];
+  if (m.etiquetados) tarjetas.push([`${m.falsos_detectados}/${m.falsos}`, 'Falsos detectados'], [m.falsos_pasaron, 'Falsos que pasaron'],
+                                   [m.falsos_autorizados, 'Falsos autorizados por una persona']);
+  $('tarjetas').innerHTML = tarjetas.map(([n, t]) => `<div class="tarjeta"><div class="numero">${esc(n)}</div><div class="etiqueta">${esc(t)}</div></div>`).join('');
+  const elegido = $('fi-grupo').value;
+  const nombres = [...new Set(estado.expedientes.map((e) => e.grupo).filter(Boolean))].sort();
+  $('fi-grupo').innerHTML = '<option value="">Todos los grupos</option>' + nombres.map((g) => `<option ${g === elegido ? 'selected' : ''}>${esc(g)}</option>`).join('')
+    + `<option value="sin" ${elegido === 'sin' ? 'selected' : ''}>Sin grupo</option>`;
+  const filas = estado.expedientes.filter(pasaFiltro);
+  $('fi-cuenta').textContent = `${filas.length} de ${estado.expedientes.length} expedientes`;
+  // Divididos por grado y grupo; al final los que aún no están en ninguna lista.
+  const orden = (g) => g || '~';
+  filas.sort((a, b) => orden(a.grupo).localeCompare(orden(b.grupo)) || String(a.alumno || '').localeCompare(String(b.alumno || '')) || a.id.localeCompare(b.id));
+  let grupoPrevio;
+  $('lista').innerHTML = filas.map((e) => {
+    const encabezado = e.grupo !== grupoPrevio ? `<li class="encabezado">${esc(e.grupo || 'Sin grupo')}</li>` : '';
+    grupoPrevio = e.grupo;
+    return `${encabezado}<li data-id="${esc(e.id)}" class="${e.id === actual ? 'activo' : ''}">
+      <span><b>${esc(e.alumno || 'Expediente ' + e.id)}</b><br><span class="chico">Expediente ${esc(e.id)}</span></span> ${insignia(e.estado)}
+      ${e.decision ? `<span class="insignia ${esc(e.decision.decision)}">${esc(e.decision.decision)}</span>` : ''}
+      ${e.etiqueta ? `<span class="chico">${esc(e.etiqueta)}${e.trampa ? ': ' + esc(e.trampa) : ''}</span>` : ''}</li>`;
+  }).join('') || `<li class="chico">${estado.expedientes.length ? 'Nada con este filtro. Cambia el filtro de arriba.' : 'Todavía no hay expedientes. Los padres los suben desde su página.'}</li>`;
+  for (const li of $('lista').querySelectorAll('li[data-id]')) li.onclick = () => abrir(li.dataset.id);
+}
+$('fi-grupo').onchange = $('fi-estado').onchange = () => mostrarEstado(datos.estado);
+
+function tablaResultado(r) {
+  const filas = [
+    ...r.hallazgos.map((h) => `<tr><td class="que ${esc(h.gravedad)}">Hallazgo</td><td>${esc(h.documento)}</td><td>${esc(h.detalle)}</td></tr>`),
+    ...r.grises.map((g) => `<tr><td class="que">Zona gris</td><td>${esc(g.documento)}</td><td>"${esc(g.a)}" contra "${esc(g.b)}".
+        El cerebro opina: <b>${esc(g.opinion.misma)}</b> <span class="chico">(${esc(g.opinion.motivo || '')})</span></td></tr>`),
+    ...r.no_leidos.map((n) => `<tr><td class="que">No se pudo leer</td><td>${esc(n.documento)}</td><td>${esc(n.detalle)}</td></tr>`),
+  ];
+  return filas.length ? `<div class="tabla-envoltura"><table><tr><th>Qué</th><th>Documento</th><th>Detalle</th></tr>${filas.join('')}</table></div>`
+                      : '<p>Todo coincide. Falta que una persona lo autorice.</p>';
+}
+
+function cajaUbicar(d) {
+  if (!d.alumno_id || d.grupo || !datos.grupos.grupos.length) return '';
+  return `<div class="caja-alumno"><b>Este alumno no está en ninguna lista de grupo.</b>
+    ${d.parecidos.length ? `<p class="chico">En las listas hay alguien parecido. Si es el mismo niño, da clic en su nombre: el expediente toma su lugar en el grupo.</p>
+      <p>${d.parecidos.map((p) => `<button data-mismo="${esc(p.id)}">Es ${esc(p.nombre)} (${esc(p.grupo)})</button>`).join(' ')}</p>` : ''}
+    <p>O ponerlo en el grupo <select id="ub-grupo" style="width:auto">${datos.grupos.grupos.map((g) => `<option value="${esc(g.id)}">${esc(g.nombre)}</option>`).join('')}</select>
+      <button id="ub-poner">Ponerlo ahí</button></p><div id="ub-mensaje"></div></div>`;
+}
+
+async function abrir(id) {
+  actual = id;
+  for (const li of $('lista').querySelectorAll('li[data-id]')) li.classList.toggle('activo', li.dataset.id === id);
+  const d = await motor.detalle(id);
+  const r = d.resultado;
+  const a = d.captura.alumno || {}, t = d.captura.tutor || {};
+  const nombreAlumno = a.nombre || [a.nombres, a.primer_apellido, a.segundo_apellido].filter(Boolean).join(' ');
+  const nombreTutor = t.nombre || [t.nombres, t.primer_apellido, t.segundo_apellido].filter(Boolean).join(' ');
+  const editable = SIDP.modo === 'demo' && Object.keys(d.textos).length;
+  $('detalle').innerHTML = `
+    <h2>${esc(d.alumno || nombreAlumno || 'Expediente ' + id)} ${r ? insignia(r.estado) : ''}</h2>
+    <p class="chico">Expediente ${esc(id)} · ${esc(d.grupo || 'sin grupo')}${r ? ` · revisado en ${esc(r.procesado_en || 'esta PC')} · ${esc(r.segundos)} s` : ''}</p>
+    ${cajaUbicar(d)}
+    <h3>Lo que capturó el padre</h3>
+    ${editable ? `<div class="rejilla">
+        <div><label>Nombre del alumno</label><input id="e-alumno" value="${esc(a.nombre)}"></div>
+        <div><label>CURP</label><input id="e-curp" value="${esc(a.curp)}"></div>
+        <div><label>Nombre del tutor</label><input id="e-tutor" value="${esc(t.nombre)}"></div>
+        <div><label>Parentesco</label><input id="e-parentesco" value="${esc(t.parentesco)}"></div>
+        <div><label>Domicilio</label><input id="e-domicilio" value="${esc(t.domicilio)}"></div></div>`
+      : `<table><tr><td>Alumno</td><td>${esc(nombreAlumno)}</td></tr><tr><td>CURP</td><td class="curp">${esc(a.curp)}</td></tr>
+         <tr><td>Tutor</td><td>${esc(nombreTutor)} (${esc(t.parentesco)})</td></tr><tr><td>Domicilio</td><td>${esc(t.domicilio)}</td></tr></table>`}
+    <h3>Documentos</h3>
+    ${editable ? Object.entries(d.textos).map(([n, texto]) => `<label>${esc(n)}</label><textarea data-archivo="${esc(n)}">${esc(texto)}</textarea>`).join('')
+        + '<p><button id="volver">Volver a revisar con estos cambios</button></p>'
+      : '<ul>' + d.archivos.map((n) => `<li>${motor.archivoUrl ? `<a href="${esc(motor.archivoUrl(id, n))}" target="_blank" rel="noopener">${esc(n)}</a>` : esc(n)}</li>`).join('') + '</ul>'}
+    <h3>Resultado del sistema</h3>
+    ${r ? tablaResultado(r) : '<p class="chico">Sin revisar. Da <b>Revisar todo</b>.</p>'}
+    ${r && Object.keys(r.extraidos || {}).length ? `<h3>Datos extraídos (propuesta, no confirmados)</h3><table>${Object.entries(r.extraidos)
+        .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(Array.isArray(v) ? v.join(', ') : v)}</td></tr>`).join('')}</table>` : ''}
+    <h3>Decisión de la persona</h3>
+    ${d.decision ? `<p><span class="insignia ${esc(d.decision.decision)}">${esc(d.decision.decision)}</span>
+        <span class="chico">${esc(d.decision.quien)} · ${esc(d.decision.fecha)}${d.decision.motivo ? ' · ' + esc(d.decision.motivo) : ''}</span></p>` : ''}
+    <label for="motivo">Motivo (obligatorio para rechazar)</label><textarea id="motivo" style="min-height:60px"></textarea>
+    <p><button class="verde" id="autorizar">Autorizar</button> <button class="rojo" id="rechazar">Rechazar</button></p>
+    <div id="reporte"></div>`;
+  $('autorizar').onclick = () => decidir('autorizado');
+  $('rechazar').onclick = () => decidir('rechazado');
+  const ubicar = async (grupo, mismo) => {
+    if (await trabajar('Ubicando al alumno…', () => motor.ubicar(d.alumno_id, grupo, mismo), (c, x) => avisoEn('ub-mensaje', c, x))) await abrir(id);
+  };
+  for (const b of $('detalle').querySelectorAll('[data-mismo]')) b.onclick = () => ubicar(null, b.dataset.mismo);
+  if ($('ub-poner')) $('ub-poner').onclick = () => ubicar($('ub-grupo').value, null);
+  if (editable) $('volver').onclick = async () => {
+    const captura = { alumno: { ...a, nombre: $('e-alumno').value, curp: $('e-curp').value },
+                      tutor: { ...t, nombre: $('e-tutor').value, parentesco: $('e-parentesco').value, domicilio: $('e-domicilio').value } };
+    const textos = Object.fromEntries([...document.querySelectorAll('textarea[data-archivo]')].map((x) => [x.dataset.archivo, x.value]));
+    await trabajar('Revisando…', () => motor.reescribir(id, captura, textos));
+    await abrir(id);
+  };
+  if (window.innerWidth <= 1000) $('detalle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function decidir(decision) {
+  const respuesta = await trabajar('Guardando…', () => motor.decidir(actual, decision, $('motivo').value));
+  if (!respuesta) return;
+  await abrir(actual);
+  if (respuesta.reporte_para_padre) $('reporte').innerHTML = `<h3>Lo que recibiría el padre</h3><pre>${esc(respuesta.reporte_para_padre)}</pre>`;
+}
+
+$('revisar').onclick = async () => { await trabajar('Revisando todos los expedientes…', () => motor.revisarTodo()); if (actual) abrir(actual); };
+
+// ================= 4. CURP Y RENAPO =================
+function copiar(texto) {
+  // Primero la forma que funciona dentro del mismo clic; la pestaña nueva se abre después.
+  const area = document.createElement('textarea');
+  area.value = texto;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed'; area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  let copiado = false;
+  try { copiado = document.execCommand('copy'); } catch (e) { copiado = false; }
+  area.remove();
+  if (!copiado && navigator.clipboard) navigator.clipboard.writeText(texto).catch(() => {});
+}
+
+function mostrarCurps(d) {
+  const alumnos = d.alumnos;
+  const pendientes = alumnos.filter((a) => a.estado !== 'validada').length;
+  contador('curp', alumnos.filter((a) => a.estado === 'sin_validar').length);
+  $('renapo-cuenta').innerHTML = alumnos.length
+    ? `<b>${alumnos.length - pendientes} de ${alumnos.length}</b> CURP validadas en RENAPO. Faltan <b>${pendientes}</b>.`
+    : 'Todavía no hay alumnos con documentos. Aparecerán aquí cuando se escaneen o los padres los suban.';
+  $('curps').innerHTML = alumnos.length ? '<tr><th>Alumno</th><th>CURP</th><th>Estado</th><th>Qué hacer</th></tr>' + alumnos.map((a) => {
+    let accion = '';
+    if (a.estado === 'validada') accion = `<span class="chico">Validada el ${esc((a.fecha || '').replace('T', ' a las '))}</span>`;
+    else if (a.estado === 'sin_curp') accion = 'No hay una CURP válida. Pídesela al padre o escanea el acta.';
+    else accion = `<button class="principal" data-copiar="${esc(a.curp)}">Copiar CURP y abrir RENAPO</button>
+        <button data-no-encontrada="${esc(a.alumno)}" title="Usa este botón si RENAPO dice que la CURP no existe">RENAPO no la encontró</button>`;
+    if (a.detalle) accion += `<div class="chico">${esc(a.detalle)}</div>`;
+    return `<tr><td>${esc(a.nombre)}</td><td class="curp">${esc(a.curp || '—')}</td>
+      <td><span class="insignia ${esc(a.estado)}">${esc(a.texto)}</span></td><td>${accion}</td></tr>`;
+  }).join('') : '';
+  for (const boton of $('curps').querySelectorAll('[data-copiar]')) boton.onclick = () => {
+    copiar(boton.dataset.copiar);
+    window.open(d.pagina_oficial, '_blank', 'noopener');
+    avisoEn('renapo-mensaje', 'ojo', `CURP copiada: ${boton.dataset.copiar}. En la página de RENAPO pégala con Ctrl + V.`);
+  };
+  for (const boton of $('curps').querySelectorAll('[data-no-encontrada]')) boton.onclick = async () => {
+    if (!confirm('¿RENAPO dijo que esta CURP no existe? Quedará anotado para pedirle al padre la CURP correcta.')) return;
+    if (await trabajar('Guardando…', () => motor.renapoNoEncontrada(boton.dataset.noEncontrada)))
+      avisoEn('renapo-mensaje', 'ojo', 'Anotado: hay que pedirle al padre la CURP correcta.');
+  };
+}
+
+async function subirConstancia(archivo) {
+  if (!archivo) return;
+  if (!/\.pdf$/i.test(archivo.name) && archivo.type !== 'application/pdf') {
+    avisoEn('renapo-mensaje', 'mal', 'Ese archivo no es un PDF. Suelta el PDF que descargaste de la página de RENAPO.');
+    return;
+  }
+  avisoEn('renapo-mensaje', '', '');
+  $('mensaje').textContent = 'Leyendo la constancia…';
+  try {
+    const r = await motor.constancia(archivo);
+    avisoEn('renapo-mensaje', r.estado === 'validada' ? 'bien' : 'ojo', r.mensaje);
+    await refrescar();
+  } catch (error) {
+    avisoEn('renapo-mensaje', 'mal', error.message);
+  }
+  $('mensaje').textContent = 'Listo.';
+}
 $('soltar').onclick = () => $('elegir-constancia').click();
 $('soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('elegir-constancia').click(); };
 $('elegir-constancia').onchange = () => { subirConstancia($('elegir-constancia').files[0]); $('elegir-constancia').value = ''; };
-// El PDF se puede soltar en cualquier parte de la página: así el navegador no lo abre por su cuenta.
-document.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('arrastrando'); });
-document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('arrastrando'); });
-document.addEventListener('drop', (e) => {
-  e.preventDefault();
-  document.body.classList.remove('arrastrando');
-  subirConstancia(e.dataTransfer.files[0]);
-});
 
+// ================= ANÁLISIS =================
+function mostrarAnalisis() {
+  const a = datos.analisis;
+  if (!a) { $('an-conteo').innerHTML = ''; $('an-kpis').innerHTML = ''; $('an-faltan').innerHTML = ''; return; }
+  const suma = (k) => a.grados.reduce((s, g) => s + g[k], 0);
+  const columnas = ['grupos', 'hombres', 'mujeres', 'sin_dato', 'total'];
+  $('an-kpis').innerHTML = kpi('azul', 'alumnos', suma('total'), 'Alumnos inscritos') + kpi('morado', 'listas', suma('grupos'), 'Grupos')
+    + kpi('azul', 'alumnos', suma('hombres'), 'Hombres') + kpi('rojo', 'alumnos', suma('mujeres'), 'Mujeres');
+  $('an-conteo').innerHTML = '<tr><th>Grado</th><th class="cifra">Grupos</th><th class="cifra">Hombres</th><th class="cifra">Mujeres</th><th class="cifra">Sin dato de sexo</th><th class="cifra">Total</th></tr>'
+    + a.grados.map((g) => `<tr><td>${esc(NOMBRE_GRADO[g.grado])}</td>${columnas.map((k) => `<td class="cifra">${g[k]}</td>`).join('')}</tr>`).join('')
+    + `<tr class="total"><td>Total</td>${columnas.map((k) => `<td class="cifra">${suma(k)}</td>`).join('')}</tr>`;
+  const f = a.faltan;
+  const fila = (n, texto, como, ir) => `<div class="alerta ${n ? 'amarilla' : 'verde'}"><div>${icono(n ? 'alerta' : 'bien')} <b>${n}</b> ${texto}${n ? `<br><span class="chico">${como}</span>` : ''}</div>
+      ${n && ir ? `<button data-ir="${ir}">Ir</button>` : ''}</div>`;
+  $('an-faltan').innerHTML = f.total ? fila(f.sin_curp, 'alumnos sin CURP', 'Se llena al escanear el acta o la CURP del alumno.', 'escanear')
+    + fila(f.curp_sin_validar, 'CURP sin validar en RENAPO', 'Se valida en la pestaña CURP y RENAPO.', 'curp')
+    + fila(f.sin_sexo, 'alumnos sin sexo registrado (el 911 lo pide)', 'Sale de la CURP o del acta al escanear.', 'escanear')
+    + fila(f.sin_fecha, 'alumnos sin fecha de nacimiento', 'Sale de la CURP o del acta al escanear.', 'escanear')
+    + fila(f.sin_documentos, 'alumnos sin documentos', 'Escanea su expediente o pide a los padres que lo suban.', 'escanear')
+    : '<div class="alerta amarilla"><div>Todavía no hay alumnos. Sube las listas de grupo primero.</div><button data-ir="listas">Ir</button></div>';
+}
+for (const b of document.querySelectorAll('[data-descargar]')) b.onclick = async () => {
+  try {
+    await motor.descargar(b.dataset.descargar, b.dataset.formato);
+    avisoEn('an-mensaje', 'bien', 'Listo: revisa tu carpeta de Descargas.');
+  } catch (error) {
+    avisoEn('an-mensaje', 'mal', error.message);
+  }
+};
+
+// ================= PLANTILLAS =================
 let plantillas = null, muestras = [];
 
-function avisoPlantilla(clase, texto) {
-  $('pl-mensaje').innerHTML = texto ? `<div class="mensaje ${clase}">${esc(texto)}</div>` : '';
-}
-
-function mostrarPlantillas(datos) {
-  plantillas = datos;
+function mostrarPlantillas(d) {
+  plantillas = d;
   const si = (v) => (v ? 'Sí' : 'No');
   $('plantillas').innerHTML = `<tr><th>Documento</th><th>De</th><th>Obligatorio</th><th>Se pide a padres</th><th>Textos fijos</th><th></th></tr>` +
-    datos.plantillas.map((p) => `<tr class="${p.activa ? '' : 'apagada'}">
+    d.plantillas.map((p) => `<tr class="${p.activa ? '' : 'apagada'}">
       <td>${esc(p.nombre)} ${p.fabrica ? '<span class="chico">(del sistema)</span>' : ''} ${p.activa ? '' : '<span class="insignia rechazado">de baja</span>'}</td>
       <td>${esc(p.de === 'alumno' ? 'Alumno' : 'Tutor')}</td><td>${si(p.obligatorio)}</td><td>${si(p.para_padres)}</td>
       <td>${p.textos.length}${p.version ? ` <span class="chico">(versión ${p.version})</span>` : ''}</td>
-      <td><button data-editar="${esc(p.clave)}">Abrir</button>
-        ${p.fabrica ? '' : `<button data-activa="${esc(p.clave)}" data-valor="${p.activa ? '' : '1'}">${p.activa ? 'Dar de baja' : 'Volver a pedir'}</button>`}</td></tr>`).join('');
-  for (const boton of document.querySelectorAll('[data-editar]')) boton.onclick = () => formularioPlantilla(datos.plantillas.find((p) => p.clave === boton.dataset.editar));
-  for (const boton of document.querySelectorAll('[data-activa]')) boton.onclick = async () => {
-    const r = await trabajar('Guardando…', () => motor.plantillaActiva(boton.dataset.activa, !!boton.dataset.valor));
-    if (r) mostrarPlantillas(r);
-  };
+      <td><button class="chico-boton" data-editar="${esc(p.clave)}">Abrir</button>
+        ${p.fabrica ? '' : `<button class="chico-boton" data-activa="${esc(p.clave)}" data-valor="${p.activa ? '' : '1'}">${p.activa ? 'Dar de baja' : 'Volver a pedir'}</button>`}</td></tr>`).join('');
+  for (const boton of $('plantillas').querySelectorAll('[data-editar]')) boton.onclick = () => formularioPlantilla(d.plantillas.find((p) => p.clave === boton.dataset.editar));
+  for (const boton of $('plantillas').querySelectorAll('[data-activa]')) boton.onclick = () =>
+    trabajar('Guardando…', () => motor.plantillaActiva(boton.dataset.activa, !!boton.dataset.valor));
 }
 
 function formularioPlantilla(p) {
   const nueva = !p;
   p = p || { nombre: '', de: 'alumno', obligatorio: true, para_padres: true, textos: [], minimo: 1, reglas: ['nombre_alumno'], meses: 3 };
   muestras = [];
-  avisoPlantilla('', '');
+  avisoEn('pl-mensaje', '', '');
   const fijo = p.fabrica ? 'disabled' : '';
   $('pl-formulario').innerHTML = `
     <h3>${nueva ? 'Documento nuevo' : esc(p.nombre)}</h3>
@@ -331,26 +905,17 @@ function formularioPlantilla(p) {
   $('pl-soltar').onclick = () => $('pl-elegir').click();
   $('pl-soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('pl-elegir').click(); };
   $('pl-elegir').onchange = () => { leerMuestras($('pl-elegir').files); $('pl-elegir').value = ''; };
-  $('pl-soltar').addEventListener('drop', (e) => {
-    e.preventDefault(); e.stopPropagation(); document.body.classList.remove('arrastrando'); leerMuestras(e.dataTransfer.files);
-  });
-  $('pl-cancelar').onclick = () => { $('pl-formulario').innerHTML = ''; avisoPlantilla('', ''); };
+  $('pl-cancelar').onclick = () => { $('pl-formulario').innerHTML = ''; avisoEn('pl-mensaje', '', ''); };
   $('pl-guardar').onclick = async () => {
-    const textos = $('pl-textos').value.split('\n').map((t) => t.trim()).filter(Boolean);
-    const datos = { clave: p.clave, nombre: $('pl-nombre').value, de: $('pl-de').value, obligatorio: $('pl-obligatorio').checked,
+    const textos = $('pl-textos').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    const guardar = { clave: p.clave, nombre: $('pl-nombre').value, de: $('pl-de').value, obligatorio: $('pl-obligatorio').checked,
       para_padres: $('pl-padres').checked, textos, minimo: Number($('pl-minimo').value),
       reglas: [...document.querySelectorAll('[data-regla]')].filter((c) => c.checked).map((c) => c.dataset.regla), meses: Number($('pl-meses').value) };
-    try {
-      $('mensaje').textContent = 'Guardando la plantilla…';
-      const r = await motor.plantillaGuardar(datos, muestras);
-      mostrarPlantillas(r);
-      $('pl-formulario').innerHTML = '';
-      avisoPlantilla('bien', `Listo: "${r.guardada.nombre}" quedó guardada (versión ${r.guardada.version}).` +
-        (r.guardada.para_padres ? ' La página de padres ya lo pide.' : ''));
-    } catch (error) {
-      avisoPlantilla('mal', error.message);
-    }
-    $('mensaje').textContent = 'Listo.';
+    const r = await trabajar('Guardando la plantilla…', () => motor.plantillaGuardar(guardar, muestras), (c, x) => avisoEn('pl-mensaje', c, x));
+    if (!r) return;
+    $('pl-formulario').innerHTML = '';
+    avisoEn('pl-mensaje', 'bien', `Listo: "${r.guardada.nombre}" quedó guardada (versión ${r.guardada.version}).` +
+      (r.guardada.para_padres ? ' La página de padres ya lo pide.' : ''));
   };
   $('pl-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -358,115 +923,27 @@ function formularioPlantilla(p) {
 async function leerMuestras(archivos) {
   archivos = [...archivos].filter((a) => a.size);
   if (!archivos.length) return;
-  avisoPlantilla('ojo', `Leyendo ${archivos.length} muestra(s)…`);
+  avisoEn('pl-mensaje', 'ojo', `Leyendo ${archivos.length} muestra(s)…`);
   try {
     const r = await motor.plantillaLeer(archivos);
     muestras = archivos;
     const actuales = $('pl-textos').value.trim();
-    $('pl-textos').value = (actuales ? actuales + '\n' : '') + r.textos.filter((t) => !actuales.split('\n').includes(t)).join('\n');
+    $('pl-textos').value = (actuales ? actuales + '\n' : '') + r.textos.filter((x) => !actuales.split('\n').includes(x)).join('\n');
     const total = $('pl-textos').value.split('\n').filter(Boolean).length;
     $('pl-minimo').value = Math.max(1, Math.ceil(total / 2));
     const avisos = [];
     if (r.sin_texto.length) avisos.push('No se pudo leer: ' + r.sin_texto.join(', ') + '. Conecta el cerebro o sube un PDF con texto.');
     const parecidos = Object.entries(r.parecido);
     if (parecidos.length) avisos.push('Ojo, la muestra también dice textos de: ' + parecidos.map(([n, c]) => `${n} (${c})`).join(', ') + '.');
-    avisoPlantilla(avisos.length ? 'ojo' : 'bien', avisos.length ? avisos.join(' ') :
+    avisoEn('pl-mensaje', avisos.length ? 'ojo' : 'bien', avisos.length ? avisos.join(' ') :
       `Se propusieron ${r.textos.length} textos fijos. Revísalos, quita los que tengan datos de alguien y guarda.`);
   } catch (error) {
-    avisoPlantilla('mal', error.message);
+    avisoEn('pl-mensaje', 'mal', error.message);
   }
 }
-
 $('pl-nueva').onclick = () => formularioPlantilla(null);
 
-async function refrescar() {
-  mostrarEstado(await motor.estado());
-  mostrarCurps(await motor.curps());
-  mostrarPlantillas(await motor.plantillas());
-  const base = await motor.base();
-  $('base').textContent = base ? 'Base de datos (39 tablas): ' + Object.entries(base).map(([t, n]) => `${t} ${n}`).join(' · ') : '';
-}
-
-function tablaResultado(r) {
-  const filas = [
-    ...r.hallazgos.map((h) => `<tr><td class="${esc(h.gravedad)}">Hallazgo</td><td>${esc(h.documento)}</td><td>${esc(h.detalle)}</td></tr>`),
-    ...r.grises.map((g) => `<tr><td>Zona gris</td><td>${esc(g.documento)}</td><td>"${esc(g.a)}" contra "${esc(g.b)}".
-        El cerebro opina: <b>${esc(g.opinion.misma)}</b> <span class="chico">(${esc(g.opinion.motivo || '')})</span></td></tr>`),
-    ...r.no_leidos.map((n) => `<tr><td>No se pudo leer</td><td>${esc(n.documento)}</td><td>${esc(n.detalle)}</td></tr>`),
-  ];
-  return filas.length ? `<table><tr><th>Qué</th><th>Documento</th><th>Detalle</th></tr>${filas.join('')}</table>`
-                      : '<p>Todo coincide. Falta que una persona lo autorice.</p>';
-}
-
-async function abrir(id) {
-  actual = id;
-  for (const li of $('lista').querySelectorAll('li[data-id]')) li.classList.toggle('activo', li.dataset.id === id);
-  const d = await motor.detalle(id);
-  const r = d.resultado;
-  const a = d.captura.alumno || {}, t = d.captura.tutor || {};
-  const editable = SIDP.modo === 'demo' && Object.keys(d.textos).length;
-  $('detalle').innerHTML = `
-    <h2>Expediente ${esc(id)} ${r ? insignia(r.estado) : ''}</h2>
-    ${r ? `<p class="chico">Revisado en: ${esc(r.procesado_en || 'esta PC')} · ${esc(r.segundos)} s</p>` : ''}
-    <h3>Lo que capturó el padre</h3>
-    ${editable ? `<div class="rejilla">
-        <div><label>Nombre del alumno</label><input id="e-alumno" value="${esc(a.nombre)}"></div>
-        <div><label>CURP</label><input id="e-curp" value="${esc(a.curp)}"></div>
-        <div><label>Nombre del tutor</label><input id="e-tutor" value="${esc(t.nombre)}"></div>
-        <div><label>Parentesco</label><input id="e-parentesco" value="${esc(t.parentesco)}"></div>
-        <div><label>Domicilio</label><input id="e-domicilio" value="${esc(t.domicilio)}"></div></div>`
-      : `<table><tr><td>Alumno</td><td>${esc(a.nombre)}</td></tr><tr><td>CURP</td><td>${esc(a.curp)}</td></tr>
-         <tr><td>Tutor</td><td>${esc(t.nombre)} (${esc(t.parentesco)})</td></tr><tr><td>Domicilio</td><td>${esc(t.domicilio)}</td></tr></table>`}
-    <h3>Documentos</h3>
-    ${editable ? Object.entries(d.textos).map(([n, texto]) => `<label>${esc(n)}</label><textarea data-archivo="${esc(n)}">${esc(texto)}</textarea>`).join('')
-        + '<p><button id="volver">Volver a revisar con estos cambios</button></p>'
-      : '<ul>' + d.archivos.map((n) => `<li>${motor.archivoUrl ? `<a href="${esc(motor.archivoUrl(id, n))}" target="_blank" rel="noopener">${esc(n)}</a>` : esc(n)}</li>`).join('') + '</ul>'}
-    <h3>Resultado del sistema</h3>
-    ${r ? tablaResultado(r) : '<p class="chico">Sin revisar.</p>'}
-    ${r && Object.keys(r.extraidos || {}).length ? `<h3>Datos extraídos (propuesta, no confirmados)</h3><table>${Object.entries(r.extraidos)
-        .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(Array.isArray(v) ? v.join(', ') : v)}</td></tr>`).join('')}</table>` : ''}
-    <h3>Decisión de la persona</h3>
-    ${d.decision ? `<p><span class="insignia ${esc(d.decision.decision)}">${esc(d.decision.decision)}</span>
-        <span class="chico">${esc(d.decision.quien)} · ${esc(d.decision.fecha)}${d.decision.motivo ? ' · ' + esc(d.decision.motivo) : ''}</span></p>` : ''}
-    <label for="motivo">Motivo (obligatorio para rechazar)</label><textarea id="motivo" style="min-height:60px"></textarea>
-    <p><button class="verde" id="autorizar">Autorizar</button> <button class="rojo" id="rechazar">Rechazar</button></p>
-    <div id="reporte"></div>`;
-  $('autorizar').onclick = () => decidir('autorizado');
-  $('rechazar').onclick = () => decidir('rechazado');
-  if (editable) $('volver').onclick = async () => {
-    const captura = { alumno: { ...a, nombre: $('e-alumno').value, curp: $('e-curp').value },
-                      tutor: { ...t, nombre: $('e-tutor').value, parentesco: $('e-parentesco').value, domicilio: $('e-domicilio').value } };
-    const textos = Object.fromEntries([...document.querySelectorAll('textarea[data-archivo]')].map((x) => [x.dataset.archivo, x.value]));
-    await trabajar('Revisando…', () => motor.reescribir(id, captura, textos));
-    await abrir(id);
-  };
-}
-
-async function decidir(decision) {
-  const respuesta = await trabajar('Guardando…', () => motor.decidir(actual, decision, $('motivo').value));
-  if (!respuesta) return;
-  await abrir(actual);
-  if (respuesta.reporte_para_padre) $('reporte').innerHTML = `<h3>Lo que recibiría el padre</h3><pre>${esc(respuesta.reporte_para_padre)}</pre>`;
-}
-
-async function trabajar(texto, accion) {
-  const botones = [...document.querySelectorAll('button')];
-  botones.forEach((b) => (b.disabled = true));
-  $('mensaje').textContent = texto;
-  try {
-    const resultado = await accion();
-    await refrescar();
-    $('mensaje').textContent = 'Listo.';
-    return resultado;
-  } catch (error) {
-    $('mensaje').textContent = 'Error: ' + error.message;
-  } finally {
-    botones.forEach((b) => (b.disabled = false));
-  }
-}
-
-$('revisar').onclick = async () => { await trabajar('Revisando todos los expedientes…', () => motor.revisarTodo()); if (actual) abrir(actual); };
-
+// ================= AJUSTES =================
 if (motor.configuracion) {
   $('panel-cerebro').classList.remove('oculto');
   motor.configuracion().then((c) => {
@@ -474,13 +951,53 @@ if (motor.configuracion) {
     $('cerebro-clave').value = c.cerebro_clave || '';
     $('cerebro-estado').textContent = c.cerebro_conectado ? 'Conectado.' : 'Sin cerebro: los procesos corren en esta PC.';
     const publica = `${PAGINA_PUBLICA}padres.html?escuela=${new URL(c.direccion_padres).host}`;
-    $('padres-ip').textContent = `Los padres, conectados al Wi-Fi de la escuela, abren ${c.direccion_padres} (o ${publica}, que los manda ahí).`;
+    $('padres-ip').innerHTML = `Los padres, conectados al Wi-Fi de la escuela, abren <b>${esc(c.direccion_padres)}</b>
+      (o ${esc(publica)}, que los manda ahí). <a href="padres.html" target="_blank" rel="noopener">Abrir la página de padres</a>.`;
   });
   $('cerebro-guardar').onclick = async () => {
     const c = await trabajar('Probando el cerebro…', () => motor.guardarConfiguracion({ cerebro_url: $('cerebro-url').value, cerebro_clave: $('cerebro-clave').value }));
     if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? 'Conectado.' : 'No respondió: ' + (c.problema || '');
   };
 }
+
+// ================= BUSCADOR =================
+let esperaBusqueda = null;
+$('buscar').oninput = () => {
+  clearTimeout(esperaBusqueda);
+  const texto = $('buscar').value.trim();
+  if (texto.length < 3) { $('buscar-resultados').classList.add('oculto'); return; }
+  esperaBusqueda = setTimeout(async () => {
+    let r;
+    try { r = await motor.buscarAlumno(texto); } catch (error) { return; }
+    $('buscar-resultados').innerHTML = r.parecidos.length ? r.parecidos.map((p) => `<button data-grupo-id="${esc(p.grupo_id)}" data-alumno="${esc(p.id)}">
+        <b>${esc(p.nombre)}</b> · ${esc(p.grupo)}<br><span class="chico curp">${esc(p.curp || 'sin CURP')}</span></button>`).join('')
+      : '<p class="chico" style="margin:6px">No hay alumnos con ese nombre en las listas.</p>';
+    $('buscar-resultados').classList.remove('oculto');
+    for (const b of $('buscar-resultados').querySelectorAll('button')) b.onclick = async () => {
+      $('buscar-resultados').classList.add('oculto'); $('buscar').value = '';
+      irA('listas');
+      await abrirGrupo(b.dataset.grupoId, b.dataset.alumno);
+    };
+  }, 250);
+};
+$('buscar').onkeydown = (e) => { if (e.key === 'Escape') { $('buscar').value = ''; $('buscar-resultados').classList.add('oculto'); } };
+document.addEventListener('click', (e) => { if (!e.target.closest('.buscador')) $('buscar-resultados').classList.add('oculto'); });
+
+// ================= SOLTAR ARCHIVOS =================
+// Se puede soltar en cualquier parte: va a lo que corresponde a la pestaña abierta (y el navegador no abre el archivo por su cuenta).
+document.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('arrastrando'); });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('arrastrando'); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  document.body.classList.remove('arrastrando');
+  const archivos = e.dataTransfer.files;
+  if (!archivos.length) return;
+  if (pestana === 'escanear') subirEscaneo(archivos);
+  else if (pestana === 'curp') subirConstancia(archivos[0]);
+  else if (pestana === 'listas') agregarArchivosLista(archivos);
+  else if (pestana === 'plantillas' && $('pl-soltar')) leerMuestras(archivos);
+  else $('mensaje').textContent = 'Para subir archivos, abre la pestaña que corresponde (por ejemplo, Escanear expediente).';
+});
 
 (async () => {
   $('mensaje').textContent = SIDP.modo === 'demo' ? 'Preparando la demostración (la primera vez tarda unos segundos)…' : 'Cargando…';
