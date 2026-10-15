@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): EMILIO  Primer apellido: SOTO  Segundo apellido: REYES
+Sexo: HOMBRE
+Fecha de nacimiento: 09/04/2018
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: SORE180409HMCTYMA4
+Datos de filiación de la persona registrada
+Padre: PEDRO SOTO REYES  Nacionalidad: MEXICANA
+Madre: ROSA DIAZ MORA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

@@ -102,3 +102,35 @@ Ahora el proceso deja en "duda", sin preguntar al modelo, los nombres en otro or
    git push origin claude/project-thread-vp6ab8
    ```
 6. Avísale a Maximiliano que ya se subió.
+
+## Tarea 004: probar el validador de expedientes con el ejemplo (2026-10-15)
+
+El validador revisa expedientes completos: lo que el padre capturó contra el texto de sus documentos. La guía está en [docs/guias/PRUEBA_VALIDACION.md](../../docs/guias/PRUEBA_VALIDACION.md). Esta tarea solo usa el ejemplo inventado; la prueba con documentos reales la arma Maximiliano después.
+
+1. Actualiza la rama:
+   ```
+   git checkout claude/project-thread-vp6ab8
+   git pull
+   ```
+2. Anota qué herramientas tiene la PC 4 (no instales nada):
+   ```
+   python -c "from validacion import lector; print(lector.herramientas())"
+   ```
+3. Corre el ejemplo sin modelo. Debe decir "Falsos que pasaron como listos (peligroso): 0 de 6":
+   ```
+   python -m validacion.prueba validacion\ejemplo --hoy 2026-10-14 --sin-modelo
+   ```
+4. Córrelo con el modelo:
+   ```
+   python -m validacion.prueba validacion\ejemplo --hoy 2026-10-14
+   ```
+5. Abre `validacion\ejemplo\informe_local.html` en el navegador y revisa que se vea bien.
+6. Copia `validacion\ejemplo\resumen_para_repo.md` como `cerebro\laboratorio\resultados\2026-10-15_validador_ejemplo.md`. Agrega al final "## Notas del agente" con lo que dijo el paso 2, cuánto tardó y cualquier error.
+7. Sube solo ese archivo:
+   ```
+   git add cerebro/laboratorio/resultados/
+   git commit -m "laboratorio: resultado de la tarea 004"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+8. Avísale a Maximiliano que ya se subió.

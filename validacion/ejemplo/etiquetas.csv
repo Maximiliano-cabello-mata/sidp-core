@@ -1,0 +1,11 @@
+expediente,es_falso,trampa
+E01,no,
+E02,no,
+E03,no,
+E04,no,
+E05,si,fecha
+E06,si,comprobante_viejo
+E07,si,tutor
+E08,si,curp
+E09,si,domicilio
+E10,si,texto_oculto

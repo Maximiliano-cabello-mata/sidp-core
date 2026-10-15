@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "DIEGO CASTRO NAVA",
+  "curp": "CANS180105HMCSVGA4"
+ },
+ "tutor": {
+  "nombre": "LAURA NAVA PEÑA",
+  "parentesco": "madre",
+  "domicilio": "Calle Olmo 8, San Mateo Atenco"
+ }
+}

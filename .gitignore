@@ -28,3 +28,8 @@ node_modules/
 !/frontend/build/.gitkeep
 /backend/static/*
 !/backend/static/.gitkeep
+
+# Salidas de la prueba del validador: pueden tener datos personales
+informe_local.html
+resultados_local.json
+resumen_para_repo.md

@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): LUIS  Primer apellido: HERNANDEZ  Segundo apellido: RAMOS
+Sexo: HOMBRE
+Fecha de nacimiento: 14/03/2018
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: HERL180314HMCRMSA9
+Datos de filiación de la persona registrada
+Padre: JUAN PEREZ LOPEZ  Nacionalidad: MEXICANA
+Madre: MARIA ELENA RAMOS SOTO  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

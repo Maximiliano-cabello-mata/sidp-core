@@ -4,7 +4,7 @@ Aquí se prueba, con datos inventados, cómo el cerebro de la PC 4 ayuda a valid
 
 ## Cómo se valida
 
-1. **Procesos fijos, sin IA** (`comparador.py`). Comparan los datos que los lectores (QR, texto del PDF, OCR) sacaron de cada documento:
+1. **Procesos fijos, sin IA** ([`validacion/comparador.py`](../../validacion/comparador.py)). Comparan los datos que los lectores (QR, texto del PDF, OCR) sacaron de cada documento:
    - la CURP: formato, dígito verificador, fecha y sexo contra el acta;
    - el tutor: debe aparecer como padre o madre en el acta y coincidir con su INE;
    - el comprobante: tener 3 meses o menos y el mismo domicilio;
@@ -12,7 +12,7 @@ Aquí se prueba, con datos inventados, cómo el cerebro de la PC 4 ayuda a valid
 
    Antes de comparar, quitan acentos y signos y expanden abreviaturas (Ma., Av., Col.). Un número de casa distinto siempre es otro domicilio.
 2. **Zona gris.** Cuando dos nombres o domicilios se parecen pero no son iguales, el proceso no decide. Si en un nombre falta o sobra una palabra, las palabras están en otro orden o una cambia más de una letra, queda en "duda" sin preguntar al modelo: en la tarea 002 el modelo se equivocó justo en esos casos.
-3. **El modelo opina solo sobre el resto de la zona gris** (`modelo.py`). Recibe dos textos y dice "si", "no" o "duda", sin ver el documento ni la ficha completa. Si no responde, la respuesta es "duda".
+3. **El modelo opina solo sobre el resto de la zona gris** ([`validacion/modelo.py`](../../validacion/modelo.py)). Recibe dos textos y dice "si", "no" o "duda", sin ver el documento ni la ficha completa. Si no responde, la respuesta es "duda".
 4. **Decide una persona.** Lo que tenga un hallazgo o una zona gris pasa a revisión manual. Lo demás queda "listo para autorizar" y el administrador lo aprueba. El modelo nunca quita una alerta.
 
 La primera prueba (2026-10-14) mostró que `llama3.1` revisando la ficha completa inventa diferencias. Por eso aquí solo opina sobre dos textos y se mide si acierta.
@@ -21,8 +21,8 @@ La primera prueba (2026-10-14) mostró que `llama3.1` revisando la ficha complet
 
 | Archivo | Qué es |
 |---|---|
-| `comparador.py` | Los procesos fijos |
-| `modelo.py` | La llamada a Ollama en `127.0.0.1:11434`; usa `sidp-revisor-2` |
+| [`validacion/comparador.py`](../../validacion/comparador.py) | Los procesos fijos (los mismos que usa el validador) |
+| [`validacion/modelo.py`](../../validacion/modelo.py) | La llamada a Ollama en `127.0.0.1:11434`; usa `sidp-revisor-2` |
 | `Modelfile` | Crea el modelo `sidp-revisor` a partir de `llama3.1:latest`, sin descargar nada |
 | `Modelfile.2` | Crea `sidp-revisor-2`: las mismas reglas, más precisas y con ejemplos |
 | `fichas.json` | Fichas inventadas con el resultado esperado |

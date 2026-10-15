@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "REGINA TORRES ARIAS",
+  "curp": "TOAR180716MMCRRGA5"
+ },
+ "tutor": {
+  "nombre": "DANIEL TORRES ARIAS",
+  "parentesco": "padre",
+  "domicilio": "Calle Laurel 7, Col. Las Palmas, Metepec"
+ }
+}

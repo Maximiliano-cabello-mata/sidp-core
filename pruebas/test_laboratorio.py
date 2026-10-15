@@ -3,7 +3,8 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
-from cerebro.laboratorio import comparador, correr, modelo
+from cerebro.laboratorio import correr
+from validacion import comparador, modelo
 
 HOY = datetime.date(2026, 10, 14)
 

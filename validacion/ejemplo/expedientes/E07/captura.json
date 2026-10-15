@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "EMILIO SOTO REYES",
+  "curp": "SORE180409HMCTYMA4"
+ },
+ "tutor": {
+  "nombre": "PEDRO SOTO REYES",
+  "parentesco": "padre",
+  "domicilio": "Calle Roble 22, Col. Centro, Toluca"
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "VALERIA MORA DIAZ",
+  "curp": "MODV171130MMCRZLA4"
+ },
+ "tutor": {
+  "nombre": "ROSA DIAZ MORA",
+  "parentesco": "madre",
+  "domicilio": "Calle Fresno 9, Col. Las Flores, Zinacantepec"
+ }
+}

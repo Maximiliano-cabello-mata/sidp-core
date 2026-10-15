@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): VALERIA  Primer apellido: MORA  Segundo apellido: DIAZ
+Sexo: MUJER
+Fecha de nacimiento: 30/11/2017
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: MODV171130MMCRZLA4
+Datos de filiación de la persona registrada
+Padre: JUAN PEREZ LOPEZ  Nacionalidad: MEXICANA
+Madre: ROSA DIAZ MORA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

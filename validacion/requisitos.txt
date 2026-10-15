@@ -1,0 +1,5 @@
+# Herramientas opcionales del lector, solo para la PC que valida (PC 4). No van en el .exe ni en CI.
+# Instalar con: python -m pip install -r validacion/requisitos.txt
+# Tesseract (OCR) se instala aparte, con su idioma español: choco install tesseract (incluye spa) o el instalador de UB Mannheim.
+pypdf>=5.1
+opencv-python-headless>=4.10

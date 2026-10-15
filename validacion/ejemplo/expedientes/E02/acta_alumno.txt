@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): ANA SOFIA  Primer apellido: BRAVO  Segundo apellido: LEON
+Sexo: MUJER
+Fecha de nacimiento: 22 DE AGOSTO DE 2017
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: BALA170822MMCRNNA2
+Datos de filiación de la persona registrada
+Padre: JORGE BRAVO CRUZ  Nacionalidad: MEXICANA
+Madre: ROSA DIAZ MORA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): PAULA  Primer apellido: HERRERA  Segundo apellido: DIAZ
+Sexo: MUJER
+Fecha de nacimiento: 25/01/2019
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: HEDP190125MMCRZLA2
+Datos de filiación de la persona registrada
+Padre: PAULO HERRERA CRUZ  Nacionalidad: MEXICANA
+Madre: ROSA DIAZ MORA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP

@@ -13,7 +13,7 @@ import statistics
 import urllib.request
 from pathlib import Path
 
-from cerebro.laboratorio import comparador, modelo
+from validacion import comparador, modelo
 
 AQUI = Path(__file__).parent
 

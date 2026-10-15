@@ -1,0 +1,11 @@
+{
+ "alumno": {
+  "nombre": "PAULA HERRERA DIAZ",
+  "curp": "HEDP190125MMCRZLA2"
+ },
+ "tutor": {
+  "nombre": "PAULO HERRERA CRUZ",
+  "parentesco": "padre",
+  "domicilio": "Calle Encino 3, Barrio La Merced, Almoloya"
+ }
+}

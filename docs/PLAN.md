@@ -56,6 +56,12 @@ Ya no va al final: avanza en paralelo desde la fase A. La validación funciona c
 | 9 | Análisis de los datos extraídos | Hay un reporte con datos de prueba |
 | 10 | Cerebro (`llama3.1` en la PC 4) que solo opina en la zona gris (nombres o domicilios parecidos); se mide en el [laboratorio](../cerebro/laboratorio/LEEME.md) | Se sabe si sus opiniones ayudan al administrador |
 
+Avance del 2026-10-15:
+
+- Hay una primera versión de los pasos 3 y 4 en [`validacion/`](../validacion/). Revisa un expediente completo: busca lo que el padre capturó dentro del texto de cada documento.
+- La prueba oficial con documentos reales y falsos corre solo en la PC 4 ([guía](guias/PRUEBA_VALIDACION.md)).
+- La base sigue siendo SQLite (decisión de Maximiliano). Sus procedimientos almacenados se traducen a funciones de Python en `database/procedimientos.py`.
+
 ## Orden de trabajo
 
 1. Fase A, y en paralelo los pasos 1 a 5.

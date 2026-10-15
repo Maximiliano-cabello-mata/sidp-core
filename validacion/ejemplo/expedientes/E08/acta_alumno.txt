@@ -1,0 +1,14 @@
+ESTADOS UNIDOS MEXICANOS
+REGISTRO NACIONAL DE POBLACION
+ACTA DE NACIMIENTO
+Identificador electrónico 15106001201800123
+Datos de la persona registrada
+Nombre(s): REGINA  Primer apellido: TORRES  Segundo apellido: ARIAS
+Sexo: MUJER
+Fecha de nacimiento: 16/07/2018
+Lugar de nacimiento: TOLUCA, MEXICO
+Clave Única de Registro de Población: TOAR180716MMCRRGA4
+Datos de filiación de la persona registrada
+Padre: DANIEL TORRES ARIAS  Nacionalidad: MEXICANA
+Madre: ROSA DIAZ MORA  Nacionalidad: MEXICANA
+Documento inventado para pruebas de SIDP
