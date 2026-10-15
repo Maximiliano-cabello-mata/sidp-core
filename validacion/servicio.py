@@ -7,11 +7,14 @@ SQLite en la carpeta (`decisiones.db`): solo se agregan, nunca se cambian ni se 
 """
 import datetime
 import hashlib
+import io
 import json
+import secrets
+import shutil
 import sqlite3
 from pathlib import Path
 
-from validacion import cerebro_red, expediente, lector, modelo, prueba, renapo
+from validacion import cerebro_red, comparador, expediente, extraer, lector, modelo, prueba, renapo
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS decision (
@@ -31,9 +34,44 @@ CREATE TRIGGER IF NOT EXISTS decision_sin_borrar BEFORE DELETE ON decision
 BEGIN SELECT RAISE(ABORT, 'Las decisiones no se borran'); END;
 """
 LISTO = 'listo para autorizar'
+EN_PAPEL = 'validado en papel'  # Expedientes que la escuela ya revisó y solo se escanean.
+MAXIMO_ESCANEO = 60 * 1024 * 1024
+MAXIMO_TANDA = 40 * 1024 * 1024  # Lo que se manda al cerebro de una vez (en base64 crece un tercio).
 ESPACIOS = ('acta_alumno', 'certificado_medico', 'boleta', 'ine_tutor', 'acta_tutor', 'comprobante')
 ACEPTADOS = lector.PDF | lector.IMAGEN
 MAXIMO_ARCHIVO = 15 * 1024 * 1024
+
+
+def partir_pdf(contenido):
+    """Cada hoja de un PDF como un PDF aparte (los escáneres juntan todo el expediente en uno)."""
+    try:
+        import pypdf
+        lector_pdf = pypdf.PdfReader(io.BytesIO(contenido))
+        if len(lector_pdf.pages) <= 1:
+            return [contenido]
+        hojas = []
+        for pagina in lector_pdf.pages:
+            escritor = pypdf.PdfWriter()
+            escritor.add_page(pagina)
+            salida = io.BytesIO()
+            escritor.write(salida)
+            hojas.append(salida.getvalue())
+        return hojas
+    except Exception:  # Sin pypdf o PDF raro: se queda entero.
+        return [contenido]
+
+
+def unir_pdf(partes):
+    if len(partes) == 1:
+        return partes[0]
+    import pypdf
+    escritor = pypdf.PdfWriter()
+    for parte in partes:
+        for pagina in pypdf.PdfReader(io.BytesIO(parte)).pages:
+            escritor.add_page(pagina)
+    salida = io.BytesIO()
+    escritor.write(salida)
+    return salida.getvalue()
 
 
 class ErrorBandeja(Exception):
@@ -99,6 +137,8 @@ class Bandeja:
     def revisar(self, identificador):
         """El cerebro de la PC 4 procesa todo; si no responde, los procesos corren aquí y nada se detiene."""
         carpeta = self._carpeta(identificador)
+        if self.resultados.get(identificador, {}).get('estado') == EN_PAPEL:
+            return self.resultados[identificador]  # Ya lo revisó una persona en papel: no se vuelve a revisar.
         resultado = None
         if self.cerebro:
             try:
@@ -153,6 +193,132 @@ class Bandeja:
             self.registro.proponer(ids, resultado)
             (destino / 'registro.json').write_text(json.dumps(ids), encoding='utf-8')
         return {'expediente': identificador, 'estado': resultado['estado']}
+
+    def _leer(self, archivos):
+        """Texto de cada archivo [(nombre, contenido)]: en el cerebro si está conectado; si no, en esta PC."""
+        if self.cerebro:
+            try:
+                paginas, tanda, procesado_en = [], [], 'cerebro'
+                for numero, archivo in enumerate(archivos):  # En tandas, para no pasar el límite del cerebro.
+                    tanda.append(archivo)
+                    if numero == len(archivos) - 1 or sum(len(c) for _, c in tanda) + len(archivos[numero + 1][1]) > MAXIMO_TANDA:
+                        respuesta = cerebro_red.leer_en_cerebro(tanda, *self.cerebro)
+                        paginas += respuesta['paginas']
+                        procesado_en, tanda = respuesta['procesado_en'], []
+                return paginas, procesado_en
+            except Exception as error:
+                aviso = f'el cerebro no respondió ({error}); se leyó en esta PC'
+        lecturas = []
+        temporal = self.carpeta / 'escaneos' / f'.leyendo_{secrets.token_hex(4)}'
+        temporal.mkdir(parents=True)
+        try:
+            for numero, (nombre, contenido) in enumerate(archivos):
+                ruta = temporal / f'{numero:03d}{Path(nombre).suffix.lower()}'
+                ruta.write_bytes(contenido)
+                lectura = lector.leer(ruta)
+                lecturas.append({'nombre': nombre, 'texto': lectura['texto'], 'qr': lectura['qr'], 'problemas': lectura['problemas']})
+        finally:
+            shutil.rmtree(temporal, ignore_errors=True)
+        return lecturas, aviso if self.cerebro else 'esta PC'
+
+    def escaneo_leer(self, archivos):
+        """Escaneos de un alumno [(nombre, contenido)]: cada página se lee, se reconoce y se proponen los datos.
+
+        Las páginas esperan en escaneos/<lote>/ hasta que la persona guarda (o descarta).
+        """
+        if not archivos:
+            raise ErrorBandeja('No se subió ningún archivo')
+        lote = secrets.token_hex(6)
+        carpeta = self.carpeta / 'escaneos' / lote
+        carpeta.mkdir(parents=True)
+        paginas = []
+        for nombre, contenido in archivos:
+            extension = Path(nombre).suffix.lower()
+            if extension not in ACEPTADOS or not 0 < len(contenido) <= MAXIMO_ESCANEO:
+                shutil.rmtree(carpeta, ignore_errors=True)
+                raise ErrorBandeja(f'Archivo no aceptado: {nombre} (PDF o foto, hasta 60 MB)')
+            partes = partir_pdf(contenido) if extension in lector.PDF else [contenido]
+            for numero, parte in enumerate(partes, 1):
+                archivo = f'p{len(paginas) + 1:03d}{extension}'
+                (carpeta / archivo).write_bytes(parte)
+                paginas.append({'archivo': archivo, 'origen': f'{Path(nombre).name} · hoja {numero}' if len(partes) > 1 else Path(nombre).name})
+        lecturas, procesado_en = self._leer([(p['archivo'], (carpeta / p['archivo']).read_bytes()) for p in paginas])
+        for pagina, lectura in zip(paginas, lecturas):
+            pagina.update(texto=lectura['texto'], qr=lectura['qr'], problemas=lectura['problemas'])
+        extraer.agrupar(paginas)
+        propuesta = extraer.proponer(paginas, self.hoy)
+        sin_texto = [p['origen'] for p in paginas if len(p['texto'].strip()) < lector.MINIMO_TEXTO]
+        if sin_texto:
+            propuesta['avisos'].insert(0, 'No se pudo leer: ' + ', '.join(sin_texto)
+                                       + ('' if self.cerebro else '. Conecta el cerebro de la PC 4 para leer escaneos.'))
+        (carpeta / 'lote.json').write_text(json.dumps({'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo')} for p in paginas],
+                                                       'extraidos': propuesta['extraidos']}, ensure_ascii=False), encoding='utf-8')
+        return {'lote': lote, 'procesado_en': procesado_en, 'tipos': extraer.ESPACIOS, 'propuesta': propuesta,
+                'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo', 'reconocido')} for p in paginas]}
+
+    def _lote(self, lote):
+        carpeta = self.carpeta / 'escaneos' / str(lote)
+        if not lote or Path(str(lote)).name != lote or not (carpeta / 'lote.json').exists():
+            raise ErrorBandeja('Ese escaneo ya no existe: vuelve a subirlo')
+        return carpeta
+
+    def escaneo_pagina(self, lote, archivo):
+        ruta = self._lote(lote) / Path(archivo).name
+        if ruta.suffix == '.json' or not ruta.is_file():
+            raise ErrorBandeja('No existe esa página')
+        return ruta
+
+    def escaneo_descartar(self, lote):
+        shutil.rmtree(self._lote(lote))
+        return {'descartado': lote}
+
+    def escaneo_guardar(self, lote, datos, quien='administrador'):
+        """Guarda el expediente escaneado con los datos que confirmó la persona. Queda validado en papel."""
+        carpeta_lote = self._lote(lote)
+        guardado = json.loads((carpeta_lote / 'lote.json').read_text(encoding='utf-8'))
+        alumno = {k: str(v or '').strip() for k, v in (datos.get('alumno') or {}).items()}
+        tutor = {k: str(v or '').strip() for k, v in (datos.get('tutor') or {}).items()}
+        if not alumno.get('nombres') or not alumno.get('primer_apellido'):
+            raise ErrorBandeja('Faltan el nombre o el primer apellido del alumno')
+        for persona, quien_es in ((alumno, 'del alumno'), (tutor, 'del tutor')):
+            persona['curp'] = persona.get('curp', '').upper()
+            if persona['curp'] and not comparador.desglose_curp(persona['curp']):
+                raise ErrorBandeja(f'La CURP {quien_es} no tiene la forma correcta: corrígela o déjala vacía')
+            persona['nombre'] = ' '.join(filter(None, (persona.get('nombres'), persona.get('primer_apellido'), persona.get('segundo_apellido'))))
+        tipos = datos.get('paginas') or {}
+        captura = {'alumno': alumno, 'tutor': tutor if tutor.get('nombres') and tutor.get('primer_apellido') else {}, 'origen': 'escaneo'}
+        carpeta_expedientes = self.carpeta / 'expedientes'
+        carpeta_expedientes.mkdir(parents=True, exist_ok=True)
+        numero = max([int(n) for n in self.expedientes() if n.isdigit()] or [0]) + 1
+        identificador = f'{numero:04d}'
+        destino = carpeta_expedientes / identificador
+        destino.mkdir()
+        por_tipo = {}
+        for pagina in guardado['paginas']:
+            tipo = tipos.get(pagina['archivo'], pagina['tipo'])
+            por_tipo.setdefault(tipo if tipo in extraer.ESPACIOS else 'otro', []).append(carpeta_lote / pagina['archivo'])
+        guardados, documentos = [], {}
+        for tipo, rutas in por_tipo.items():
+            pdfs = [r for r in rutas if r.suffix == '.pdf']
+            partes = ([('pdf', unir_pdf([r.read_bytes() for r in pdfs]))] if pdfs else []) + [(r.suffix[1:], r.read_bytes()) for r in rutas if r.suffix != '.pdf']
+            for numero, (extension, contenido) in enumerate(partes, 1):
+                archivo = destino / f'{tipo}_{numero}.{extension}'
+                archivo.write_bytes(contenido)
+                guardados.append((tipo, archivo.relative_to(self.carpeta).as_posix(), contenido))
+                documentos.setdefault(tipo, {'archivos': [], 'paginas': 0})
+                documentos[tipo]['archivos'].append(archivo.name)
+            documentos[tipo]['paginas'] = len(rutas)
+        (destino / 'captura.json').write_text(json.dumps(captura, ensure_ascii=False, indent=1), encoding='utf-8')
+        resultado = {'id': identificador, 'estado': EN_PAPEL, 'hallazgos': [], 'grises': [], 'no_leidos': [],
+                     'extraidos': guardado.get('extraidos', {}), 'documentos': documentos, 'procesado_en': 'escaneo', 'segundos': 0}
+        (destino / 'resultado.json').write_text(json.dumps(resultado, ensure_ascii=False), encoding='utf-8')
+        self.resultados[identificador] = resultado
+        if self.registro:
+            ids = self.registro.registrar(captura, guardados, resultado['extraidos'])
+            (destino / 'registro.json').write_text(json.dumps(ids), encoding='utf-8')
+        self.decidir(identificador, 'autorizado', 'Validado en papel por la escuela (escaneo)', quien)
+        shutil.rmtree(carpeta_lote, ignore_errors=True)
+        return {'expediente': identificador, 'alumno': alumno['nombre']}
 
     def revisar_todo(self):
         for identificador in self.expedientes():
@@ -259,7 +425,8 @@ class Bandeja:
                                  and f['decision']['decision'] == 'autorizado')
         return {'carpeta': str(self.carpeta), 'hoy': self.hoy.isoformat(), 'expedientes': filas,
                 'medidas': {'revisados': len(revisados), 'listos': sum(r['estado'] == LISTO for r in revisados),
-                            'revision': sum(r['estado'] != LISTO for r in revisados), 'etiquetados': medidas['etiquetados'],
+                            'revision': sum(r['estado'] not in (LISTO, EN_PAPEL) for r in revisados),
+                            'en_papel': sum(r['estado'] == EN_PAPEL for r in revisados), 'etiquetados': medidas['etiquetados'],
                             'falsos': medidas['falsos'], 'falsos_detectados': medidas['falsos_detectados'],
                             'falsos_pasaron': medidas['falsos_pasaron'], 'verdaderos': medidas['verdaderos'],
                             'falsas_alarmas': medidas['falsas_alarmas'],

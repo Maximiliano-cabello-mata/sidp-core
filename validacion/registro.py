@@ -25,7 +25,7 @@ DISENO = RAIZ / 'database' / 'diseno_integral.sql'
 # Espacio de la página de padres -> (tipo_documento del diseño, de quién es).
 TIPO_DISENO = {'acta_alumno': ('acta', 'alumno'), 'certificado_medico': ('certificado_medico', 'alumno'),
                'boleta': ('boleta_anterior', 'alumno'), 'ine_tutor': ('ine_tutor', 'tutor'),
-               'comprobante': ('comprobante_domicilio', 'tutor')}
+               'comprobante': ('comprobante_domicilio', 'tutor'), 'constancia_curp': ('curp', 'alumno')}
 MIME = {'.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
 
 
@@ -64,6 +64,9 @@ class Registro:
         identificador = str(uuid.uuid4())
         columnas = {'id': identificador, 'curp': curp, 'nombres': datos['nombres'], 'primer_apellido': datos['primer_apellido'],
                     'segundo_apellido': datos.get('segundo_apellido') or None}
+        if tabla == 'alumno':  # Del escaneo vienen también la fecha de nacimiento y el sexo.
+            columnas.update(fecha_nacimiento=datos.get('fecha_nacimiento') or None,
+                            sexo=datos.get('sexo') if datos.get('sexo') in ('H', 'M') else None)
         if tabla == 'tutor':
             columnas.update(telefono=datos.get('telefono') or None, correo=datos.get('correo') or None,
                             domicilio=datos.get('domicilio') or None)
@@ -83,8 +86,9 @@ class Registro:
         """
         extraidos = extraidos or {}
         alumno = self._persona('alumno', captura['alumno'], captura['alumno'].get('curp', '').upper())
-        tutor = self._persona('tutor', captura['tutor'])
-        parentesco = captura['tutor'].get('parentesco', 'otro')
+        datos_tutor = captura.get('tutor') or {}
+        tutor = self._persona('tutor', datos_tutor, str(datos_tutor.get('curp') or '').upper()) if datos_tutor.get('nombres') else None
+        parentesco = datos_tutor.get('parentesco', 'otro')
         # El vínculo con el alumno es solo una solicitud: se aplica cuando el administrador autoriza.
         # Así nadie queda como tutor de un niño con solo escribir su CURP.
         parentesco = parentesco if parentesco in ('madre', 'padre', 'tutor_legal', 'abuelo') else 'otro'
@@ -92,7 +96,7 @@ class Registro:
         for espacio, ruta, contenido in archivos:
             tipo, dueno = TIPO_DISENO.get(espacio, (None, None))
             mime = MIME.get(Path(ruta).suffix.lower())
-            if not tipo or not mime:
+            if not tipo or not mime or (dueno == 'tutor' and not tutor):
                 continue  # Opcionales sin tipo en el diseño (acta del tutor) o textos de prueba: solo quedan en la carpeta.
             sha = hashlib.sha256(contenido).hexdigest()
             with self.db:
@@ -112,7 +116,8 @@ class Registro:
                 identificador = str(uuid.uuid4())
                 with self.db:
                     self.db.execute("INSERT INTO documento(id, tipo, tutor_id, archivo_sha256, origen, estado, recibido) "
-                                    "VALUES(?,?,?,?,'buzon','recibido',?)", (identificador, tipo, tutor, sha, _ahora()))
+                                    "VALUES(?,?,?,?,?,'recibido',?)", (identificador, tipo, tutor, sha,
+                                                                       'escaneo' if captura.get('origen') == 'escaneo' else 'buzon', _ahora()))
                 documentos.append(identificador)
         return {'alumno': alumno, 'tutor': tutor, 'parentesco': parentesco, 'documentos': documentos}
 
@@ -135,7 +140,7 @@ class Registro:
         with self.db:
             self.db.execute("UPDATE sugerencia_ia SET estado = ?, decidio = ? WHERE objeto_id = ? AND estado = 'propuesta'",
                             ('aceptada' if decision == 'autorizado' else 'rechazada', self.actor, ids['alumno']))
-        if decision == 'autorizado' and 'parentesco' in ids:  # Expedientes anteriores ya traían el vínculo.
+        if decision == 'autorizado' and 'parentesco' in ids and ids['tutor']:  # Expedientes anteriores ya traían el vínculo.
             sp.sp_asignar_tutor(self.db, ids['alumno'], ids['tutor'], ids['parentesco'], self.actor)
 
     def _ultimo_renapo(self, alumno_id):

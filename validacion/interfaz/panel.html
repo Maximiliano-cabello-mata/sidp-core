@@ -30,6 +30,19 @@
     <p><button id="cerebro-guardar">Conectar</button> <span class="chico" id="cerebro-estado"></span></p>
     <p class="chico" id="padres-ip"></p>
   </div>
+  <div class="panel" id="panel-escaneo" style="margin-bottom:14px">
+    <h2>Escanear expediente (ya revisado en papel)</h2>
+    <ol class="pasos">
+      <li>Escanea los documentos de <b>un alumno</b>: todos en un PDF o en varios, como salgan del escáner.</li>
+      <li>Arrástralos a este cuadro (o da clic para elegirlos). El sistema reconoce cada hoja y llena los datos solo.</li>
+      <li>Revisa los datos. Si algo salió mal o falta, corrígelo ahí mismo.</li>
+      <li>Da <b>Guardar expediente</b>. Queda guardado y validado en papel. Sigue con el próximo alumno.</li>
+    </ol>
+    <div class="soltar" id="soltar-escaneo" role="button" tabindex="0">Suelta aquí los escaneos de un alumno (PDF o fotos)<br><span class="chico">o da clic para elegirlos</span></div>
+    <input type="file" id="elegir-escaneo" accept=".pdf,image/*" multiple hidden>
+    <div id="escaneo-mensaje"></div>
+    <div id="escaneo-formulario"></div>
+  </div>
   <div class="panel" id="panel-renapo" style="margin-bottom:14px">
     <h2>CURP: validar en RENAPO</h2>
     <p id="renapo-cuenta"></p>
@@ -38,7 +51,7 @@
       <li>En la página de RENAPO, da clic en el cuadro de la CURP y pega con <b>Ctrl + V</b>.</li>
       <li>Marca <b>"No soy un robot"</b>, resuelve lo que te pida y da clic en <b>Buscar</b>.</li>
       <li>Descarga el <b>PDF</b> de la constancia.</li>
-      <li>Regresa a esta pestaña y <b>arrastra el PDF a cualquier parte de esta página</b>. Puedes arrastrarlo directo
+      <li>Regresa a esta pestaña y <b>arrastra el PDF a cualquier parte de esta página</b> (menos al cuadro de escaneo). Puedes arrastrarlo directo
         desde las descargas del navegador (la flecha de arriba a la derecha). No tienes que decir de qué alumno es:
         el sistema lo encuentra solo.</li>
     </ol>
@@ -66,12 +79,13 @@ $('aviso').textContent = SIDP.modo === 'demo'
 
 function insignia(estado) {
   if (!estado) return '<span class="insignia pendiente">sin revisar</span>';
+  if (estado === 'validado en papel') return '<span class="insignia listo">escaneado</span>';
   return estado === 'listo para autorizar' ? '<span class="insignia listo">listo</span>' : '<span class="insignia revision">revisión</span>';
 }
 
 function mostrarEstado(estado) {
   const m = estado.medidas;
-  const tarjetas = [[m.revisados, 'Revisados'], [m.listos, 'Listos para autorizar'], [m.revision, 'A revisión manual'],
+  const tarjetas = [[m.revisados, 'Revisados'], [m.listos, 'Listos para autorizar'], [m.revision, 'A revisión manual'], [m.en_papel, 'Escaneados (validados en papel)'],
                     [m.autorizados, 'Autorizados'], [m.rechazados, 'Rechazados']];
   if (m.etiquetados) tarjetas.push([`${m.falsos_detectados}/${m.falsos}`, 'Falsos detectados'], [m.falsos_pasaron, 'Falsos que pasaron'],
                                    [m.falsos_autorizados, 'Falsos autorizados por una persona']);
@@ -148,6 +162,96 @@ async function subirConstancia(archivo) {
     $('mensaje').textContent = 'Listo.';
   }
 }
+
+let escaneo = null;
+
+function avisoEscaneo(clase, texto) {
+  $('escaneo-mensaje').innerHTML = texto ? `<div class="mensaje ${clase}">${esc(texto)}</div>` : '';
+}
+
+function campo(id, etiqueta, valor, extra = '') {
+  return `<div><label for="${id}">${etiqueta}</label><input id="${id}" value="${esc(valor || '')}" ${extra}></div>`;
+}
+
+function mostrarEscaneo(r) {
+  escaneo = r;
+  const a = r.propuesta.alumno || {}, t = r.propuesta.tutor || {};
+  const opciones = (actual) => Object.entries(r.tipos).map(([clave, nombre]) =>
+    `<option value="${esc(clave)}" ${clave === actual ? 'selected' : ''}>${esc(nombre)}</option>`).join('');
+  const parentescos = ['madre', 'padre', 'tutor_legal', 'abuelo', 'otro'];
+  $('escaneo-formulario').innerHTML = `
+    ${r.propuesta.avisos.length ? `<div class="mensaje ojo">${r.propuesta.avisos.map(esc).join('<br>')}</div>` : '<div class="mensaje bien">Se leyó todo. Revisa los datos y guarda.</div>'}
+    <p class="chico">Leído en: ${esc(r.procesado_en)}</p>
+    <h3>Alumno</h3>
+    <div class="rejilla">${campo('es-a-nombres', 'Nombre(s)', a.nombres)}${campo('es-a-ap1', 'Primer apellido', a.primer_apellido)}
+      ${campo('es-a-ap2', 'Segundo apellido', a.segundo_apellido)}${campo('es-a-curp', 'CURP', a.curp, 'maxlength="18" class="curp"')}
+      ${campo('es-a-fecha', 'Fecha de nacimiento', a.fecha_nacimiento, 'type="date"')}
+      <div><label for="es-a-sexo">Sexo</label><select id="es-a-sexo"><option value=""></option>
+        <option value="H" ${a.sexo === 'H' ? 'selected' : ''}>Hombre</option><option value="M" ${a.sexo === 'M' ? 'selected' : ''}>Mujer</option></select></div></div>
+    <h3>Madre, padre o tutor</h3>
+    <div class="rejilla">${campo('es-t-nombres', 'Nombre(s)', t.nombres)}${campo('es-t-ap1', 'Primer apellido', t.primer_apellido)}
+      ${campo('es-t-ap2', 'Segundo apellido', t.segundo_apellido)}
+      <div><label for="es-t-parentesco">Parentesco</label><select id="es-t-parentesco">${parentescos.map((p) =>
+        `<option value="${p}" ${p === (t.parentesco || 'madre') ? 'selected' : ''}>${p.replace('_', ' ')}</option>`).join('')}</select></div>
+      ${campo('es-t-curp', 'CURP (si se ve)', t.curp, 'maxlength="18" class="curp"')}${campo('es-t-telefono', 'Teléfono', t.telefono)}
+      ${campo('es-t-domicilio', 'Domicilio', t.domicilio)}</div>
+    <h3>Hojas escaneadas</h3>
+    <table><tr><th>Hoja</th><th>Qué documento es</th></tr>${r.paginas.map((p) => `<tr>
+      <td>${motor.paginaUrl ? `<a href="${esc(motor.paginaUrl(r.lote, p.archivo))}" target="_blank" rel="noopener">${esc(p.origen)}</a>` : esc(p.origen)}
+        ${p.reconocido ? '' : '<span class="chico">(no reconocida)</span>'}</td>
+      <td><select data-hoja="${esc(p.archivo)}">${opciones(p.tipo)}</select></td></tr>`).join('')}</table>
+    <p><button class="verde" id="es-guardar">Guardar expediente</button> <button id="es-descartar">Descartar</button></p>`;
+  $('es-guardar').onclick = guardarEscaneo;
+  $('es-descartar').onclick = async () => {
+    await trabajar('Descartando…', () => motor.escaneoDescartar(escaneo.lote));
+    escaneo = null; $('escaneo-formulario').innerHTML = ''; avisoEscaneo('', '');
+  };
+}
+
+async function guardarEscaneo() {
+  const valor = (id) => $(id).value.trim();
+  const datos = {
+    alumno: { nombres: valor('es-a-nombres'), primer_apellido: valor('es-a-ap1'), segundo_apellido: valor('es-a-ap2'),
+              curp: valor('es-a-curp').toUpperCase(), fecha_nacimiento: valor('es-a-fecha'), sexo: valor('es-a-sexo') },
+    tutor: { nombres: valor('es-t-nombres'), primer_apellido: valor('es-t-ap1'), segundo_apellido: valor('es-t-ap2'),
+             parentesco: valor('es-t-parentesco'), curp: valor('es-t-curp').toUpperCase(), telefono: valor('es-t-telefono'),
+             domicilio: valor('es-t-domicilio') },
+    paginas: Object.fromEntries([...document.querySelectorAll('select[data-hoja]')].map((s) => [s.dataset.hoja, s.value])),
+  };
+  const r = await trabajar('Guardando el expediente…', () => motor.escaneoGuardar(escaneo.lote, datos));
+  if (!r) { avisoEscaneo('mal', $('mensaje').textContent.replace(/^Error: /, '')); return; }
+  escaneo = null;
+  $('escaneo-formulario').innerHTML = '';
+  avisoEscaneo('bien', `Listo: el expediente ${r.expediente} de ${r.alumno} quedó guardado. Ya puedes soltar los escaneos del siguiente alumno.`);
+}
+
+async function subirEscaneo(archivos) {
+  archivos = [...archivos].filter((a) => a.size);
+  if (!archivos.length) return;
+  if (escaneo && !confirm('Hay un expediente escaneado sin guardar. ¿Lo descartas y lees el nuevo?')) return;
+  avisoEscaneo('ojo', `Leyendo ${archivos.length} archivo(s)… Con escaneos puede tardar unos segundos por hoja.`);
+  $('escaneo-formulario').innerHTML = '';
+  try {
+    $('mensaje').textContent = 'Leyendo los escaneos…';
+    const r = await motor.escaneoLeer(archivos);
+    avisoEscaneo('', '');
+    mostrarEscaneo(r);
+    $('mensaje').textContent = 'Listo.';
+  } catch (error) {
+    avisoEscaneo('mal', error.message);
+    $('mensaje').textContent = 'Listo.';
+  }
+}
+
+$('soltar-escaneo').onclick = () => $('elegir-escaneo').click();
+$('soltar-escaneo').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('elegir-escaneo').click(); };
+$('elegir-escaneo').onchange = () => { subirEscaneo($('elegir-escaneo').files); $('elegir-escaneo').value = ''; };
+$('panel-escaneo').addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.stopPropagation();  // Lo que se suelta aquí son escaneos, no la constancia de RENAPO.
+  document.body.classList.remove('arrastrando');
+  subirEscaneo(e.dataTransfer.files);
+});
 
 $('soltar').onclick = () => $('elegir-constancia').click();
 $('soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('elegir-constancia').click(); };

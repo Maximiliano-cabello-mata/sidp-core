@@ -193,6 +193,21 @@ schtasks /create /tn "SIDP Cerebro" /tr "\"$PWD\validacion\iniciar_cerebro.bat\"
    coincide" con lo que falta. Si RENAPO no la encuentra, da **RENAPO no la encontró**.
 7. El tutor queda vinculado al alumno (principal y puede recoger) **solo cuando autorizas** su
    expediente.
+8. **Escanear expedientes que ya revisaron en papel.** Para los alumnos que ya tienen su carpeta
+   revisada por la escuela no hace falta la validación completa:
+   1. Escanea los documentos de **un alumno**: todo en un PDF o en varios, como salgan del escáner.
+   2. Arrástralos al cuadro **Escanear expediente (ya revisado en papel)**.
+   3. El sistema separa las hojas, reconoce cada documento (acta, INE, comprobante, certificado,
+      boleta, constancia de la CURP) y llena los datos del alumno y del tutor: nombre, CURP, fecha
+      de nacimiento, sexo y parentesco. Lo que no alcanzó a leer aparece en un aviso amarillo.
+   4. Revisa, corrige lo que haga falta y da **Guardar expediente**. Queda como "Escaneado
+      (validado en papel)", con sus PDF en `SIDP-prueba\expedientes\` y los datos en la base.
+      "Revisar todo" ya no lo vuelve a revisar. La CURP sigue apareciendo "Sin validar" en RENAPO
+      hasta que alguien haga el paso 6.
+
+   Para leer escaneos (PDF que son solo imagen) se necesita el cerebro **conectado** (paso 3), con
+   el código actualizado (Parte 1, pasos 1 y 5). Sin cerebro, esta PC solo lee los PDF que traen
+   texto, y el panel lo avisa.
 
 Si el celular no abre la página, revisa que la red de esta PC también sea **Privada** (paso 4a de
 la Parte 1) y que la regla del firewall exista:

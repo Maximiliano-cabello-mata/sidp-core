@@ -151,6 +151,9 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     if url.path == '/api/configuracion':
                         return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro),
                                                   'direccion_padres': app.direccion_padres()})
+                    if url.path == '/api/escaneo/pagina':
+                        ruta = app.bandeja.escaneo_pagina(consulta.get('lote', [''])[0], consulta.get('archivo', [''])[0])
+                        return self._enviar(200, ruta.read_bytes(), mimetypes.guess_type(ruta.name)[0] or 'application/octet-stream')
                     if url.path == '/api/archivo':
                         carpeta = app.bandeja._carpeta(consulta.get('id', [''])[0])
                         nombre = Path(consulta.get('nombre', [''])[0]).name
@@ -179,6 +182,10 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     return
                 if not self._admin():
                     return
+                if url.path == '/api/escaneo/leer':  # Escaneos de un alumno ya revisado en papel.
+                    archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.escaneo_leer(archivos))
                 if url.path == '/api/renapo/constancia':  # El PDF tal cual, arrastrado al panel.
                     contenido = self._cuerpo()
                     with app.candado:
@@ -189,6 +196,10 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.revisar_todo())
                     if url.path == '/api/decidir':
                         return self._enviar(200, app.bandeja.decidir(datos.get('id', ''), datos.get('decision', ''), datos.get('motivo', '')))
+                    if url.path == '/api/escaneo/guardar':
+                        return self._enviar(200, app.bandeja.escaneo_guardar(datos.get('lote', ''), datos))
+                    if url.path == '/api/escaneo/descartar':
+                        return self._enviar(200, app.bandeja.escaneo_descartar(datos.get('lote', '')))
                     if url.path == '/api/renapo/no_encontrada':
                         return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':
@@ -220,6 +231,14 @@ def leer_formulario(tipo, cuerpo):
     if captura is None:
         raise ErrorBandeja('Faltan los datos del formulario')
     return captura, archivos
+
+
+def leer_archivos(tipo, cuerpo):
+    """Solo los archivos de un formulario multipart: [(nombre, contenido)]."""
+    if not tipo.startswith('multipart/form-data'):
+        raise ErrorBandeja('Se esperaba un formulario con archivos')
+    mensaje = BytesParser(policy=politica_correo).parsebytes(f'Content-Type: {tipo}\r\n\r\n'.encode() + cuerpo)
+    return [(parte.get_filename(), parte.get_payload(decode=True) or b'') for parte in mensaje.iter_parts() if parte.get_filename()]
 
 
 def main(argumentos=None):

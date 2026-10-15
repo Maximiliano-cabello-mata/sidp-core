@@ -79,6 +79,28 @@ def validar_en_cerebro(carpeta, hoy, url, clave, espera=900):
         return json.load(respuesta)
 
 
+def leer(pedido):
+    """Solo lectura (expedientes escaneados): el texto y los códigos de cada archivo, sin revisar nada."""
+    salida = []
+    with tempfile.TemporaryDirectory(prefix='sidp-') as temporal:
+        for numero, archivo in enumerate(pedido['archivos']):
+            nombre = Path(archivo['nombre']).name  # Nunca una ruta: solo el nombre.
+            ruta = Path(temporal) / f'{numero:03d}_{nombre}'
+            ruta.write_bytes(base64.b64decode(archivo['contenido']))
+            lectura = lector.leer(ruta)
+            salida.append({'nombre': nombre, 'texto': lectura['texto'], 'qr': lectura['qr'], 'metodo': lectura['metodo'],
+                           'problemas': [p.replace(ruta.name, nombre) for p in lectura['problemas']]})
+    return {'paginas': salida, 'procesado_en': f'cerebro ({socket.gethostname()})'}
+
+
+def leer_en_cerebro(archivos, url, clave, espera=900):
+    """Lado del .exe: archivos [(nombre, contenido)] -> lo que leyó el cerebro de cada uno."""
+    cuerpo = json.dumps({'archivos': [{'nombre': n, 'contenido': base64.b64encode(c).decode()} for n, c in archivos]}).encode()
+    solicitud = urllib.request.Request(url.rstrip('/') + '/leer', cuerpo, {'Content-Type': 'application/json', 'X-SIDP-Clave': clave})
+    with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
+        return json.load(respuesta)
+
+
 def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0'):
     class Puente(BaseHTTPRequestHandler):
         def _responder(self, codigo, datos):
@@ -102,16 +124,18 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 self._responder(200, {'ok': True, 'modelo': nombre_modelo, 'herramientas': lector.herramientas()})
 
         def do_POST(self):
-            if self.path not in ('/opinar', '/validar'):
+            if self.path not in ('/opinar', '/validar', '/leer'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
             largo = int(self.headers.get('Content-Length') or 0)
-            if self.path == '/validar':
+            if self.path in ('/validar', '/leer'):
                 if not 0 < largo <= MAXIMO_EXPEDIENTE:
                     return self._responder(413, {'error': 'expediente demasiado grande'})
                 try:
                     pedido = json.loads(self.rfile.read(largo))
+                    if self.path == '/leer':
+                        return self._responder(200, leer(pedido))
                     return self._responder(200, validar(pedido, nombre_modelo, url))
                 except (ValueError, KeyError, TypeError) as error:
                     return self._responder(400, {'error': f'expediente mal formado: {error}'})

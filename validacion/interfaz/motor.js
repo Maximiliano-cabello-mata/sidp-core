@@ -43,6 +43,14 @@ function motorLocal() {
       return datos;
     },
     renapoNoEncontrada: (alumno) => api('/api/renapo/no_encontrada', { alumno }),
+    escaneoLeer: (archivos) => {
+      const formulario = new FormData();
+      for (const archivo of archivos) formulario.append('archivo', archivo, archivo.name);
+      return api('/api/escaneo/leer', formulario);
+    },
+    escaneoGuardar: (lote, datos) => api('/api/escaneo/guardar', { lote, ...datos }),
+    escaneoDescartar: (lote) => api('/api/escaneo/descartar', { lote }),
+    paginaUrl: (lote, archivo) => `/api/escaneo/pagina?lote=${encodeURIComponent(lote)}&archivo=${encodeURIComponent(archivo)}&t=${encodeURIComponent(SIDP.token || '')}`,
   };
 }
 
@@ -63,6 +71,12 @@ def llamar(nombre, argumentos):
 def constancia(nombre, contenido):
     try:
         return json.dumps({'ok': bandeja.constancia_renapo(nombre, base64.b64decode(contenido))}, ensure_ascii=False, default=str)
+    except ErrorBandeja as error:
+        return json.dumps({'error': str(error)}, ensure_ascii=False)
+def escaneo(archivos):
+    lista = [(a['nombre'], base64.b64decode(a['contenido'])) for a in json.loads(archivos)]
+    try:
+        return json.dumps({'ok': bandeja.escaneo_leer(lista)}, ensure_ascii=False, default=str)
     except ErrorBandeja as error:
         return json.dumps({'error': str(error)}, ensure_ascii=False)
 def recibir(captura, archivos):
@@ -127,6 +141,17 @@ def recibir(captura, archivos):
       return datos.ok;
     },
     renapoNoEncontrada: (alumno) => llamar('renapo_no_encontrada', alumno),
+    escaneoLeer: async (archivos) => {
+      await listo;
+      const lista = [];
+      for (const archivo of archivos) lista.push({ nombre: archivo.name, contenido: base64(await archivo.arrayBuffer()) });
+      const datos = JSON.parse(py.globals.get('escaneo')(JSON.stringify(lista)));
+      if (datos.error) throw new Error(datos.error);
+      return datos.ok;
+    },
+    escaneoGuardar: (lote, datos) => llamar('escaneo_guardar', lote, datos, 'administrador (demostración)'),
+    escaneoDescartar: (lote) => llamar('escaneo_descartar', lote),
+    paginaUrl: null,
     enviar: async (formulario) => {
       await listo;
       const archivos = [];

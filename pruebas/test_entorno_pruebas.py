@@ -248,3 +248,69 @@ def test_el_tutor_queda_vinculado_solo_al_autorizar(entorno):
     pedir(url, '/api/decidir', {'id': '0002', 'decision': 'rechazado', 'motivo': 'No es su tutor'}, token)
     filas = db.execute('SELECT t.nombres, a.principal, a.puede_recoger FROM alumno_tutor a JOIN tutor t ON t.id = a.tutor_id').fetchall()
     assert filas == [('María Elena', 1, 1)]
+
+
+def expediente_escaneado():
+    """Un solo PDF con varias hojas, como lo deja el escáner: acta, INE y comprobante, sin nada capturado."""
+    import io
+    domicilio = 'C. PINO NO. 5 COL. CENTRO TOLUCA'
+    hojas = [generar.acta('LUIS', 'HERNANDEZ', 'RAMOS', '14/03/2018', 'HOMBRE', CURP, 'JUAN PEREZ LOPEZ', 'MARIA ELENA RAMOS SOTO'),
+             generar.ine('RAMOS', 'SOTO', 'MARIA ELENA', domicilio),
+             generar.cfe('MARIA ELENA RAMOS SOTO', domicilio, '20 SEP 2026')]
+    escritor = pypdf.PdfWriter()
+    for texto in hojas:
+        escritor.add_page(pypdf.PdfReader(io.BytesIO(pdf_de_texto(texto.splitlines()))).pages[0])
+    salida = io.BytesIO()
+    escritor.write(salida)
+    return salida.getvalue()
+
+
+def escanear(url, app, contenido, nombre='expediente.pdf'):
+    limite = uuid.uuid4().hex
+    cuerpo = (f'--{limite}\r\nContent-Disposition: form-data; name="archivo"; filename="{nombre}"\r\n'
+              f'Content-Type: application/pdf\r\n\r\n'.encode() + contenido + f'\r\n--{limite}--\r\n'.encode())
+    return pedir(url, '/api/escaneo/leer', cuerpo, {'X-SIDP-Token': app.token}, tipo=f'multipart/form-data; boundary={limite}')
+
+
+def test_el_escaneo_propone_los_datos_y_guarda_el_expediente_validado_en_papel(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    assert pedir(url, '/api/escaneo/leer', b'', tipo='multipart/form-data; boundary=x')[0] == 403  # Solo el panel.
+    codigo, leido = escanear(url, app, expediente_escaneado())
+    assert codigo == 200, leido
+    assert [p['tipo'] for p in leido['paginas']] == ['acta_alumno', 'ine_tutor', 'comprobante']
+    propuesta = leido['propuesta']
+    assert propuesta['alumno']['curp'] == CURP and propuesta['alumno']['nombres'] == 'LUIS'
+    assert (propuesta['alumno']['primer_apellido'], propuesta['alumno']['segundo_apellido']) == ('HERNANDEZ', 'RAMOS')
+    assert propuesta['tutor']['nombres'] == 'MARIA ELENA' and propuesta['tutor']['parentesco'] == 'madre'
+    # La persona revisa, corrige si hace falta y guarda.
+    codigo, guardado = pedir(url, '/api/escaneo/guardar', {'lote': leido['lote'], 'alumno': propuesta['alumno'],
+                                                             'tutor': {**propuesta['tutor'], 'telefono': '7221234567'}}, token)
+    assert codigo == 200 and guardado['expediente'] == '0001', guardado
+    db = app.bandeja.registro.db
+    assert db.execute('SELECT curp, fecha_nacimiento, sexo FROM alumno').fetchall() == [(CURP, '2018-03-14', 'H')]
+    assert db.execute('SELECT t.nombres, a.parentesco FROM alumno_tutor a JOIN tutor t ON t.id = a.tutor_id').fetchall() == [('MARIA ELENA', 'madre')]
+    estados = db.execute('SELECT tipo, estado, origen FROM documento ORDER BY tipo').fetchall()
+    assert estados == [('acta', 'validado', 'escaneo'), ('comprobante_domicilio', 'validado', 'escaneo'), ('ine_tutor', 'validado', 'escaneo')]
+    estado = pedir(url, '/api/estado', cabeceras=token)[1]
+    assert estado['medidas']['en_papel'] == 1 and estado['medidas']['revision'] == 0
+    assert estado['expedientes'][0]['decision']['decision'] == 'autorizado'
+    # "Revisar todo" no lo vuelve a revisar, y el escaneo temporal ya se borró.
+    pedir(url, '/api/revisar_todo', {}, token)
+    assert app.bandeja.resultados['0001']['estado'] == 'validado en papel'
+    assert not list((app.carpeta / 'escaneos').iterdir())
+    assert sorted(p.name for p in (app.carpeta / 'expedientes' / '0001').glob('*.pdf')) == ['acta_alumno_1.pdf', 'comprobante_1.pdf', 'ine_tutor_1.pdf']
+
+
+def test_el_escaneo_sin_nombre_no_se_guarda_y_se_puede_descartar(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    leido = escanear(url, app, expediente_escaneado())[1]
+    codigo, respuesta = pedir(url, '/api/escaneo/guardar', {'lote': leido['lote'], 'alumno': {'nombres': 'Luis'}}, token)
+    assert codigo == 400 and 'apellido' in respuesta['error']
+    codigo, respuesta = pedir(url, '/api/escaneo/guardar', {'lote': leido['lote'], 'alumno': {**leido['propuesta']['alumno'], 'curp': 'ABC'}}, token)
+    assert codigo == 400 and 'CURP' in respuesta['error']
+    assert pedir(url, '/api/escaneo/descartar', {'lote': leido['lote']}, token)[0] == 200
+    assert pedir(url, '/api/escaneo/guardar', {'lote': leido['lote'], 'alumno': leido['propuesta']['alumno']}, token)[0] == 400
+    assert pedir(url, '/api/escaneo/descartar', {'lote': '../expedientes'}, token)[0] == 400
+    assert not app.bandeja.expedientes()
