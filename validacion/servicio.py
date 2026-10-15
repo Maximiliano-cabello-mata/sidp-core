@@ -15,7 +15,7 @@ import sqlite3
 from pathlib import Path
 
 from validacion import cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo
-from validacion.grupos import ErrorGrupo, Grupos
+from validacion.grupos import ErrorGrupo, Grupos, ciclo_de
 from validacion import plantillas as plantillas_mod
 
 ESQUEMA = """
@@ -63,6 +63,18 @@ def partir_pdf(contenido):
         return [contenido]
 
 
+def texto_por_hoja(contenido):
+    """El texto de cada hoja de un PDF, respetando columnas (así un renglón de una tabla queda en un renglón), o None."""
+    try:
+        import logging
+        import pypdf
+        logging.getLogger('pypdf').setLevel(logging.ERROR)  # Avisos de texto girado en los formatos de la SEP.
+        lector_pdf = pypdf.PdfReader(io.BytesIO(contenido))
+        return [pagina.extract_text(extraction_mode='layout') or '' for pagina in lector_pdf.pages]
+    except Exception:  # Sin pypdf, PDF dañado o versión vieja de pypdf: se lee con el lector normal.
+        return None
+
+
 def unir_pdf(partes):
     if len(partes) == 1:
         return partes[0]
@@ -83,6 +95,40 @@ def sp_error():
 
 class ErrorBandeja(Exception):
     """Algo que la persona hizo mal (falta el motivo, no existe el expediente)."""
+
+
+def con_padron(propuesta, paginas):
+    """Usa las sugerencias de la base del cerebro: si la CURP leída no es de nadie pero se parece a la de un
+    alumno de las listas, o no se leyó la CURP pero el nombre sí, se propone ese alumno con un aviso."""
+    sugerencias = [s for p in paginas if p.get('tipo') in ('acta_alumno', 'constancia_curp') for s in p.get('sugerencias') or []]
+    if not sugerencias:
+        return
+    alumno, avisos = propuesta['alumno'], propuesta['avisos']
+    nombre = lambda s: ' '.join(filter(None, (s['nombres'], s['primer_apellido'], s['segundo_apellido'])))
+    por_curp = sorted((s for s in sugerencias if s['por'] == 'curp'), key=lambda s: s['distancia'])
+    if any(s['distancia'] == 0 and s['curp'] == alumno.get('curp') for s in por_curp):
+        return  # La CURP leída es de un alumno de las listas: nada que corregir.
+    elegido = next((s for s in por_curp if s['leida'] == alumno.get('curp')), None) or (por_curp[0] if not alumno.get('curp') and por_curp else None)
+    if elegido:
+        avisos.insert(0, f'La CURP leída {elegido["leida"]} no es de nadie en las listas; la más parecida ({elegido["distancia"]} '
+                         f'letra(s) distinta(s)) es {elegido["curp"]}, de {nombre(elegido)} ({elegido["grado"]}° {elegido["letra"]}). '
+                         'Se propuso esa: compárala con el acta.')
+    elif not alumno.get('curp'):
+        por_nombre = sorted((s for s in sugerencias if s['por'] == 'nombre'), key=lambda s: -s['parecido'])
+        if not por_nombre or (len(por_nombre) > 1 and por_nombre[1]['parecido'] >= por_nombre[0]['parecido'] - 0.05):
+            return  # Dos alumnos igual de parecidos (hermanos, por ejemplo): que elija la persona.
+        elegido = por_nombre[0]
+        avisos.insert(0, f'No se leyó la CURP, pero el nombre se parece a {nombre(elegido)} ({elegido["grado"]}° {elegido["letra"]}) '
+                         'de las listas. Se propusieron sus datos: compáralos con el acta.')
+    else:
+        return
+    alumno.update({k: elegido[k] for k in ('curp', 'nombres', 'primer_apellido', 'segundo_apellido')})
+    desglose = comparador.desglose_curp(elegido['curp'])
+    if desglose:
+        alumno.update(fecha_nacimiento=desglose['fecha'], sexo=desglose['sexo'])
+    if elegido.get('leida'):  # Los avisos sobre la CURP mal leída ya no aplican.
+        propuesta['avisos'] = avisos[:1] + [a for a in avisos[1:] if elegido['leida'] not in a]
+    propuesta['padron'] = elegido
 
 
 def reglas_de(resultado):
@@ -115,6 +161,7 @@ class Bandeja:
         self.editable = editable  # Solo la demostración deja cambiar la captura y los textos.
         self.registro = registro  # validacion.registro.Registro: la base con las 39 tablas, si se usa.
         self.cerebro = None  # (url, clave) del cerebro de la PC 4; sin él, los procesos corren aquí.
+        self.padron_aviso = None  # Cómo quedó el padrón en la base del cerebro (PostgreSQL de la PC 4).
         self.resultados = {}
         for identificador in self.expedientes():  # Lo ya revisado sobrevive a cerrar el programa.
             guardado = self.carpeta / 'expedientes' / identificador / 'resultado.json'
@@ -143,7 +190,22 @@ class Bandeja:
             return None
         problema = modelo.salud_remota(url, clave)
         self.cerebro = None if problema else (url, clave)
+        if self.cerebro:
+            self.enviar_padron()
         return problema
+
+    def enviar_padron(self):
+        """Manda los alumnos de las listas a la base del cerebro, para que compare lo que lee contra ellos."""
+        if not (self.cerebro and self.grupos):
+            return None
+        ciclo, alumnos = self.grupos.padron()
+        try:
+            respuesta = cerebro_red.padron_a_cerebro(ciclo, alumnos, *self.cerebro)
+            self.padron_aviso = f'Padrón en la base del cerebro ({respuesta.get("motor", "PostgreSQL")}): {respuesta.get("alumnos", 0)} alumnos.'
+        except Exception as error:
+            detalle = getattr(error, 'code', None) == 503 and 'el cerebro no tiene PostgreSQL todavía' or str(error)
+            self.padron_aviso = f'El padrón no llegó a la base del cerebro ({detalle}); el cerebro lee igual, sin compararlo.'
+        return self.padron_aviso
 
     def revisar(self, identificador):
         """El cerebro de la PC 4 procesa todo; si no responde, los procesos corren aquí y nada se detiene."""
@@ -257,9 +319,11 @@ class Bandeja:
                 paginas.append({'archivo': archivo, 'origen': f'{Path(nombre).name} · hoja {numero}' if len(partes) > 1 else Path(nombre).name})
         lecturas, procesado_en = self._leer([(p['archivo'], (carpeta / p['archivo']).read_bytes()) for p in paginas])
         for pagina, lectura in zip(paginas, lecturas):
-            pagina.update(texto=lectura['texto'], qr=lectura['qr'], problemas=lectura['problemas'])
+            pagina.update(texto=lectura['texto'], qr=lectura['qr'], problemas=lectura['problemas'],
+                          sugerencias=lectura.get('sugerencias') or [])
         extraer.agrupar(paginas, self.plantillas.activas())
         propuesta = extraer.proponer(paginas, self.hoy)
+        con_padron(propuesta, paginas)
         sin_texto = [p['origen'] for p in paginas if len(p['texto'].strip()) < lector.MINIMO_TEXTO]
         if sin_texto:
             propuesta['avisos'].insert(0, 'No se pudo leer: ' + ', '.join(sin_texto)
@@ -320,24 +384,85 @@ class Bandeja:
         return datos
 
     def lista_leer(self, archivos=(), texto='', apellidos_primero=True):
-        """La lista de un grupo, escaneada o escrita: propone los renglones y el grado y grupo. No guarda nada."""
-        sin_texto, procesado_en = [], None
-        if archivos:
-            lecturas, procesado_en = self._leer(self._muestras(archivos))
-            sin_texto = [n for (n, _), l in zip(archivos, lecturas) if len(l['texto'].strip()) < lector.MINIMO_TEXTO]
-            texto = '\n'.join(l['texto'] for l in lecturas) + '\n' + (texto or '')
-        if not str(texto or '').strip():
+        """Listas de grupo, escaneadas o escritas: propone los grupos con sus renglones. No guarda nada.
+
+        Un PDF puede traer varios grupos (el formato EIA de la SEP trae toda la escuela, una hoja por grupo):
+        cada hoja se lee aparte. El grado sale de lo escrito en la hoja o, si hay CURP, de la edad de la mayoría.
+        """
+        sin_texto, procesado_en, hojas, por_leer = [], None, [], []
+        for nombre, contenido in archivos:
+            textos = texto_por_hoja(contenido) if nombre.lower().endswith('.pdf') else None
+            if textos and sum(len(t.strip()) for t in textos) >= lector.MINIMO_TEXTO:
+                hojas += [(f'{nombre} · hoja {numero}', t) for numero, t in enumerate(textos, 1)]
+                procesado_en = procesado_en or 'esta PC'
+            else:
+                por_leer.append((nombre, contenido))
+        if por_leer:  # Escaneos y fotos: el lector de siempre (el cerebro, si está conectado).
+            lecturas, procesado_en = self._leer(self._muestras(por_leer))
+            sin_texto = [n for (n, _), l in zip(por_leer, lecturas) if len(l['texto'].strip()) < lector.MINIMO_TEXTO]
+            hojas += [(l.get('nombre') or 'escaneo', l['texto']) for l in lecturas]
+        if str(texto or '').strip():
+            hojas.append(('escrita', texto))
+        if not hojas:
             raise ErrorBandeja('Sube la lista escaneada o escribe los nombres, uno por renglón')
-        grado, letra = extraer.grado_y_grupo(texto)
-        return {'filas': extraer.lista_de_grupo(texto, apellidos_primero), 'grado': grado, 'letra': letra,
+        inicio_ciclo = int(ciclo_de(self.hoy)[0][:4])
+        leidas = [(nombre, t, extraer.lista_de_grupo(t, apellidos_primero)) for nombre, t in hojas]
+        con_curp = any(sum(bool(f['curp']) for f in filas) >= 3 for _, _, filas in leidas)
+        grupos, vistas = [], set()
+        for nombre, t, filas in leidas:
+            if con_curp:  # Lista oficial con CURP: las hojas sin CURP son instrucciones o avisos.
+                filas = [f for f in filas if f['curp']]
+            filas = [f for f in filas if not f['curp'] or f['curp'] not in vistas]  # Un alumno en dos hojas, una vez.
+            vistas.update(f['curp'] for f in filas if f['curp'])
+            if not filas:
+                continue
+            escrito, letra = extraer.grado_y_grupo(t)
+            por_edad = extraer.grado_por_edad([f['curp'] for f in filas if not f['dudoso']], inicio_ciclo)
+            grado = por_edad or escrito
+            letra = letra if escrito == grado else None  # Si el número de la hoja no es el grado, su letra tampoco cuenta.
+            anterior = grupos[-1] if grupos else None
+            if anterior and (grado is None or (grado, letra) == (anterior['grado'], anterior['letra'])):
+                anterior['filas'] += filas  # La lista sigue en la hoja siguiente.
+                anterior['hojas'].append(nombre)
+            else:
+                grupos.append({'grado': grado, 'letra': letra, 'filas': filas, 'hojas': [nombre], 'letra_supuesta': letra is None})
+        if not grupos:
+            raise ErrorBandeja('No se encontraron nombres de alumnos. Revisa que sea la lista del grupo o escribe los nombres.')
+        for grupo in grupos:  # Sin letra en la hoja: A, B, C... en orden, por grado.
+            if grupo['letra'] is None and grupo['grado']:
+                usadas = {g['letra'] for g in grupos if g['grado'] == grupo['grado'] and g['letra']}
+                grupo['letra'] = next(l for l in 'ABCDEFGH' if l not in usadas)
+        primero = grupos[0]
+        return {'grupos': grupos, 'filas': primero['filas'], 'grado': primero['grado'],
+                'letra': None if primero['letra_supuesta'] else primero['letra'],
                 'procesado_en': procesado_en, 'sin_texto': sin_texto}
 
     def lista_guardar(self, datos):
+        """Guarda una lista (grado, letra, filas) o varias a la vez (grupos: [{grado, letra, filas}])."""
+        varios = datos.get('grupos')
+        if varios is not None:
+            if not varios:
+                raise ErrorBandeja('No hay grupos para guardar')
+            for numero, grupo in enumerate(varios, 1):  # Primero se revisa todo; así no queda guardada solo una parte.
+                try:
+                    self.grupos.revisar_filas(grupo.get('filas') or [])
+                    self.grupos.validar_grupo(grupo.get('grado'), grupo.get('letra'))
+                except ErrorGrupo as error:
+                    raise ErrorBandeja(f'Grupo {numero}: {error}')
+            claves = [(int(g['grado']), str(g['letra']).upper()) for g in varios]
+            if len(set(claves)) < len(claves):
+                raise ErrorBandeja('Hay dos grupos con el mismo grado y letra: cambia la letra de uno')
+            resumen = [self._guardar_un_grupo(g) for g in varios]
+            return {'guardados': [{'grupo': r['grupo']['nombre'], 'agregados': r['agregados'], 'ya_estaban': r['ya_estaban']} for r in resumen],
+                    'agregados': sum(r['agregados'] for r in resumen), 'ya_estaban': sum(r['ya_estaban'] for r in resumen),
+                    'padron': self.enviar_padron(), **self.grupos.lista()}
+        return {**self._guardar_un_grupo(datos), 'padron': self.enviar_padron(), **self.grupos.lista()}
+
+    def _guardar_un_grupo(self, datos):
         def guardar():
             grupo = self.grupos.crear(datos.get('grado'), datos.get('letra'))
             return self.grupos.guardar_lista(grupo, datos.get('filas') or [])
-        resultado = self._con_grupos(guardar)
-        return {**resultado, **self.grupos.lista()}
+        return self._con_grupos(guardar)
 
     def grupo_crear(self, grado, letra):
         self._con_grupos(lambda: self.grupos.crear(grado, letra))

@@ -8,6 +8,10 @@ los archivos viven en una carpeta temporal que se borra al terminar cada expedie
 Ollama sigue escuchando solo en 127.0.0.1; lo único abierto a la red es este servicio, y pide
 la clave que muestra al arrancar (sin ella responde 401).
 
+La base de datos del cerebro (PostgreSQL, también solo en 127.0.0.1) guarda el padrón de alumnos que
+manda el .exe en /padron; con él, /leer propone al alumno correcto aunque la CURP o el nombre se hayan
+leído con errores. Sin PostgreSQL todo funciona igual, sin esas propuestas (ver validacion/base_cerebro.py).
+
 En la PC 4, desde la raíz del repositorio:
     python -m validacion.cerebro_red              # puerto 8771, modelo sidp-revisor-2
 Windows pregunta si permite el acceso en la red: elegir solo "redes privadas".
@@ -23,11 +27,12 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from validacion import expediente, lector, modelo
+from validacion import base_cerebro, expediente, lector, modelo
 
 PUERTO = 8771
 MAXIMO = 4096  # Una pregunta son dos textos cortos; nada más grande pasa.
 MAXIMO_EXPEDIENTE = 80 * 1024 * 1024  # Fotos de un expediente completo, en base64.
+MAXIMO_PADRON = 4 * 1024 * 1024  # Toda la escuela: unos cientos de alumnos.
 TIPOS = ('nombre', 'domicilio')
 
 
@@ -80,8 +85,12 @@ def validar_en_cerebro(carpeta, hoy, url, clave, espera=900, plantillas=None):
         return json.load(respuesta)
 
 
-def leer(pedido):
-    """Solo lectura (expedientes escaneados): el texto y los códigos de cada archivo, sin revisar nada."""
+def leer(pedido, base=None):
+    """Solo lectura (expedientes escaneados): el texto y los códigos de cada archivo, sin revisar nada.
+
+    Con la base de datos, cada página trae además las sugerencias del padrón (alumnos cuya CURP o nombre
+    se parecen a lo leído).
+    """
     salida = []
     with tempfile.TemporaryDirectory(prefix='sidp-') as temporal:
         for numero, archivo in enumerate(pedido['archivos']):
@@ -89,8 +98,15 @@ def leer(pedido):
             ruta = Path(temporal) / f'{numero:03d}_{nombre}'
             ruta.write_bytes(base64.b64decode(archivo['contenido']))
             lectura = lector.leer(ruta)
-            salida.append({'nombre': nombre, 'texto': lectura['texto'], 'qr': lectura['qr'], 'metodo': lectura['metodo'],
-                           'problemas': [p.replace(ruta.name, nombre) for p in lectura['problemas']]})
+            pagina = {'nombre': nombre, 'texto': lectura['texto'], 'qr': lectura['qr'], 'metodo': lectura['metodo'],
+                      'problemas': [p.replace(ruta.name, nombre) for p in lectura['problemas']]}
+            if base:
+                try:
+                    pagina['sugerencias'] = base.sugerir(pagina['texto'] + '\n' + '\n'.join(pagina['qr']))
+                    base.anotar(pagina['metodo'], pagina['texto'], pagina['sugerencias'])
+                except Exception as error:  # La base nunca detiene la lectura.
+                    print(f'base de datos: {type(error).__name__}: {error}', flush=True)
+            salida.append(pagina)
     return {'paginas': salida, 'procesado_en': f'cerebro ({socket.gethostname()})'}
 
 
@@ -102,7 +118,15 @@ def leer_en_cerebro(archivos, url, clave, espera=900):
         return json.load(respuesta)
 
 
-def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0'):
+def padron_a_cerebro(ciclo, alumnos, url, clave, espera=60):
+    """Lado del .exe: manda el padrón (los alumnos de las listas) a la base del cerebro."""
+    cuerpo = json.dumps({'ciclo': ciclo, 'alumnos': alumnos}, ensure_ascii=False).encode()
+    solicitud = urllib.request.Request(url.rstrip('/') + '/padron', cuerpo, {'Content-Type': 'application/json', 'X-SIDP-Clave': clave})
+    with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
+        return json.load(respuesta)
+
+
+def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None):
     class Puente(BaseHTTPRequestHandler):
         def _responder(self, codigo, datos):
             cuerpo = json.dumps(datos, ensure_ascii=False).encode()
@@ -122,21 +146,38 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
             if self.path != '/salud':
                 return self._responder(404, {'error': 'no existe'})
             if self._autorizado():
-                self._responder(200, {'ok': True, 'modelo': nombre_modelo, 'herramientas': lector.herramientas()})
+                try:
+                    datos_base = base.resumen() if base else None
+                except Exception as error:
+                    datos_base = {'error': f'{type(error).__name__}: {error}'}
+                self._responder(200, {'ok': True, 'modelo': nombre_modelo, 'herramientas': lector.herramientas(), 'base': datos_base})
 
         def do_POST(self):
-            if self.path not in ('/opinar', '/validar', '/leer'):
+            if self.path not in ('/opinar', '/validar', '/leer', '/padron'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
             largo = int(self.headers.get('Content-Length') or 0)
+            if self.path == '/padron':
+                if not base:
+                    return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
+                if not 0 < largo <= MAXIMO_PADRON:
+                    return self._responder(413, {'error': 'padrón demasiado grande'})
+                try:
+                    pedido = json.loads(self.rfile.read(largo))
+                    cargados = base.cargar(str(pedido['ciclo']), list(pedido['alumnos']))
+                except (ValueError, KeyError, TypeError) as error:
+                    return self._responder(400, {'error': f'padrón mal formado: {error}'})
+                except Exception as error:
+                    return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}'})
+                return self._responder(200, {'ok': True, 'cargados': cargados, **base.resumen()})
             if self.path in ('/validar', '/leer'):
                 if not 0 < largo <= MAXIMO_EXPEDIENTE:
                     return self._responder(413, {'error': 'expediente demasiado grande'})
                 try:
                     pedido = json.loads(self.rfile.read(largo))
                     if self.path == '/leer':
-                        return self._responder(200, leer(pedido))
+                        return self._responder(200, leer(pedido, base))
                     return self._responder(200, validar(pedido, nombre_modelo, url))
                 except (ValueError, KeyError, TypeError) as error:
                     return self._responder(400, {'error': f'expediente mal formado: {error}'})
@@ -164,10 +205,17 @@ def main(argumentos=None):
     parser.add_argument('--ollama', default=modelo.URL, help='Ollama local (no cambiar: sigue en 127.0.0.1)')
     # Fuera del repositorio, que es público: la clave nunca debe subirse.
     parser.add_argument('--clave', type=Path, default=Path.home() / '.sidp' / 'clave_cerebro.txt')
+    parser.add_argument('--base', type=Path, default=base_cerebro.ARCHIVO, help='archivo con la dirección de PostgreSQL')
     args = parser.parse_args(argumentos)
     clave = clave_guardada(args.clave)
-    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama)
+    base, problema = base_cerebro.abrir(args.base)
+    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base)
     print(f'Cerebro escuchando en http://{ip_local()}:{args.puerto}  (modelo {args.modelo})')
+    if base:
+        resumen = base.resumen()
+        print(f'Base de datos: {resumen["motor"]} con {resumen["alumnos"]} alumnos en el padrón.')
+    else:
+        print(f'Sin base de datos ({problema}): funciona igual, sin comparar contra el padrón.')
     print(f'Clave para SIDP-Validador.exe: {clave}')
     print('Cierra esta ventana para apagarlo.', flush=True)
     try:

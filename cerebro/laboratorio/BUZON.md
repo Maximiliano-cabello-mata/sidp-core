@@ -231,3 +231,70 @@ y reinicia; no hay que medir ni subir nada.
    curl.exe http://127.0.0.1:8771/salud
    ```
 4. Avísale a Maximiliano que el cerebro quedó encendido con el código del día de escaneo.
+
+## Tarea 008: base de datos PostgreSQL para el cerebro (2026-10-15)
+
+Maximiliano decidió que la PC 4 tenga su propia base de datos, PostgreSQL, para hacer mejores procesos. Ahí
+el cerebro guarda el padrón de alumnos (lo manda SIDP-Validador.exe) y compara lo que lee contra los
+nombres y CURP reales: una CURP con una o dos letras mal leídas, o un apellido mal escrito, se reconocen.
+PostgreSQL escucha **solo en 127.0.0.1**, como Ollama: nadie de la red entra a la base, todo pasa por el
+cerebro y su clave. Las contraseñas se quedan en `%USERPROFILE%\.sidp\` y **nunca** van al repositorio ni
+al informe.
+
+1. Actualiza la rama:
+   ```
+   git checkout claude/project-thread-vp6ab8
+   git pull
+   ```
+2. Crea las dos contraseñas (quedan solo en esta PC):
+   ```
+   New-Item -ItemType Directory -Force "$env:USERPROFILE\.sidp" | Out-Null
+   $admin = [guid]::NewGuid().ToString('N'); $admin | Set-Content -NoNewline -Encoding ascii "$env:USERPROFILE\.sidp\postgres_admin.txt"
+   $clave = [guid]::NewGuid().ToString('N')
+   ```
+3. Instala PostgreSQL 17 sin pgAdmin. Baja el instalador de Windows x86-64 de
+   https://www.enterprisedb.com/downloads/postgres-postgresql-downloads (la versión 17 más nueva) y córrelo así,
+   cambiando el nombre del archivo por el que bajaste:
+   ```
+   & ".\postgresql-17.X-X-windows-x64.exe" --mode unattended --unattendedmodeui none --superpassword $admin `
+     --serverport 5432 --disable-components pgAdmin,stackbuilder
+   ```
+   Si `winget` está disponible, también sirve `winget install -e --id PostgreSQL.PostgreSQL.17`; en ese caso
+   anota qué contraseña quedó para el usuario `postgres` y guárdala en `postgres_admin.txt`.
+4. Que escuche solo en esta PC. En `C:\Program Files\PostgreSQL\17\data\postgresql.conf` deja la línea
+   `listen_addresses = 'localhost'` (sin `#` al inicio) y reinicia el servicio:
+   ```
+   Get-Service postgresql* | Restart-Service
+   netstat -ano | findstr :5432
+   ```
+   Solo deben salir `127.0.0.1:5432` y `[::1]:5432`. Si hay una regla del firewall para PostgreSQL, desactívala:
+   `Get-NetFirewallRule | Where-Object DisplayName -like '*Postgre*' | Disable-NetFirewallRule`.
+5. Crea el usuario y la base del cerebro:
+   ```
+   $env:PGPASSWORD = $admin
+   $psql = "C:\Program Files\PostgreSQL\17\bin\psql.exe"
+   & $psql -U postgres -h 127.0.0.1 -c "CREATE ROLE sidp LOGIN PASSWORD '$clave'"
+   & $psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE sidp_cerebro OWNER sidp"
+   Remove-Item Env:PGPASSWORD
+   "postgresql://sidp:$clave@127.0.0.1:5432/sidp_cerebro" | Set-Content -NoNewline -Encoding ascii "$env:USERPROFILE\.sidp\base_cerebro.txt"
+   ```
+6. Instala el conector (pg8000, solo Python: sirve con cualquier versión) y crea las tablas:
+   ```
+   python -m pip install -r validacion/requisitos.txt
+   python -m validacion.base_cerebro
+   ```
+   Debe decir `Base lista: PostgreSQL 17..., 0 alumnos en el padrón`.
+7. Reinicia el cerebro: cierra su ventana y abre otra vez `validacion\iniciar_cerebro.bat`. Ahora debe decir
+   `Base de datos: PostgreSQL 17... con 0 alumnos en el padrón`. La clave del cerebro y la dirección no cambian.
+8. Escribe `cerebro\laboratorio\resultados\2026-10-15_base_pc4.md` con: la versión de PostgreSQL, lo que dijo el
+   paso 6, lo que dijo el cerebro al arrancar (sin la clave), lo que salió de `netstat` en el paso 4 y cualquier
+   error completo. No pongas contraseñas, la clave del cerebro ni la IP.
+9. Sube solo ese archivo:
+   ```
+   git add cerebro/laboratorio/resultados/
+   git commit -m "laboratorio: resultado de la tarea 008"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+10. Avísale a Maximiliano que la base quedó lista. Él abre **Ajustes** en el panel y da **Conectar**: el panel debe
+    decir `Padrón en la base del cerebro (PostgreSQL ...): N alumnos`.

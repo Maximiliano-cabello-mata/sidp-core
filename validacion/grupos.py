@@ -79,7 +79,8 @@ class Grupos:
         return {'ciclo': nombre, 'grupos': [{'id': i, 'grado': g, 'letra': l, 'nombre': f'{g}° {l}', 'alumnos': n,
                                              'con_documentos': c, 'sin_curp': s} for i, g, l, n, c, s in filas]}
 
-    def crear(self, grado, letra):
+    @staticmethod
+    def validar_grupo(grado, letra):
         try:
             grado = int(grado)
         except (TypeError, ValueError):
@@ -89,6 +90,10 @@ class Grupos:
             raise ErrorGrupo('Elige el grado, de 1° a 6°.')
         if len(letra) != 1 or letra not in LETRAS:
             raise ErrorGrupo('Elige la letra del grupo (A, B, C...).')
+        return grado, letra
+
+    def crear(self, grado, letra):
+        grado, letra = self.validar_grupo(grado, letra)
         ciclo, _ = self.ciclo()
         fila = self.db.execute('SELECT id FROM grupo WHERE ciclo_id = ? AND grado = ? AND letra = ?', (ciclo, grado, letra)).fetchone()
         if fila:
@@ -127,12 +132,9 @@ class Grupos:
                             'documentos': documentos, 'validados': validados, 'tutor': tutor_nombre or None, 'telefono': telefono or None})
         return {'grupo': {'id': grupo_id, 'grado': grado, 'letra': letra, 'nombre': f'{grado}° {letra}'}, 'alumnos': alumnos}
 
-    def guardar_lista(self, grupo_id, filas):
-        """Agrega a un grupo los alumnos de su lista. filas: [{nombres, primer_apellido, segundo_apellido, curp}].
-
-        Si un alumno ya existe (misma CURP, o mismo nombre sin CURP), no se duplica.
-        """
-        grado, _, ciclo = self._grupo(grupo_id)
+    @staticmethod
+    def revisar_filas(filas):
+        """Los renglones limpios de una lista; un renglón incompleto o con CURP mal formada detiene todo, con su número."""
         limpias = []
         for numero, fila in enumerate(filas, 1):
             datos = {k: ' '.join(str(fila.get(k) or '').split()).upper() for k in ('nombres', 'primer_apellido', 'segundo_apellido', 'curp')}
@@ -145,6 +147,15 @@ class Grupos:
             limpias.append(datos)
         if not limpias:
             raise ErrorGrupo('La lista está vacía.')
+        return limpias
+
+    def guardar_lista(self, grupo_id, filas):
+        """Agrega a un grupo los alumnos de su lista. filas: [{nombres, primer_apellido, segundo_apellido, curp}].
+
+        Si un alumno ya existe (misma CURP, o mismo nombre sin CURP), no se duplica.
+        """
+        grado, _, ciclo = self._grupo(grupo_id)
+        limpias = self.revisar_filas(filas)
         agregados, ya_estaban = 0, 0
         for datos in limpias:
             alumno = self.registro.alumno_por(datos['curp'], nombre_completo(datos['nombres'], datos['primer_apellido'], datos['segundo_apellido']))
@@ -237,6 +248,16 @@ class Grupos:
         grupos = dict(self.db.execute('SELECT grado, COUNT(*) FROM grupo WHERE ciclo_id = ? GROUP BY grado', (ciclo,)).fetchall())
         return {'ciclo': nombre, 'grados': [{'grado': g, 'hombres': t['H'], 'mujeres': t['M'], 'sin_dato': t['?'],
                                              'total': sum(t.values()), 'grupos': grupos.get(g, 0)} for g, t in tabla.items()]}
+
+    def padron(self):
+        """(ciclo, alumnos con CURP del ciclo con su grado y grupo): lo que se manda a la base del cerebro."""
+        ciclo, nombre = self.ciclo()
+        filas = self.db.execute(
+            "SELECT a.curp, a.primer_apellido, COALESCE(a.segundo_apellido, ''), a.nombres, g.grado, g.letra "
+            "FROM inscripcion i JOIN grupo g ON g.id = i.grupo_id JOIN alumno a ON a.id = i.alumno_id "
+            "WHERE i.ciclo_id = ? AND i.estado IN ('incompleta','completa') AND a.curp IS NOT NULL", (ciclo,)).fetchall()
+        return nombre, [{'curp': c, 'primer_apellido': p, 'segundo_apellido': s, 'nombres': n, 'grado': g, 'letra': l}
+                        for c, p, s, n, g, l in filas]
 
     def exportar_alumnos(self):
         """Todos los alumnos del ciclo como renglones para CSV o Excel."""

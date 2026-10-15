@@ -45,8 +45,13 @@ SEXO_CURP = {'HOMBRE': 'H', 'MASCULINO': 'H', 'H': 'H', 'MUJER': 'M', 'FEMENINO'
 ETIQUETAS_NOMBRE = {'NOMBRE', 'NOMBRES', 'S', 'PRIMER', 'SEGUNDO', 'APELLIDO', 'APELLIDOS', 'PATERNO', 'MATERNO'}
 
 
+# Letras griegas y cirílicas que se ven idénticas a las latinas. Algunos PDF oficiales (por ejemplo, el formato
+# EIA de la SEP) las traen por su tipo de letra: "ΑΕΤΝ..." se ve como una CURP pero no lo es para la computadora.
+PARECIDAS = str.maketrans('ΑΒΕΖΗΙΚΜΝΟΡΤΥΧАВЕКМНОРСТУХ', 'ABEZHIKMNOPTYXABEKMHOPCTYX')
+
+
 def mayusculas(texto):
-    texto = unicodedata.normalize('NFD', (texto or '').upper())
+    texto = unicodedata.normalize('NFD', (texto or '').upper().translate(PARECIDAS))
     return ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
 
 

@@ -322,6 +322,19 @@ def grado_y_grupo(texto):
     return None, None
 
 
+def grado_por_edad(curps_grupo, inicio_ciclo):
+    """El grado que corresponde a la edad de la mayoría (año de nacimiento de sus CURP), o None.
+
+    Sirve cuando la hoja no dice el grado o dice otra cosa (el formato EIA de la SEP pone la fase, no el grado).
+    En el ciclo 2026-2027, los nacidos en 2020 van en 1°: grado = inicio del ciclo - año - 5.
+    """
+    anios = sorted(int(d['fecha'][:4]) for d in (comparador.desglose_curp(c) for c in curps_grupo if c) if d)
+    if len(anios) < 3:
+        return None
+    grado = inicio_ciclo - anios[len(anios) // 2] - 5
+    return grado if 1 <= grado <= 6 else None
+
+
 def lista_de_grupo(texto, apellidos_primero=True):
     """Los alumnos de una lista de grupo, un renglón por alumno: [{nombres, primer_apellido, segundo_apellido, curp, dudoso}].
 

@@ -203,3 +203,32 @@ por grado y grupo. El trabajo empieza por las listas de cada grupo y después va
 - **Panel** (`validacion/interfaz/panel.html`): Inicio, 1 Listas de grupo, 2 Escanear expediente
   (validación manual), 3 Fila de revisión (validación automática, por grupo y estado), 4 CURP y RENAPO,
   Análisis 911 y SAID, Plantillas y Ajustes. Funciona sin internet (sin Tailwind ni Font Awesome) y en celular.
+
+## Lista oficial de la escuela y base de datos del cerebro (2026-10-15)
+
+Pedido de Maximiliano: usar la lista oficial de la estadística de la SEP (un PDF con toda la escuela, un
+grupo por grado) como base de alumnos, y que la PC 4 tenga su propia base de datos, PostgreSQL, para hacer
+mejores procesos. Después solo se escanean los documentos físicos de cada alumno.
+
+- **Formato del PDF oficial.** Es una hoja de cálculo exportada: cada renglón trae CURP, número y nombre
+  (primer apellido, segundo apellido, nombre). Hay que leerlo con `extract_text(extraction_mode='layout')`;
+  el modo normal no separa los renglones. Algunas CURP traen letras griegas que se ven iguales a las
+  latinas (Α, Ε, Μ...): `expediente.mayusculas` las cambia. El número del encabezado es la **fase**, no el
+  grado, así que el grado sale de la edad de la mayoría (`extraer.grado_por_edad`: año de inicio del ciclo
+  − año de nacimiento − 5). La letra no viene: se pone A y la persona la confirma.
+- **Importar de un jalón.** `lista_leer` lee hoja por hoja y devuelve todos los grupos; una hoja que sigue
+  la lista del grupo anterior se une a él, y las hojas sin CURP (instrucciones) se ignoran.
+  `lista_guardar({'grupos': [...]})` revisa todo antes de guardar, así nada queda a medias.
+- **Base del cerebro** (`validacion/base_cerebro.py` y `base_cerebro.sql`). PostgreSQL en la PC 4,
+  escuchando solo en 127.0.0.1. Guarda `padron_alumno` (un alumno que sale de la lista se apaga, no se
+  borra) y `lectura` (cuánto se leyó de cada página y qué tan cerca quedó del padrón, para medir).
+  Los procesos viven en la base: `sidp_cargar_padron`, `sidp_curp_cercana` (levenshtein, hasta 2 letras)
+  y `sidp_nombre_cercano` (trigramas: aguanta faltas de ortografía y otro orden). Se conecta con pg8000,
+  que es solo Python. Sin PostgreSQL el cerebro funciona igual, sin comparar.
+- **Cómo se usa.** El .exe manda el padrón al cerebro (`POST /padron`, con la clave) al conectarse y cada
+  vez que se guardan listas. En `/leer`, cada página regresa con sus sugerencias del padrón. Al escanear,
+  si la CURP leída no es de nadie pero está a una o dos letras de la de un alumno, o no se leyó la CURP y
+  el nombre se parece a uno solo, el panel propone ese alumno **con un aviso**; la persona compara con el
+  acta y decide. Dos alumnos igual de parecidos (hermanos) no se proponen.
+- **Dónde vive cada cosa.** El .exe del administrador sigue guardando todo en su SQLite (las 39 tablas);
+  la base de la PC 4 es para procesar mejor, no es la oficial. La instalación es la Tarea 008 del buzón.

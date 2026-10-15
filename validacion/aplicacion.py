@@ -162,7 +162,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     if url.path == '/api/curps':
                         return self._enviar(200, app.bandeja.curps())
                     if url.path == '/api/configuracion':
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro),
+                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso,
                                                   'direccion_padres': app.direccion_padres()})
                     if url.path == '/api/plantillas':
                         return self._enviar(200, app.bandeja.lista_plantillas())
@@ -253,7 +253,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'problema': problema,
+                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'problema': problema,
                                                   'direccion_padres': app.direccion_padres()})
                 self._enviar(404, {'error': 'no existe'})
             except (ErrorBandeja, ValueError) as error:

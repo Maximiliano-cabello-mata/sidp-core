@@ -440,55 +440,80 @@ $('ls-leer').onclick = async () => {
   try {
     $('mensaje').textContent = 'Leyendo la lista…';
     const r = await motor.listaLeer(listaArchivos, $('ls-texto').value, $('ls-apellidos').checked);
-    listaFilas = r.filas.map((f) => ({ ...f }));
-    const grado = Number($('ls-subir').dataset.grado) || r.grado, letra = $('ls-subir').dataset.letra || r.letra;
+    const fijo = Number($('ls-subir').dataset.grado) || null;
+    const leidos = r.grupos || [{ grado: r.grado, letra: r.letra, filas: r.filas, letra_supuesta: !r.letra }];
+    // Si se abrió desde un grupo, todo va a ese grupo; si no, cada grupo del archivo va aparte.
+    listaFilas = fijo ? [{ grado: fijo, letra: $('ls-subir').dataset.letra, filas: leidos.flatMap((g) => g.filas), letra_supuesta: false }]
+                      : leidos.map((g) => ({ ...g, filas: g.filas.map((f) => ({ ...f })) }));
+    const total = listaFilas.reduce((n, g) => n + g.filas.length, 0);
     const avisos = [];
     if (r.sin_texto.length) avisos.push(`No se pudo leer: ${r.sin_texto.join(', ')}. Conecta el cerebro (Ajustes) o escribe los nombres.`);
-    const dudosos = listaFilas.filter((f) => f.dudoso).length;
+    const dudosos = listaFilas.reduce((n, g) => n + g.filas.filter((f) => f.dudoso).length, 0);
     if (dudosos) avisos.push(`${dudosos} renglón(es) en amarillo: revísalos con la hoja en la mano.`);
-    if (!grado || !letra) avisos.push('No se encontró el grado o el grupo en la hoja: elígelos abajo.');
-    avisoEn('ls-mensaje', avisos.length ? 'ojo' : 'bien', avisos.length ? avisos.join(' ') : `Se leyeron ${listaFilas.length} alumnos. Revisa y guarda.`);
-    tablaLista(grado, letra);
+    if (listaFilas.some((g) => !g.grado || !g.letra)) avisos.push('No se encontró el grado o el grupo en la hoja: elígelos abajo.');
+    else if (listaFilas.some((g) => g.letra_supuesta)) avisos.push('La hoja no dice la letra del grupo: se puso A. Cámbiala si no es así.');
+    const leido = listaFilas.length > 1 ? `Se leyeron ${listaFilas.length} grupos con ${total} alumnos.` : `Se leyeron ${total} alumnos.`;
+    avisoEn('ls-mensaje', avisos.length ? 'ojo' : 'bien', `${leido} ${avisos.length ? avisos.join(' ') : 'Revisa y guarda.'}`);
+    tablaLista();
   } catch (error) {
     avisoEn('ls-mensaje', 'mal', error.message);
   }
   $('mensaje').textContent = 'Listo.';
 };
 
-function tablaLista(grado, letra) {
+function tablaLista() {
   const letras = 'ABCDEFGH'.split('');
-  $('ls-revisar').innerHTML = `
-    <h3>Revisa los alumnos</h3>
+  const varios = listaFilas.length > 1;
+  const total = listaFilas.reduce((n, g) => n + g.filas.length, 0);
+  $('ls-revisar').innerHTML = `<h3>Revisa los alumnos</h3>` + listaFilas.map((g, k) => `
+    <div class="panel" data-g="${k}">
+    ${varios ? `<div class="seccion-titulo">Grupo ${k + 1} de ${listaFilas.length} · ${g.filas.length} alumnos</div>` : ''}
     <div class="rejilla" style="max-width:420px">
-      <div><label for="ls-grado">Grado</label><select id="ls-grado"><option value="">Elige</option>${GRADOS.map((g, i) => `<option value="${i + 1}" ${i + 1 === grado ? 'selected' : ''}>${g}</option>`).join('')}</select></div>
-      <div><label for="ls-letra">Grupo</label><select id="ls-letra"><option value="">Elige</option>${letras.map((l) => `<option ${l === letra ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div><label for="ls-grado-${k}">Grado</label><select id="ls-grado-${k}" data-g="${k}" data-campo-grupo="grado"><option value="">Elige</option>${GRADOS.map((n, i) => `<option value="${i + 1}" ${i + 1 === g.grado ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div><label for="ls-letra-${k}">Grupo</label><select id="ls-letra-${k}" data-g="${k}" data-campo-grupo="letra"><option value="">Elige</option>${letras.map((l) => `<option ${l === g.letra ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     </div>
+    ${g.letra_supuesta ? '<p class="chico">La hoja no dice la letra: se puso la primera libre.</p>' : ''}
     <div class="tabla-envoltura"><table><tr><th>#</th><th>Primer apellido</th><th>Segundo apellido</th><th>Nombre(s)</th><th>CURP (si la trae)</th><th></th></tr>
-    ${listaFilas.map((f, i) => `<tr class="${f.dudoso ? 'dudoso' : ''}"><td>${i + 1}</td>
-      <td><input data-i="${i}" data-campo="primer_apellido" value="${esc(f.primer_apellido)}" aria-label="Primer apellido"></td>
-      <td><input data-i="${i}" data-campo="segundo_apellido" value="${esc(f.segundo_apellido)}" aria-label="Segundo apellido"></td>
-      <td><input data-i="${i}" data-campo="nombres" value="${esc(f.nombres)}" aria-label="Nombres"></td>
-      <td><input data-i="${i}" data-campo="curp" value="${esc(f.curp)}" maxlength="18" class="curp" aria-label="CURP"></td>
-      <td><button class="chico-boton" data-quitar="${i}" title="Quitar este renglón">Quitar</button></td></tr>`).join('')}</table></div>
-    <p><button data-agregar-renglon>Agregar un renglón</button>
-       <button class="verde" id="ls-guardar">Guardar lista (${listaFilas.length} alumnos)</button></p>`;
-  for (const entrada of $('ls-revisar').querySelectorAll('input[data-i]')) entrada.oninput = () => { listaFilas[entrada.dataset.i][entrada.dataset.campo] = entrada.value; };
-  const actual = () => [Number($('ls-grado').value) || null, $('ls-letra').value || null];
-  for (const b of $('ls-revisar').querySelectorAll('[data-quitar]')) b.onclick = () => { listaFilas.splice(Number(b.dataset.quitar), 1); tablaLista(...actual()); };
-  $('ls-revisar').querySelector('[data-agregar-renglon]').onclick = () => {
-    listaFilas.push({ nombres: '', primer_apellido: '', segundo_apellido: '', curp: '', dudoso: false }); tablaLista(...actual());
+    ${g.filas.map((f, i) => `<tr class="${f.dudoso ? 'dudoso' : ''}"><td>${i + 1}</td>
+      <td><input data-g="${k}" data-i="${i}" data-campo="primer_apellido" value="${esc(f.primer_apellido)}" aria-label="Primer apellido"></td>
+      <td><input data-g="${k}" data-i="${i}" data-campo="segundo_apellido" value="${esc(f.segundo_apellido)}" aria-label="Segundo apellido"></td>
+      <td><input data-g="${k}" data-i="${i}" data-campo="nombres" value="${esc(f.nombres)}" aria-label="Nombres"></td>
+      <td><input data-g="${k}" data-i="${i}" data-campo="curp" value="${esc(f.curp)}" maxlength="18" class="curp" aria-label="CURP"></td>
+      <td><button class="chico-boton" data-g="${k}" data-quitar="${i}" title="Quitar este renglón">Quitar</button></td></tr>`).join('')}</table></div>
+    <p><button data-g="${k}" data-agregar-renglon>Agregar un renglón</button></p>
+    </div>`).join('') +
+    `<p><button class="verde" id="ls-guardar">${varios ? `Guardar los ${listaFilas.length} grupos (${total} alumnos)` : `Guardar lista (${total} alumnos)`}</button></p>`;
+  const caja = $('ls-revisar');
+  for (const entrada of caja.querySelectorAll('input[data-i]')) entrada.oninput = () => { listaFilas[entrada.dataset.g].filas[entrada.dataset.i][entrada.dataset.campo] = entrada.value; };
+  for (const s of caja.querySelectorAll('select[data-campo-grupo]')) s.onchange = () => {
+    const g = listaFilas[s.dataset.g];
+    if (s.dataset.campoGrupo === 'grado') g.grado = Number(s.value) || null;
+    else { g.letra = s.value || null; g.letra_supuesta = false; }
+  };
+  for (const b of caja.querySelectorAll('[data-quitar]')) b.onclick = () => { listaFilas[b.dataset.g].filas.splice(Number(b.dataset.quitar), 1); tablaLista(); };
+  for (const b of caja.querySelectorAll('[data-agregar-renglon]')) b.onclick = () => {
+    listaFilas[b.dataset.g].filas.push({ nombres: '', primer_apellido: '', segundo_apellido: '', curp: '', dudoso: false }); tablaLista();
   };
   $('ls-guardar').onclick = async () => {
-    const [g, l] = actual();
-    if (!g || !l) { avisoEn('ls-mensaje', 'mal', 'Elige el grado y el grupo.'); return; }
-    const r = await trabajar('Guardando la lista…', () => motor.listaGuardar({ grado: g, letra: l, filas: listaFilas }),
-                             (c, t) => avisoEn('ls-mensaje', c, t));
+    if (listaFilas.some((g) => !g.grado || !g.letra)) { avisoEn('ls-mensaje', 'mal', 'Elige el grado y el grupo de cada lista.'); return; }
+    const grupos = listaFilas.map((g) => ({ grado: g.grado, letra: g.letra, filas: g.filas }));
+    const r = await trabajar('Guardando…', () => motor.listaGuardar(varios ? { grupos } : grupos[0]), (c, t) => avisoEn('ls-mensaje', c, t));
     if (!r) return;
     $('ls-subir').classList.add('oculto');
     listaArchivos = []; listaFilas = null;
+    if (varios) {
+      datos.grupos = { ciclo: r.ciclo, grupos: r.grupos };
+      mostrarGrupos();
+      $('ls-grupos').insertAdjacentHTML('afterbegin', `<div class="mensaje bien">Listo: ${r.agregados} alumno(s) en ${r.guardados.length} grupos (` +
+        r.guardados.map((x) => esc(x.grupo)).join(', ') + ')' + (r.ya_estaban ? `; ${r.ya_estaban} ya estaban.` : '.') +
+        ' Abre un grupo para escanear los expedientes de sus alumnos.' + (r.padron ? ` <span class="chico">${esc(r.padron)}</span>` : '') + '</div>');
+      $('ls-grupos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     await abrirGrupo(r.grupo.id);
     $('ls-detalle').insertAdjacentHTML('afterbegin', `<div class="mensaje bien">Listo: ${r.agregados} alumno(s) agregados a ${esc(r.grupo.nombre)}` +
-      (r.ya_estaban ? `; ${r.ya_estaban} ya estaban.` : '.') + ' Sigue con la lista del próximo grupo, o escanea los expedientes de este.</div>');
+      (r.ya_estaban ? `; ${r.ya_estaban} ya estaban.` : '.') + ' Sigue con la lista del próximo grupo, o escanea los expedientes de este.' +
+      (r.padron ? ` <span class="chico">${esc(r.padron)}</span>` : '') + '</div>');
   };
 }
 
@@ -949,14 +974,14 @@ if (motor.configuracion) {
   motor.configuracion().then((c) => {
     $('cerebro-url').value = c.cerebro_url || '';
     $('cerebro-clave').value = c.cerebro_clave || '';
-    $('cerebro-estado').textContent = c.cerebro_conectado ? 'Conectado.' : 'Sin cerebro: los procesos corren en esta PC.';
+    $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.padron || ''}` : 'Sin cerebro: los procesos corren en esta PC.';
     const publica = `${PAGINA_PUBLICA}padres.html?escuela=${new URL(c.direccion_padres).host}`;
     $('padres-ip').innerHTML = `Los padres, conectados al Wi-Fi de la escuela, abren <b>${esc(c.direccion_padres)}</b>
       (o ${esc(publica)}, que los manda ahí). <a href="padres.html" target="_blank" rel="noopener">Abrir la página de padres</a>.`;
   });
   $('cerebro-guardar').onclick = async () => {
     const c = await trabajar('Probando el cerebro…', () => motor.guardarConfiguracion({ cerebro_url: $('cerebro-url').value, cerebro_clave: $('cerebro-clave').value }));
-    if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? 'Conectado.' : 'No respondió: ' + (c.problema || '');
+    if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.padron || ''}` : 'No respondió: ' + (c.problema || '');
   };
 }
 
