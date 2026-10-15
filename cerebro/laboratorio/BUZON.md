@@ -134,3 +134,35 @@ El validador revisa expedientes completos: lo que el padre capturó contra el te
    git push origin claude/project-thread-vp6ab8
    ```
 8. Avísale a Maximiliano que ya se subió.
+
+## Tarea 005: dejar la PC 4 como validación y cerebro por IP (2026-10-15)
+
+Maximiliano autorizó instalar en la PC 4 lo que haga falta. Desde ahora la PC 4 valida los
+expedientes y es el cerebro: SIDP-Validador.exe, en la PC del administrador, le manda cada
+expediente por la red y ella responde. Tú solo preparas la PC y arrancas el cerebro; no participas
+en la validación. La guía completa, con todos los comandos, está en
+[docs/guias/ENTORNO_PRUEBAS.md](../../docs/guias/ENTORNO_PRUEBAS.md), Parte 1.
+
+1. Actualiza la rama (Parte 1, paso 1).
+2. Instala pypdf, opencv y Tesseract con español, y comprueba que las cuatro herramientas digan `True` (paso 2).
+3. Revisa que exista `sidp-revisor-2` en Ollama (paso 3). No cambies a Ollama de `127.0.0.1`.
+4. Pon la red como Privada, abre el puerto 8771 solo en red Privada y quita la suspensión (paso 4).
+5. Arranca el cerebro con `validacion\iniciar_cerebro.bat` y deja la ventana abierta (paso 5).
+6. Prueba `/salud` con la clave (paso 6).
+7. Muéstrale a Maximiliano, **en la pantalla**, la dirección y la clave. **Nunca** escribas la clave
+   en un archivo del repositorio, en el informe ni en un mensaje.
+8. Corre el ejemplo con todo instalado. Debe decir "Falsos que pasaron como listos (peligroso): 0 de 6":
+   ```
+   python -m validacion.prueba validacion\ejemplo --hoy 2026-10-14
+   ```
+9. Escribe `cerebro\laboratorio\resultados\2026-10-15_entorno_pc4.md` con: lo que dijo `lector.herramientas()`,
+   lo que respondió `/salud` (sin la clave), si la red quedó Privada, si se creó la regla del firewall,
+   el resumen del paso 8 y cualquier error. No pongas la IP ni la clave.
+10. Sube solo ese archivo:
+    ```
+    git add cerebro/laboratorio/resultados/
+    git commit -m "laboratorio: resultado de la tarea 005"
+    git pull --rebase
+    git push origin claude/project-thread-vp6ab8
+    ```
+11. Avísale a Maximiliano que ya se subió y que el cerebro quedó encendido.

@@ -33,3 +33,8 @@ node_modules/
 informe_local.html
 resultados_local.json
 resumen_para_repo.md
+validacion/ejemplo/decisiones.db
+validacion/ejemplo/plataforma_prueba.db
+validacion/ejemplo/configuracion.json
+validacion/ejemplo/expedientes/*/resultado.json
+clave_cerebro.txt

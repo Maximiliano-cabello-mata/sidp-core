@@ -1,4 +1,4 @@
-# Herramientas opcionales del lector, solo para la PC que valida (PC 4). No van en el .exe ni en CI.
+# Herramientas opcionales del lector para la PC 4 (validación y cerebro). El .exe del administrador solo lleva pypdf, para leer PDF si la PC 4 está apagada.
 # Instalar con: python -m pip install -r validacion/requisitos.txt
 # Tesseract (OCR) se instala aparte, con su idioma español: choco install tesseract (incluye spa) o el instalador de UB Mannheim.
 pypdf>=5.1

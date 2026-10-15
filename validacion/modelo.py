@@ -45,3 +45,31 @@ def opinar(gris, modelo=MODELO, url=URL, espera=120):
         opinion = {'misma': 'duda', 'motivo': f'sin respuesta del modelo: {error}'}
     opinion['segundos'] = round(time.monotonic() - inicio, 1)
     return opinion
+
+
+def opinar_remoto(gris, url, clave, espera=150):
+    """Opinión del cerebro de otra PC, por IP, a través de validacion/cerebro_red.py. Sin respuesta: "duda"."""
+    inicio = time.monotonic()
+    cuerpo = json.dumps({'tipo': gris['tipo'], 'a': gris['a'], 'b': gris['b']}).encode()
+    try:
+        solicitud = urllib.request.Request(url.rstrip('/') + '/opinar', cuerpo,
+                                           {'Content-Type': 'application/json', 'X-SIDP-Clave': clave})
+        with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
+            opinion = json.load(respuesta)
+        if opinion.get('misma') not in ('si', 'no', 'duda'):
+            raise ValueError(f'respuesta fuera del formato: {opinion}')
+    except Exception as error:  # Sin cerebro, el caso sigue en revisión manual.
+        opinion = {'misma': 'duda', 'motivo': f'sin respuesta del cerebro: {error}'}
+    opinion['segundos'] = round(time.monotonic() - inicio, 1)
+    return opinion
+
+
+def salud_remota(url, clave, espera=5):
+    """None si el cerebro responde con esa clave; si no, el motivo."""
+    try:
+        solicitud = urllib.request.Request(url.rstrip('/') + '/salud', headers={'X-SIDP-Clave': clave})
+        with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
+            return None if json.load(respuesta).get('ok') else 'respuesta inesperada'
+    except Exception as error:
+        return str(error)
+

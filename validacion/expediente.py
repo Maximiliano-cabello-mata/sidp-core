@@ -104,7 +104,8 @@ def alinear(buscadas, encontradas):
 
 class Revision:
     def __init__(self, identificador):
-        self.resultado = {'id': identificador, 'hallazgos': [], 'grises': [], 'no_leidos': [], 'documentos': {}}
+        # extraidos: lo que se encontró en cada documento; va a la base como propuesta, nunca como dato confirmado.
+        self.resultado = {'id': identificador, 'hallazgos': [], 'grises': [], 'no_leidos': [], 'documentos': {}, 'extraidos': {}}
 
     def hallazgo(self, regla, documento, detalle, gravedad='alta'):
         self.resultado['hallazgos'].append({'regla': regla, 'documento': documento, 'detalle': detalle,
@@ -116,6 +117,8 @@ class Revision:
     def cotejar(self, regla, documento, capturado, texto, tipo, que, orden_libre=False, gravedad='alta'):
         """Busca lo capturado en el texto del documento y anota lo que encuentre."""
         resultado, pedazo = buscar(capturado, texto, tipo, orden_libre)
+        if resultado != 'distinto':
+            self.resultado['extraidos'][regla] = pedazo
         if resultado == 'gris':
             self.resultado['grises'].append({'regla': regla, 'documento': documento, 'tipo': tipo, 'a': capturado,
                                              'b': pedazo, 'sin_consultar': comparador.sin_consultar(capturado, pedazo, tipo)})
@@ -128,7 +131,7 @@ def leer_documentos(carpeta):
     """Texto de cada tipo de documento; un tipo puede tener varios archivos (frente y reverso)."""
     documentos = {}
     for archivo in sorted(Path(carpeta).iterdir()):
-        if archivo.name == 'captura.json' or archivo.name.startswith('.'):
+        if archivo.suffix == '.json' or archivo.name.startswith('.'):  # captura, resultado y registro no son documentos.
             continue
         tipo = next((t for t in sorted(TIPOS, key=len, reverse=True) if archivo.stem.lower().startswith(t)), None)
         lectura = lector.leer(archivo)
@@ -141,7 +144,7 @@ def leer_documentos(carpeta):
     return documentos
 
 
-def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, url=modelo.URL):
+def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, url=modelo.URL, opinador=None):
     """Revisa un expediente. Devuelve el resultado con estado, hallazgos, zona gris y lo que no se pudo leer."""
     inicio, hoy, carpeta = time.monotonic(), hoy or datetime.date.today(), Path(carpeta)
     revision = Revision(carpeta.name)
@@ -194,12 +197,16 @@ def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, ur
         if alumno.get('nombre'):
             revision.cotejar('acta_nombre', documento, alumno['nombre'], acta, 'nombre', 'El nombre del alumno')
         curps = set(CURP.findall(mayusculas(acta)))
+        revision.resultado['extraidos']['acta_curps'] = sorted(curps)
+        revision.resultado['extraidos']['acta_fechas'] = sorted({f.isoformat() for f in fechas(acta)})
         if alumno.get('curp') and curps and alumno['curp'].upper() not in curps:
             revision.hallazgo('acta_curp', documento, f'la CURP del acta ({", ".join(sorted(curps))}) no es la capturada')
         if desglose:
             if datetime.date.fromisoformat(desglose['fecha']) not in fechas(acta):
                 revision.no_leido('acta_fecha', documento, f'no se encontró en el acta la fecha de nacimiento de la CURP ({desglose["fecha"]})')
             sexo = SEXO.search(mayusculas(acta))
+            if sexo:
+                revision.resultado['extraidos']['acta_sexo'] = SEXO_CURP[sexo.group(1)]
             if sexo and SEXO_CURP[sexo.group(1)] != desglose['sexo']:
                 revision.hallazgo('acta_sexo', documento, 'el sexo del acta no coincide con la CURP')
         if tutor.get('nombre') and tutor.get('parentesco', '').lower() in PADRES:
@@ -221,6 +228,8 @@ def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, ur
     if comprobante:
         documento = TIPOS['comprobante'][0]
         pasadas = [f for f in fechas(comprobante) if f <= hoy]
+        if pasadas:
+            revision.resultado['extraidos']['comprobante_fecha'] = max(pasadas).isoformat()
         if not pasadas:
             revision.no_leido('comprobante_fecha', documento, 'no se encontró la fecha del comprobante')
         elif comparador.sumar_meses(max(pasadas), 3) < hoy:
@@ -229,8 +238,10 @@ def revisar(carpeta, hoy=None, usar_modelo=True, nombre_modelo=modelo.MODELO, ur
             revision.cotejar('comprobante_domicilio', documento, tutor['domicilio'], comprobante, 'domicilio', 'El domicilio')
 
     for gris in revision.resultado['grises']:
-        gris['opinion'] = (modelo.opinar(gris, nombre_modelo, url) if usar_modelo and not gris['sin_consultar']
-                           else {'misma': 'duda', 'motivo': gris['sin_consultar'] or 'sin modelo', 'segundos': 0.0})
+        if usar_modelo and not gris['sin_consultar']:  # opinador: el cerebro de otra PC (modelo.opinar_remoto).
+            gris['opinion'] = opinador(gris) if opinador else modelo.opinar(gris, nombre_modelo, url)
+        else:
+            gris['opinion'] = {'misma': 'duda', 'motivo': gris['sin_consultar'] or 'sin modelo', 'segundos': 0.0}
     r = revision.resultado
     r['estado'] = 'revisión manual' if r['hallazgos'] or r['grises'] or r['no_leidos'] else 'listo para autorizar'
     r['segundos'] = round(time.monotonic() - inicio, 1)

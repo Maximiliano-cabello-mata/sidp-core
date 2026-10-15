@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIDP · Validación de expedientes</title>
+<link rel="stylesheet" href="estilo.css">
+<script>/*SIDP_CONFIG*/</script>
+<script src="motor.js"></script>
+</head>
+<body>
+<header>
+  <h1>SIDP · Validación de expedientes</h1>
+  <span class="modo" id="modo"></span>
+  <a href="padres.html" id="enlace-padres">Página de padres</a>
+</header>
+<main>
+  <div class="aviso" id="aviso"></div>
+  <div class="tarjetas" id="tarjetas"></div>
+  <div class="barra">
+    <button class="principal" id="revisar">Revisar todo</button>
+    <span class="chico" id="mensaje">Cargando…</span>
+  </div>
+  <div class="panel oculto" id="panel-cerebro" style="margin-bottom:14px">
+    <h2>Cerebro de la PC 4</h2>
+    <div class="rejilla">
+      <div><label for="cerebro-url">Dirección (por ejemplo http://192.168.1.40:8771)</label><input id="cerebro-url"></div>
+      <div><label for="cerebro-clave">Clave que muestra el cerebro al arrancar</label><input id="cerebro-clave"></div>
+    </div>
+    <p><button id="cerebro-guardar">Conectar</button> <span class="chico" id="cerebro-estado"></span></p>
+    <p class="chico" id="padres-ip"></p>
+  </div>
+  <div class="columnas">
+    <div class="panel"><h2>Expedientes</h2><ul class="lista" id="lista"></ul></div>
+    <div class="panel" id="detalle"><p class="chico">Elige un expediente.</p></div>
+  </div>
+  <p class="chico" id="base"></p>
+</main>
+<script>
+const motor = crearMotor();
+const $ = (id) => document.getElementById(id);
+let actual = null;
+const PAGINA_PUBLICA = 'https://maximiliano-cabello-mata.github.io/sidp-core/';
+
+$('modo').textContent = SIDP.modo === 'demo' ? 'Demostración con datos inventados' : 'Entorno de pruebas · esta PC';
+$('aviso').textContent = SIDP.modo === 'demo'
+  ? 'Página pública: solo expedientes inventados. No escribas ni subas datos reales. Todo corre en tu navegador y no se envía a ningún lado. Fecha de la demostración: 14/10/2026.'
+  : 'Este panel tiene datos personales y solo se abre en esta PC. El sistema y el cerebro solo proponen: autoriza o rechaza una persona.';
+
+function insignia(estado) {
+  if (!estado) return '<span class="insignia pendiente">sin revisar</span>';
+  return estado === 'listo para autorizar' ? '<span class="insignia listo">listo</span>' : '<span class="insignia revision">revisión</span>';
+}
+
+function mostrarEstado(estado) {
+  const m = estado.medidas;
+  const tarjetas = [[m.revisados, 'Revisados'], [m.listos, 'Listos para autorizar'], [m.revision, 'A revisión manual'],
+                    [m.autorizados, 'Autorizados'], [m.rechazados, 'Rechazados']];
+  if (m.etiquetados) tarjetas.push([`${m.falsos_detectados}/${m.falsos}`, 'Falsos detectados'], [m.falsos_pasaron, 'Falsos que pasaron'],
+                                   [m.falsos_autorizados, 'Falsos autorizados por una persona']);
+  $('tarjetas').innerHTML = tarjetas.map(([n, t]) => `<div class="tarjeta"><div class="numero">${esc(n)}</div><div class="etiqueta">${esc(t)}</div></div>`).join('');
+  $('lista').innerHTML = estado.expedientes.map((e) => `<li data-id="${esc(e.id)}" class="${e.id === actual ? 'activo' : ''}">
+      <b>${esc(e.id)}</b> ${insignia(e.estado)}
+      ${e.decision ? `<span class="insignia ${esc(e.decision.decision)}">${esc(e.decision.decision)}</span>` : ''}
+      ${e.etiqueta ? `<span class="chico">${esc(e.etiqueta)}${e.trampa ? ': ' + esc(e.trampa) : ''}</span>` : ''}</li>`).join('')
+    || '<li class="chico">Todavía no hay expedientes. Abre la página de padres para subir uno.</li>';
+  for (const li of $('lista').querySelectorAll('li[data-id]')) li.onclick = () => abrir(li.dataset.id);
+}
+
+async function refrescar() {
+  mostrarEstado(await motor.estado());
+  const base = await motor.base();
+  $('base').textContent = base ? 'Base de datos (39 tablas): ' + Object.entries(base).map(([t, n]) => `${t} ${n}`).join(' · ') : '';
+}
+
+function tablaResultado(r) {
+  const filas = [
+    ...r.hallazgos.map((h) => `<tr><td class="${esc(h.gravedad)}">Hallazgo</td><td>${esc(h.documento)}</td><td>${esc(h.detalle)}</td></tr>`),
+    ...r.grises.map((g) => `<tr><td>Zona gris</td><td>${esc(g.documento)}</td><td>"${esc(g.a)}" contra "${esc(g.b)}".
+        El cerebro opina: <b>${esc(g.opinion.misma)}</b> <span class="chico">(${esc(g.opinion.motivo || '')})</span></td></tr>`),
+    ...r.no_leidos.map((n) => `<tr><td>No se pudo leer</td><td>${esc(n.documento)}</td><td>${esc(n.detalle)}</td></tr>`),
+  ];
+  return filas.length ? `<table><tr><th>Qué</th><th>Documento</th><th>Detalle</th></tr>${filas.join('')}</table>`
+                      : '<p>Todo coincide. Falta que una persona lo autorice.</p>';
+}
+
+async function abrir(id) {
+  actual = id;
+  for (const li of $('lista').querySelectorAll('li[data-id]')) li.classList.toggle('activo', li.dataset.id === id);
+  const d = await motor.detalle(id);
+  const r = d.resultado;
+  const a = d.captura.alumno || {}, t = d.captura.tutor || {};
+  const editable = SIDP.modo === 'demo' && Object.keys(d.textos).length;
+  $('detalle').innerHTML = `
+    <h2>Expediente ${esc(id)} ${r ? insignia(r.estado) : ''}</h2>
+    ${r ? `<p class="chico">Revisado en: ${esc(r.procesado_en || 'esta PC')} · ${esc(r.segundos)} s</p>` : ''}
+    <h3>Lo que capturó el padre</h3>
+    ${editable ? `<div class="rejilla">
+        <div><label>Nombre del alumno</label><input id="e-alumno" value="${esc(a.nombre)}"></div>
+        <div><label>CURP</label><input id="e-curp" value="${esc(a.curp)}"></div>
+        <div><label>Nombre del tutor</label><input id="e-tutor" value="${esc(t.nombre)}"></div>
+        <div><label>Parentesco</label><input id="e-parentesco" value="${esc(t.parentesco)}"></div>
+        <div><label>Domicilio</label><input id="e-domicilio" value="${esc(t.domicilio)}"></div></div>`
+      : `<table><tr><td>Alumno</td><td>${esc(a.nombre)}</td></tr><tr><td>CURP</td><td>${esc(a.curp)}</td></tr>
+         <tr><td>Tutor</td><td>${esc(t.nombre)} (${esc(t.parentesco)})</td></tr><tr><td>Domicilio</td><td>${esc(t.domicilio)}</td></tr></table>`}
+    <h3>Documentos</h3>
+    ${editable ? Object.entries(d.textos).map(([n, texto]) => `<label>${esc(n)}</label><textarea data-archivo="${esc(n)}">${esc(texto)}</textarea>`).join('')
+        + '<p><button id="volver">Volver a revisar con estos cambios</button></p>'
+      : '<ul>' + d.archivos.map((n) => `<li>${motor.archivoUrl ? `<a href="${esc(motor.archivoUrl(id, n))}" target="_blank" rel="noopener">${esc(n)}</a>` : esc(n)}</li>`).join('') + '</ul>'}
+    <h3>Resultado del sistema</h3>
+    ${r ? tablaResultado(r) : '<p class="chico">Sin revisar.</p>'}
+    ${r && Object.keys(r.extraidos || {}).length ? `<h3>Datos extraídos (propuesta, no confirmados)</h3><table>${Object.entries(r.extraidos)
+        .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(Array.isArray(v) ? v.join(', ') : v)}</td></tr>`).join('')}</table>` : ''}
+    <h3>Decisión de la persona</h3>
+    ${d.decision ? `<p><span class="insignia ${esc(d.decision.decision)}">${esc(d.decision.decision)}</span>
+        <span class="chico">${esc(d.decision.quien)} · ${esc(d.decision.fecha)}${d.decision.motivo ? ' · ' + esc(d.decision.motivo) : ''}</span></p>` : ''}
+    <label for="motivo">Motivo (obligatorio para rechazar)</label><textarea id="motivo" style="min-height:60px"></textarea>
+    <p><button class="verde" id="autorizar">Autorizar</button> <button class="rojo" id="rechazar">Rechazar</button></p>
+    <div id="reporte"></div>`;
+  $('autorizar').onclick = () => decidir('autorizado');
+  $('rechazar').onclick = () => decidir('rechazado');
+  if (editable) $('volver').onclick = async () => {
+    const captura = { alumno: { ...a, nombre: $('e-alumno').value, curp: $('e-curp').value },
+                      tutor: { ...t, nombre: $('e-tutor').value, parentesco: $('e-parentesco').value, domicilio: $('e-domicilio').value } };
+    const textos = Object.fromEntries([...document.querySelectorAll('textarea[data-archivo]')].map((x) => [x.dataset.archivo, x.value]));
+    await trabajar('Revisando…', () => motor.reescribir(id, captura, textos));
+    await abrir(id);
+  };
+}
+
+async function decidir(decision) {
+  const respuesta = await trabajar('Guardando…', () => motor.decidir(actual, decision, $('motivo').value));
+  if (!respuesta) return;
+  await abrir(actual);
+  if (respuesta.reporte_para_padre) $('reporte').innerHTML = `<h3>Lo que recibiría el padre</h3><pre>${esc(respuesta.reporte_para_padre)}</pre>`;
+}
+
+async function trabajar(texto, accion) {
+  const botones = [...document.querySelectorAll('button')];
+  botones.forEach((b) => (b.disabled = true));
+  $('mensaje').textContent = texto;
+  try {
+    const resultado = await accion();
+    await refrescar();
+    $('mensaje').textContent = 'Listo.';
+    return resultado;
+  } catch (error) {
+    $('mensaje').textContent = 'Error: ' + error.message;
+  } finally {
+    botones.forEach((b) => (b.disabled = false));
+  }
+}
+
+$('revisar').onclick = async () => { await trabajar('Revisando todos los expedientes…', () => motor.revisarTodo()); if (actual) abrir(actual); };
+
+if (motor.configuracion) {
+  $('panel-cerebro').classList.remove('oculto');
+  motor.configuracion().then((c) => {
+    $('cerebro-url').value = c.cerebro_url || '';
+    $('cerebro-clave').value = c.cerebro_clave || '';
+    $('cerebro-estado').textContent = c.cerebro_conectado ? 'Conectado.' : 'Sin cerebro: los procesos corren en esta PC.';
+    const publica = `${PAGINA_PUBLICA}padres.html?escuela=${new URL(c.direccion_padres).host}`;
+    $('padres-ip').textContent = `Los padres, conectados al Wi-Fi de la escuela, abren ${c.direccion_padres} (o ${publica}, que los manda ahí).`;
+  });
+  $('cerebro-guardar').onclick = async () => {
+    const c = await trabajar('Probando el cerebro…', () => motor.guardarConfiguracion({ cerebro_url: $('cerebro-url').value, cerebro_clave: $('cerebro-clave').value }));
+    if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? 'Conectado.' : 'No respondió: ' + (c.problema || '');
+  };
+}
+
+(async () => {
+  $('mensaje').textContent = SIDP.modo === 'demo' ? 'Preparando la demostración (la primera vez tarda unos segundos)…' : 'Cargando…';
+  try {
+    await motor.listo;
+    await refrescar();
+    if (SIDP.modo === 'demo') await trabajar('Revisando los expedientes de ejemplo…', () => motor.revisarTodo());
+    $('mensaje').textContent = 'Listo.';
+  } catch (error) {
+    $('mensaje').textContent = 'Error: ' + error.message;
+  }
+})();
+</script>
+</body>
+</html>
