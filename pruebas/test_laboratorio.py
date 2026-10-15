@@ -14,6 +14,10 @@ HOY = datetime.date(2026, 10, 14)
     ('JORGE SALINAS PEÑA', 'LAURA VEGA MORA', 'nombre', 'distinto'),
     ('Av. Juárez 12, Col. Centro', 'AVENIDA JUAREZ NUM 12 CENTRO', 'domicilio', 'igual'),
     ('Calle Olmo 8, San Mateo', 'CALLE OLMO 18 SAN MATEO', 'domicilio', 'distinto'),
+    ('Calle Cedro 11, Col. La Joya', 'CALLE CEDRO 11 COL LA LOMA', 'domicilio', 'gris'),
+    ('Calle Hidalgo 45, Toluca', 'HIDALGO NUM 45 TOLUCA MEX', 'domicilio', 'igual'),
+    ('GERARDO IBARRA SOLIS', 'GERARDO YBARRA SOLIS', 'nombre', 'gris'),
+    ('JUAN CARLOS LOPEZ', 'JUAN CARLOS LOPEZ HERNANDEZ', 'nombre', 'gris'),
 ])
 def test_comparar(a, b, tipo, resultado):
     assert comparador.comparar(a, b, tipo)[0] == resultado
@@ -30,6 +34,11 @@ def test_fichas_de_prueba_con_procesos():
     datos = json.loads((correr.AQUI / 'fichas.json').read_text(encoding='utf-8'))
     filas = correr.correr(datos['fichas'], HOY, False, modelo.MODELO, modelo.URL, 1)
     assert [f['id'] for f in filas if not f['reglas_ok']] == []
+
+
+def test_pares_de_prueba_quedan_en_zona_gris():
+    pares = json.loads((correr.AQUI / 'pares.json').read_text(encoding='utf-8'))['pares']
+    assert [f['id'] for f in correr.correr_pares(pares, False, modelo.MODELO, modelo.URL, 1) if f['proceso'] != 'gris'] == []
 
 
 def test_texto_con_ordenes_se_reporta():

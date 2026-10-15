@@ -3,6 +3,7 @@
 Uso, desde la raíz del repositorio:
     python -m cerebro.laboratorio.correr               # procesos y modelo
     python -m cerebro.laboratorio.correr --sin-modelo  # solo procesos, sin guardar informe
+    python -m cerebro.laboratorio.correr --pares --modelo sidp-revisor-2  # solo la zona gris
 """
 import argparse
 import datetime
@@ -49,6 +50,35 @@ def correr(fichas, hoy, usar_modelo, nombre_modelo, url, vueltas):
     return filas
 
 
+def correr_pares(pares, usar_modelo, nombre_modelo, url, vueltas):
+    filas = []
+    for par in pares:
+        proceso = comparador.comparar(par['a'], par['b'], par['tipo'])[0]
+        opiniones = [modelo.opinar(par, nombre_modelo, url) for _ in range(vueltas)] if usar_modelo and proceso == 'gris' else []
+        filas.append({**par, 'proceso': proceso, 'opiniones': opiniones,
+                      'aciertos': sum(o['misma'] in par['esperado'] for o in opiniones),
+                      'peligrosas': sum(o['misma'] == 'si' and 'si' not in par['esperado'] for o in opiniones)})
+    return filas
+
+
+def informe_pares(filas, entorno):
+    opiniones = [o for f in filas for o in f['opiniones']]
+    lineas = ['# Resultados del laboratorio: zona gris', '']
+    lineas += [f'- {clave}: {valor}' for clave, valor in entorno.items()] + ['', '## Resumen', '',
+               f'- Pares en zona gris según los procesos: {sum(f["proceso"] == "gris" for f in filas)} de {len(filas)}.',
+               f'- Opiniones acertadas: {sum(f["aciertos"] for f in filas)} de {len(opiniones)}; '
+               f'{sum(f["peligrosas"] for f in filas)} dijeron "si" cuando era "no".']
+    if opiniones:
+        segundos = [o['segundos'] for o in opiniones]
+        lineas.append(f'- Tiempo por opinión: promedio {statistics.mean(segundos):.1f} s, máximo {max(segundos):.1f} s.')
+    lineas += ['', '## Pares', '', '| Par | Tipo | Texto A | Texto B | Esperado | Opiniones |', '|---|---|---|---|---|---|']
+    for f in filas:
+        opiniones_par = ', '.join(o['misma'] for o in f['opiniones']) or f'sin modelo (proceso: {f["proceso"]})'
+        lineas.append(f'| {f["id"]} | {f["tipo"]} | {f["a"]} | {f["b"]} | {"/".join(f["esperado"])} | {opiniones_par} |')
+    lineas += ['', '## Detalle', '', '```json', json.dumps(filas, ensure_ascii=False, indent=1), '```', '']
+    return '\n'.join(lineas)
+
+
 def informe(filas, entorno):
     lineas = ['# Resultados del laboratorio del cerebro', '']
     lineas += [f'- {clave}: {valor}' for clave, valor in entorno.items()] + ['']
@@ -79,17 +109,28 @@ def main(argumentos=None):
     parser.add_argument('--url', default=modelo.URL)
     parser.add_argument('--vueltas', type=int, default=3)
     parser.add_argument('--fichas', type=Path, default=AQUI / 'fichas.json')
+    parser.add_argument('--pares', action='store_true', help='Probar solo los pares de zona gris de pares.json')
     parser.add_argument('--salida', type=Path, default=AQUI / 'resultados')
     args = parser.parse_args(argumentos)
 
-    datos = json.loads(args.fichas.read_text(encoding='utf-8'))
-    hoy = datetime.date.fromisoformat(datos['hoy'])
-    filas = correr(datos['fichas'], hoy, not args.sin_modelo, args.modelo, args.url, args.vueltas)
     ahora = datetime.datetime.now()
     entorno = {'Fecha': ahora.strftime('%Y-%m-%d %H:%M'), 'Equipo': platform.node(), 'Sistema': platform.platform(),
                'Procesador': platform.processor() or '?', 'Python': platform.python_version(),
                'Modelo': 'sin modelo' if args.sin_modelo else args.modelo,
                'Ollama': 'no se usó' if args.sin_modelo else version_ollama(args.url)}
+    if args.pares:
+        pares = json.loads((AQUI / 'pares.json').read_text(encoding='utf-8'))['pares']
+        texto = informe_pares(correr_pares(pares, not args.sin_modelo, args.modelo, args.url, args.vueltas), entorno)
+        print(texto.split('## Detalle')[0])
+        if not args.sin_modelo:
+            args.salida.mkdir(parents=True, exist_ok=True)
+            archivo = args.salida / f'{ahora:%Y-%m-%d_%H%M}_{args.modelo.replace(":", "-")}_pares.md'
+            archivo.write_text(texto, encoding='utf-8')
+            print(f'Guardado en {archivo}')
+        return 0
+    datos = json.loads(args.fichas.read_text(encoding='utf-8'))
+    hoy = datetime.date.fromisoformat(datos['hoy'])
+    filas = correr(datos['fichas'], hoy, not args.sin_modelo, args.modelo, args.url, args.vueltas)
     if args.sin_modelo:  # Comprobación rápida: no deja informe.
         print(informe(filas, entorno).split('## Detalle')[0])
         return 0 if all(f['reglas_ok'] for f in filas) else 1

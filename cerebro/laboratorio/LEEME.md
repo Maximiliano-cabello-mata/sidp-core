@@ -24,7 +24,9 @@ La primera prueba (2026-10-14) mostró que `llama3.1` revisando la ficha complet
 | `comparador.py` | Los procesos fijos |
 | `modelo.py` | La llamada a Ollama en `127.0.0.1:11434` |
 | `Modelfile` | Crea el modelo `sidp-revisor` a partir de `llama3.1:latest`, sin descargar nada |
+| `Modelfile.2` | Crea `sidp-revisor-2`: las mismas reglas, más precisas y con ejemplos |
 | `fichas.json` | Fichas inventadas con el resultado esperado |
+| `pares.json` | 18 pares de nombres y domicilios en zona gris, con la respuesta aceptable |
 | `correr.py` | Corre las fichas y guarda el informe en `resultados/` |
 | `BUZON.md` | Tareas de Claude para el agente de la PC 4 |
 | `resultados/` | Lo que el agente sube |
@@ -35,9 +37,10 @@ El canal es este repositorio, en la rama `claude/project-thread-vp6ab8`:
 
 1. Claude escribe una tarea nueva en `BUZON.md` y la sube.
 2. El agente actualiza la rama, hace la tarea y deja el informe en `resultados/`.
-3. El agente sube solo ese informe. Claude recibe el aviso del cambio y lo lee.
+3. El agente sube solo ese informe y le avisa a Maximiliano.
+4. Maximiliano le escribe a Claude en el hilo de SIDP ("ya subió") y Claude lee el informe de la rama.
 
-La rama tiene un PR abierto, "Laboratorio del cerebro", que sirve de canal: cada vez que el agente sube algo, a Claude le llega el aviso. Ese PR no se fusiona hasta que Maximiliano lo pida.
+La primera vez que el agente sube desde una PC, configura su nombre y correo de Git solo para este repositorio (`git config user.name` y `git config user.email`).
 
 Reglas para el agente:
 

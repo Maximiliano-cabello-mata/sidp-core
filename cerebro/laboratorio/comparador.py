@@ -21,9 +21,11 @@ ABREVIATURAS = {
 RELLENO_DOMICILIO = {'COL', 'COLONIA', 'NUM', 'NO', 'NUMERO', 'N', 'DE', 'LA', 'EL', 'MZ', 'LT'}
 SOSPECHOSO = re.compile(r'IGNORA|INSTRUCCION|RESPONDE|ERES UN|SYSTEM|PROMPT|APRUEBA', re.I)
 
-# Umbrales de parecido (0 a 1). Iguales tras normalizar: coincide.
+# Palabras que pueden sobrar en un domicilio sin cambiarlo.
+SOBRANTES_DOMICILIO = {'CALLE', 'MEX', 'MEXICO', 'EDO', 'ESTADO'}
+
+# Parecido mínimo (0 a 1) para zona gris; debajo, es distinto.
 NOMBRE_GRIS = 0.80
-DOMICILIO_IGUAL = 0.92
 DOMICILIO_GRIS = 0.70
 
 
@@ -37,8 +39,8 @@ def normalizar(texto, tipo='nombre'):
 
 
 def parecido(a, b):
-    a, b = ' '.join(sorted(a.split())), ' '.join(sorted(b.split()))
-    return difflib.SequenceMatcher(None, a, b).ratio()
+    ordenados = ' '.join(sorted(a.split())), ' '.join(sorted(b.split()))
+    return max(difflib.SequenceMatcher(None, a, b).ratio(), difflib.SequenceMatcher(None, *ordenados).ratio())
 
 
 def comparar(a, b, tipo):
@@ -48,11 +50,12 @@ def comparar(a, b, tipo):
         return 'distinto', parecido(na, nb)  # Otro número de casa es otro domicilio.
     if na == nb:
         return 'igual', 1.0
-    valor = parecido(na, nb)
-    igual, gris = (1.01, NOMBRE_GRIS) if tipo == 'nombre' else (DOMICILIO_IGUAL, DOMICILIO_GRIS)
-    if valor >= igual:
+    valor, pa, pb = parecido(na, nb), set(na.split()), set(nb.split())
+    if tipo == 'domicilio' and pa ^ pb <= SOBRANTES_DOMICILIO:
         return 'igual', valor
-    return ('gris' if valor >= gris else 'distinto'), valor
+    if tipo == 'nombre' and (pa <= pb or pb <= pa):
+        return 'gris', valor  # Falta un nombre o apellido: lo decide una persona.
+    return ('gris' if valor >= (NOMBRE_GRIS if tipo == 'nombre' else DOMICILIO_GRIS) else 'distinto'), valor
 
 
 def digito_curp(curp):
