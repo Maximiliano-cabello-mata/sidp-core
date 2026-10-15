@@ -37,6 +37,8 @@ El canal es este repositorio, en la rama `claude/project-thread-vp6ab8`:
 2. El agente actualiza la rama, hace la tarea y deja el informe en `resultados/`.
 3. El agente sube solo ese informe. Claude recibe el aviso del cambio y lo lee.
 
+La rama tiene un PR abierto, "Laboratorio del cerebro", que sirve de canal: cada vez que el agente sube algo, a Claude le llega el aviso. Ese PR no se fusiona hasta que Maximiliano lo pida.
+
 Reglas para el agente:
 
 1. Solo agrega archivos en `cerebro/laboratorio/resultados/`. No cambia ningún otro archivo.
