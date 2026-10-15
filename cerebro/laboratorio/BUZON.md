@@ -212,3 +212,22 @@ inventadas, los avisos de "no parece" bajaron de 8 a 0. Esta tarea lo instala y 
    git push origin claude/project-thread-vp6ab8
    ```
 8. Avísale a Maximiliano que ya se subió y que el cerebro quedó encendido con el lector nuevo.
+
+## Tarea 007: el cerebro lee los escaneos del día de escaneo (2026-10-15)
+
+El Validador ahora tiene un cuadro "Escanear expediente (ya revisado en papel)". Los escaneos son PDF de
+pura imagen: los lee la PC 4 con Tesseract por la ruta nueva `/leer` del cerebro. Esta tarea solo actualiza
+y reinicia; no hay que medir ni subir nada.
+
+1. Actualiza la rama:
+   ```
+   git checkout claude/project-thread-vp6ab8
+   git pull
+   ```
+2. Reinicia el cerebro: cierra su ventana y abre otra vez `validacion\iniciar_cerebro.bat`. La clave y la
+   dirección no cambian.
+3. Comprueba que responde (debe decir `"ok": true`):
+   ```
+   curl.exe http://127.0.0.1:8771/salud
+   ```
+4. Avísale a Maximiliano que el cerebro quedó encendido con el código del día de escaneo.
