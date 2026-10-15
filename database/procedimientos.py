@@ -431,6 +431,37 @@ def sp_validar_curp_renapo(db, alumno_id, archivo_sha256, resultado, actor, vers
     return documento_id
 
 
+def sp_pasar_lista(db, grupo_id, fecha, marcas, actor, *, ahora=None):
+    """Asistencia de un grupo en una fecha. marcas: {inscripcion_id: 'presente'|'falta'|'retardo'|'justificada'}.
+
+    Volver a pasar lista el mismo día cambia la marca y deja el valor anterior en la bitácora.
+    """
+    momento = _ahora(ahora)
+    try:
+        datetime.date.fromisoformat(fecha)
+    except (TypeError, ValueError) as error:
+        raise ProcedimientoError('La fecha debe tener la forma AAAA-MM-DD.') from error
+    with _transaccion(db):
+        _persona(db, actor)
+        inscritas = {i for (i,) in db.execute("SELECT id FROM inscripcion WHERE grupo_id = ? AND estado IN ('incompleta','completa')",
+                                              (grupo_id,))}
+        for inscripcion_id, estado in marcas.items():
+            _opcion(estado, ('presente', 'falta', 'retardo', 'justificada'), 'Asistencia')
+            if inscripcion_id not in inscritas:
+                raise ProcedimientoError('Un alumno de la lista no está inscrito en este grupo.')
+            actual = _uno(db, 'SELECT estado FROM asistencia_alumno WHERE inscripcion_id = ? AND fecha = ?', (inscripcion_id, fecha))
+            if actual is None:
+                db.execute('INSERT INTO asistencia_alumno(inscripcion_id, fecha, estado, capturo) VALUES(?,?,?,?)',
+                           (inscripcion_id, fecha, estado, actor))
+            elif actual['estado'] != estado:
+                db.execute('UPDATE asistencia_alumno SET estado = ?, capturo = ?, version = version + 1 '
+                           'WHERE inscripcion_id = ? AND fecha = ?', (estado, actor, inscripcion_id, fecha))
+            else:
+                continue
+            _anotar(db, momento, actor, 'asistencia.capturada', 'inscripcion', inscripcion_id, actual,
+                    {'fecha': fecha, 'estado': estado})
+
+
 def sp_capturar_calificacion(db, inscripcion_id, periodo_id, campo, valor, actor, version=None, observaciones=None,
                              *, ahora=None):
     """Captura o cambia la calificación de un campo formativo en un periodo abierto."""

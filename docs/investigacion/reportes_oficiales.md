@@ -60,11 +60,11 @@ No se encontraron plantillas oficiales de Excel para importar datos: todo se cap
 | CCT de la escuela | **No** | Una fila de datos de la escuela |
 | Nuevo ingreso o repetidor | Parcial | `inscripcion.tipo` tiene nuevo ingreso; falta "repite el grado" |
 | Promovido al cerrar el ciclo | **No** | Resultado de fin de ciclo por inscripción |
-| Discapacidad, BAP, aptitudes | Parcial | Hoy es texto libre; el 911 pide tipos fijos |
+| Discapacidad, BAP, aptitudes | Parcial | Hoy es texto libre (`alumno_salud.condiciones`); el 911 pide tipos fijos |
 | Lengua indígena, nacido fuera, afrodescendiente | **No** | Tres campos del alumno |
 | Personal: sexo, nivel de estudios, función | Parcial | `personal.puesto` existe; faltan sexo y nivel de estudios |
 | Aulas, libros, becas | **No** | Datos de la escuela por ciclo |
-| Observaciones por campo formativo | Parcial | Hay observaciones por calificación; revisar que sea por campo |
+| Observaciones por campo formativo | Sí | `calificacion.observaciones` (una por campo y periodo) |
 | Carta compromiso | Sí, ya | Se agrega como plantilla |
 | Folio SAID, escuela de origen y destino | **No** | Campos de la inscripción y del traslado |
 
