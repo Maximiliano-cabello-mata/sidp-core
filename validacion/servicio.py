@@ -389,8 +389,15 @@ class Bandeja:
         Un PDF puede traer varios grupos (el formato EIA de la SEP trae toda la escuela, una hoja por grupo):
         cada hoja se lee aparte. El grado sale de lo escrito en la hoja o, si hay CURP, de la edad de la mayoría.
         """
-        sin_texto, procesado_en, hojas, por_leer = [], None, [], []
+        sin_texto, procesado_en, hojas, por_leer, de_csv = [], None, [], [], []
         for nombre, contenido in archivos:
+            if nombre.lower().endswith('.csv'):  # Una lista ya revisada (por ejemplo, la que descarga el panel).
+                leidos = extraer.grupos_de_csv(contenido.decode('utf-8-sig', errors='replace'))
+                if not leidos:
+                    raise ErrorBandeja(f'{nombre}: el CSV necesita las columnas Grado, Grupo, Primer apellido, Segundo apellido, Nombre(s) y CURP')
+                de_csv += leidos
+                procesado_en = procesado_en or 'esta PC'
+                continue
             textos = texto_por_hoja(contenido) if nombre.lower().endswith('.pdf') else None
             if textos and sum(len(t.strip()) for t in textos) >= lector.MINIMO_TEXTO:
                 hojas += [(f'{nombre} · hoja {numero}', t) for numero, t in enumerate(textos, 1)]
@@ -403,9 +410,9 @@ class Bandeja:
             hojas += [(l.get('nombre') or 'escaneo', l['texto']) for l in lecturas]
         if str(texto or '').strip():
             hojas.append(('escrita', texto))
-        if not hojas:
+        if not hojas and not de_csv:
             raise ErrorBandeja('Sube la lista escaneada o escribe los nombres, uno por renglón')
-        grupos = extraer.grupos_de_hojas(hojas, int(ciclo_de(self.hoy)[0][:4]), apellidos_primero)
+        grupos = de_csv + (extraer.grupos_de_hojas(hojas, int(ciclo_de(self.hoy)[0][:4]), apellidos_primero) if hojas else [])
         if not grupos:
             raise ErrorBandeja('No se encontraron nombres de alumnos. Revisa que sea la lista del grupo o escribe los nombres.')
         primero = grupos[0]

@@ -162,6 +162,13 @@ def test_la_lista_oficial_se_carga_una_sola_vez(base, capsys):
     assert not any(texto in salida for texto in ('GARCIA', 'JUAN', CURP_JUAN[:10]))
 
 
+def test_la_lista_revisada_en_csv_tambien_se_carga(base):
+    renglones = ['Grado,Grupo,Primer apellido,Segundo apellido,Nombre(s),CURP']
+    renglones += [f'1,A,{p},{s},{n},{generar.curp(c)}' for p, s, n, c in PRIMERO]
+    resultado = base.importar_lista(('\ufeff' + '\n'.join(renglones)).encode('utf-8'), CICLO, es_csv=True)
+    assert (resultado['nuevos'], resultado['grupos_leidos']) == (3, [{'grupo': '1° A', 'alumnos': 3, 'dudosos': 0}])
+
+
 def test_la_version_1_pasa_a_la_2_sin_perder_alumnos(base):
     base._consulta('DROP SCHEMA sidp CASCADE')
     base._consulta('CREATE TABLE public.padron_alumno (curp char(18) PRIMARY KEY, primer_apellido text, segundo_apellido text, '

@@ -40,7 +40,8 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
 - **CURP:** `curp_digito`, `curp_valida`, `curp_fecha`. Revisan igual que el código de Python.
 - **Edades:** `edad_al`, `grado_esperado` (6 años cumplidos al 31 de diciembre para 1°) y `ciclo_de`.
 - **Cargas:** `cargar_alumnos` (reconoce al alumno por su CURP o por su nombre idéntico, cambia de grupo y
-  rechaza renglones malos con su motivo) e `importar` (lo mismo, una sola vez por archivo).
+  rechaza renglones malos con su motivo) e `importar` (lo mismo, una sola vez por lista leída; si el lector
+  mejora, el mismo PDF se vuelve a cargar y corrige los nombres de cada CURP).
 - **Búsqueda:** `curp_cercana` (hasta 2 letras distintas), `nombre_cercano` (faltas de ortografía y otro
   orden) y `buscar` (para el panel).
 - **Expediente:** `registrar_documento` (la versión anterior queda reemplazada), `revisar_documento`,

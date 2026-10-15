@@ -10,7 +10,10 @@ escanea los revisa en el panel y guarda. Procesos fijos, sin IA:
   esas letras se encuentra el nombre dentro del texto, esté donde esté en la hoja.
 - Del reverso de la INE se lee la franja con '<' (nombre, nacimiento, sexo y vigencia).
 """
+import csv
 import datetime
+import io
+import itertools
 import re
 
 from validacion import comparador, mrz, renapo
@@ -335,6 +338,34 @@ def grado_por_edad(curps_grupo, inicio_ciclo):
     return grado if 1 <= grado <= 6 else None
 
 
+COLUMNAS_CSV = {'grado': 'grado', 'grupo': 'letra', 'letra': 'letra', 'primer apellido': 'primer_apellido',
+                'segundo apellido': 'segundo_apellido', 'nombre(s)': 'nombres', 'nombres': 'nombres', 'nombre': 'nombres', 'curp': 'curp'}
+
+
+def grupos_de_csv(texto):
+    """Una lista ya revisada en CSV (la misma forma que descarga el panel): Grado, Grupo, Primer apellido,
+    Segundo apellido, Nombre(s) y CURP. Devuelve los grupos como grupos_de_hojas; [] si no tiene esas columnas."""
+    filas = [f for f in csv.reader(io.StringIO(texto.lstrip('\ufeff'))) if any(c.strip() for c in f)]
+    if not filas:
+        return []
+    campos = [COLUMNAS_CSV.get(c.strip().lower()) for c in filas[0]]
+    if not {'grado', 'letra', 'primer_apellido', 'nombres'} <= set(campos):
+        return []
+    grupos = {}
+    for fila in filas[1:]:
+        datos = {campo: fila[i].strip().lstrip("'") for i, campo in enumerate(campos) if campo and i < len(fila)}
+        grado = int(re.sub(r'\D', '', datos.get('grado', '')) or 0) or None
+        letra = datos.get('letra', '').upper()[:1] or None
+        curp = re.sub(r'[^A-Z0-9]', '', mayusculas(datos.get('curp', '')))
+        desglose = comparador.desglose_curp(curp)
+        grupo = grupos.setdefault((grado, letra), {'grado': grado, 'letra': letra, 'filas': [], 'hojas': ['CSV'],
+                                                   'letra_supuesta': letra is None})
+        grupo['filas'].append({'nombres': datos.get('nombres', '').upper(), 'primer_apellido': datos.get('primer_apellido', '').upper(),
+                               'segundo_apellido': datos.get('segundo_apellido', '').upper(), 'curp': curp,
+                               'dudoso': bool(curp) and not (desglose and desglose['digito_valido'])})
+    return sorted(grupos.values(), key=lambda g: (g['grado'] or 9, g['letra'] or 'Z'))
+
+
 def grupos_de_hojas(hojas, inicio_ciclo, apellidos_primero=True):
     """Hojas [(nombre, texto)] de una o varias listas -> grupos [{grado, letra, filas, hojas, letra_supuesta}].
 
@@ -369,6 +400,115 @@ def grupos_de_hojas(hojas, inicio_ciclo, apellidos_primero=True):
     return grupos
 
 
+# Nombres frecuentes: sirven para separar dos nombres que la lista trae pegados ("IKERDANIEL").
+NOMBRES_CONOCIDOS = frozenset("""
+AARON ABEL ABIGAIL ABRIL ADRIAN ADRIANA AIDA ALAN ALBERTO ALDO ALEJANDRA ALEJANDRO ALEXA ALEXANDER ALEXIS ALFREDO ALICIA
+ALISSON ALONDRA ALONSO AMANDA AMAURY ANA ANDREA ANDRES ANGEL ANGELA ANTONIO ARIADNA ARIANA ARLETH ARTURO AXEL BENJAMIN BRENDA
+BRUNO CAMILA CARLOS CAROLINA CESAR CRISTIAN DANIEL DANIELA DANNA DAVID DIANA DIEGO DYLAN EDUARDO ELENA ELIZABETH EMILIA
+EMILIANO EMILIO EMILY EMMANUEL ENRIQUE ERICK ERIKA ESTEBAN FATIMA FERNANDA FERNANDO FRANCISCO FRIDA GABRIEL GABRIELA GAEL
+GERARDO GUADALUPE HECTOR HUGO IAN IKER IRVING ISAAC ISABEL ISABELLA ISMAEL ITZEL IVAN JAVIER JESUS JIMENA JONATHAN JORGE
+JOSE JOSUE JUAN JULIO KARLA KEVIN LAURA LEONARDO LIA LIAM LUCIA LUIS LUNA MANUEL MARIA MARIANA MARIO MATEO MATIAS
+MAXIMILIANO MELANIE MIGUEL MISAEL MONSERRAT NAHOMI NAOMI NATALIA NICOLAS NICOLE OSCAR PABLO PAOLA PATRICIA PAULINA PEDRO
+RAFAEL RAUL REGINA RENATA RICARDO ROBERTO RODRIGO ROMINA ROSA RUBI SAMANTHA SANTIAGO SARA SEBASTIAN SERGIO SOFIA TADEO
+VALENTINA VALERIA VANESSA VICTOR XAVIER XIMENA YAEL YAMILETH YARETZI ZOE""".split())
+# Apellidos frecuentes: deciden entre dos cortes que cuadran con la CURP ("RIVERAARIZA" -> RIVERA ARIZA, no RIVER AARIZA).
+APELLIDOS_CONOCIDOS = frozenset("""
+AGUILAR ALVAREZ ARIZA CASTILLO CASTRO CHAVEZ CONTRERAS CRUZ DIAZ DOMINGUEZ ESPINOSA ESPINOZA FERNANDEZ FLORES GARCIA GOMEZ
+GONZALEZ GUTIERREZ GUZMAN HERNANDEZ HERRERA JIMENEZ JUAREZ LOPEZ MALDONADO MARTINEZ MEDINA MENDOZA MORALES MORENO MUÑOZ
+ORTIZ PEREZ RAMIREZ RAMOS REYES RIVERA RODRIGUEZ ROJAS ROMERO RUIZ SALAZAR SANCHEZ SANTIAGO TORRES VARGAS VAZQUEZ""".split())
+
+
+def mayusculas_con_enie(texto):
+    """Como mayusculas(), pero la Ñ se queda (en los nombres sí importa; en la CURP se escribe X)."""
+    return 'Ñ'.join(mayusculas(pedazo) for pedazo in (texto or '').replace('ñ', 'Ñ').split('Ñ'))
+
+
+def _clave_curp(palabras, nombre=False):
+    """Cuál palabra da sus letras a la CURP: sin partículas (DE LA) y, en el nombre, sin MARIA o JOSE si hay otro."""
+    utiles = [i for i, p in enumerate(palabras) if p not in PARTICULAS] or list(range(len(palabras)))
+    if nombre and len(utiles) > 1 and palabras[utiles[0]] in NOMBRES_COMUNES:
+        utiles = utiles[1:]
+    return utiles[0]
+
+
+def _letras_curp(palabras, nombre=False):
+    return palabras[_clave_curp(palabras, nombre)].replace('Ñ', 'X')
+
+
+def _consonante(palabra, letra_curp):
+    """La consonante interna; una N donde la CURP dice X era una Ñ que la lista perdió (ZUNIGA -> ZUÑIGA)."""
+    letra = _interna(palabra, False)
+    return 'X' if letra == 'N' and letra_curp == 'X' else letra
+
+
+def _poner_enie(palabras, letra_curp, nombre=False):
+    """Devuelve la Ñ a la palabra que da sus letras a la CURP, si la CURP dice que la tenía."""
+    if not palabras:
+        return palabras
+    i = _clave_curp(palabras, nombre)
+    palabra = palabras[i]
+    if letra_curp == 'X' and _interna(palabra, False) == 'N':
+        n = next(j for j, letra in enumerate(palabra) if j and letra not in VOCALES)
+        palabras = palabras[:i] + [palabra[:n] + 'Ñ' + palabra[n + 1:]] + palabras[i + 1:]
+    return palabras
+
+
+def _cuadra_curp(curp, primero, segundo, nombres):
+    a1, nombre = _letras_curp(primero), _letras_curp(nombres, True)
+    a2 = _letras_curp(segundo) if segundo else None
+    return (a1[0] == curp[0] and curp[1] in (_interna(a1, True), 'X') and (a2[0] if a2 else 'X') == curp[2] and nombre[0] == curp[3]
+            and _consonante(a1, curp[13]) == curp[13] and (_consonante(a2, curp[14]) if a2 else 'X') == curp[14]
+            and _consonante(nombre, curp[15]) == curp[15])
+
+
+def separar_con_curp(palabras, curp, conocidas=frozenset()):
+    """Acomoda apellidos y nombres con las letras de la CURP, aunque la lista traiga palabras pegadas.
+
+    "DIAZGARCIA FRANCO PAOLO" con DIGF... -> DIAZ, GARCIA, FRANCO PAOLO. Se prueba partir hasta dos palabras;
+    gana la opción con menos cortes y con pedazos que son palabras conocidas. None si nada cuadra; si dos
+    acomodos distintos empatan, el renglón queda como duda.
+    """
+    conocidas = conocidas | NOMBRES_CONOCIDOS | APELLIDOS_CONOCIDOS | PARTICULAS
+    opciones = []
+    for cortes in range(3):
+        for elegidas in itertools.combinations(range(len(palabras)), cortes):
+            pedazos = [[p] if i not in elegidas else None for i, p in enumerate(palabras)]
+            for posiciones in itertools.product(*[range(2, len(palabras[i]) - 1) for i in elegidas]):
+                for i, posicion in zip(elegidas, posiciones):
+                    pedazos[i] = [palabras[i][:posicion], palabras[i][posicion:]]
+                lista = [w for pedazo in pedazos for w in pedazo]
+                nuevas = [w for i in elegidas for w in pedazos[i]]
+                for a, b in itertools.combinations(range(1, len(lista)), 2):
+                    primero, segundo, nombres = lista[:a], lista[a:b], lista[b:]
+                    if primero[-1] in PARTICULAS or segundo[-1] in PARTICULAS or nombres[0] in PARTICULAS - {'DE', 'DEL'}:
+                        continue
+                    if _cuadra_curp(curp, primero, segundo, nombres):
+                        opciones.append(((cortes, sum(w not in conocidas for w in nuevas), len(primero) + len(segundo)),
+                                         ' '.join(_poner_enie(primero, curp[13])), ' '.join(_poner_enie(segundo, curp[14])),
+                                         ' '.join(_poner_enie(nombres, curp[15], True))))
+        if opciones:
+            break  # Con menos cortes ya cuadra: no se parte más.
+    if not opciones:
+        return None
+    opciones.sort()
+    empate = len(opciones) > 1 and opciones[1][0] == opciones[0][0] and opciones[1][1:] != opciones[0][1:]
+    _, primero, segundo, nombres = opciones[0]
+    return {'primer_apellido': primero, 'segundo_apellido': segundo, 'nombres': separar_nombres(nombres, conocidas), 'dudoso': empate}
+
+
+def separar_nombres(nombres, conocidas=frozenset()):
+    """Dos nombres pegados se separan si los dos pedazos son nombres conocidos (IKERDANIEL -> IKER DANIEL), o si
+    termina en un nombre conocido largo y lo de antes también parece un nombre (CITLALLINAHOMI -> CITLALLI NAHOMI)."""
+    conocidas = conocidas | NOMBRES_CONOCIDOS
+    salida = []
+    for palabra in nombres.split():
+        cortes = [(palabra[:i], palabra[i:]) for i in range(2, len(palabra) - 1)
+                  if palabra not in conocidas and palabra[i:] in conocidas
+                  and (palabra[:i] in conocidas or palabra[:i] in ('DE', 'DEL') or (i >= 4 and len(palabra) - i >= 6))]
+        salida += list(cortes[0]) if len(cortes) == 1 else [palabra]
+    return ' '.join(salida)
+
+
 def lista_de_grupo(texto, apellidos_primero=True):
     """Los alumnos de una lista de grupo, un renglón por alumno: [{nombres, primer_apellido, segundo_apellido, curp, dudoso}].
 
@@ -376,21 +516,28 @@ def lista_de_grupo(texto, apellidos_primero=True):
     si no, se usa el orden de la lista (casi siempre apellidos primero, como en las listas de la SEP).
     """
     filas = []
-    for linea in mayusculas(texto).splitlines():
+    texto = mayusculas_con_enie(texto)
+    repetidas = re.findall(r'[A-ZÑ]{3,}', texto)
+    conocidas = frozenset(p for p in set(repetidas) if repetidas.count(p) >= 2)  # Las que aparecen sueltas más de una vez.
+    for linea in texto.splitlines():
         curp = next(iter(curps(linea)), None)
         # Una CURP mal leída (dígito verificador que no cuadra) se propone, pero como duda.
         dudosa = None if curp else next(iter(curps(linea, exigir_digito=False)), None)
         # Las palabras con números (una CURP rota, una fecha) no son parte del nombre.
         limpia = ' '.join(p for p in linea.replace(curp or '\0', ' ').split() if not re.search(r'[A-Z]\d|\d[A-Z]', p))
-        palabras = [p for p in re.sub(r'[^A-Z]+', ' ', limpia).split()]
+        palabras = [p for p in re.sub(r'[^A-ZÑ]+', ' ', limpia).split()]
         palabras = [p for p in palabras if len(p) > 1 or p == 'Y']
         if not palabras or sum(p in ENCABEZADOS for p in palabras) >= max(1, len(palabras) // 2):
             continue
         if len(palabras) < 2 or len(palabras) > 7:
             continue
         persona = nombre_por_curp(' '.join(palabras), curp) if curp else None
-        if persona:
-            filas.append({**persona, 'curp': curp, 'dudoso': False})
+        if persona and set(' '.join(persona.values()).split()) == set(palabras):  # Sin dejar palabras fuera.
+            filas.append({**persona, 'nombres': separar_nombres(persona['nombres'], conocidas), 'curp': curp, 'dudoso': False})
+            continue
+        acomodo = separar_con_curp(palabras, curp, conocidas) if curp and len(palabras) <= 7 else None
+        if acomodo:
+            filas.append({**acomodo, 'curp': curp})
             continue
         if apellidos_primero:
             primero = (_apellido(palabras, 0) or ([palabras[0]], palabras[0], 1))[0]

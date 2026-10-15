@@ -11,7 +11,7 @@ from pruebas.test_entorno_pruebas import entorno, formulario, pedir  # noqa: F40
 from validacion import servicio
 from validacion.ejemplo import generar
 from validacion.expediente import mayusculas
-from validacion.extraer import curps, grado_por_edad
+from validacion.extraer import curps, grado_por_edad, lista_de_grupo
 
 pypdf = pytest.importorskip('pypdf')
 
@@ -103,3 +103,32 @@ def test_sin_curp_el_nombre_propone_al_alumno_solo_si_no_hay_empate():
     propuesta = {'alumno': {}, 'avisos': []}
     servicio.con_padron(propuesta, [{'tipo': 'acta_alumno', 'sugerencias': [juan, hermano]}])
     assert propuesta == {'alumno': {}, 'avisos': []}
+
+
+def test_la_lista_revisada_en_csv_trae_sus_grupos(entorno):  # noqa: F811
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    renglones = ['Grado,Grupo,Primer apellido,Segundo apellido,Nombre(s),CURP']
+    renglones += [f'1,A,{p},{s},{n},{generar.curp(c)}' for p, s, n, c in PRIMERO]
+    renglones += [f'2,B,{p},{s},{n},{generar.curp(c)}' for p, s, n, c in SEGUNDO]
+    contenido = ('﻿' + '\n'.join(renglones)).encode('utf-8')
+    cuerpo, tipo = formulario({}, [('archivo', 'alumnos.csv', contenido)])
+    codigo, leida = pedir(url, '/api/listas/leer', cuerpo, token, tipo=tipo)
+    assert codigo == 200, leida
+    assert [(g['grado'], g['letra'], len(g['filas'])) for g in leida['grupos']] == [(1, 'A', 3), (2, 'B', 4)]
+    assert not any(f['dudoso'] for g in leida['grupos'] for f in g['filas'])
+    cuerpo, tipo = formulario({}, [('archivo', 'otra.csv', b'nombre,edad\nLUIS,7')])
+    codigo, respuesta = pedir(url, '/api/listas/leer', cuerpo, token, tipo=tipo)
+    assert codigo == 400 and 'columnas' in respuesta['error']
+
+
+def test_las_palabras_pegadas_se_separan_con_la_curp_y_la_enie_se_queda():
+    # Así llegan algunos renglones del PDF oficial: palabras pegadas y una Ñ perdida (ZUNIGA).
+    renglones = [('DIAZGARCIA FRANCO PAOLO', 'DIGF200512HMCZRRA'), ('ROJAS VEGA IKERDANIEL', 'ROVI190905HMCJGKA'),
+                 ('MUÑOZ PEREZ LUCIA', 'MUPL180310MMCXRCA'), ('ZUNIGA LOPEZ SOFIA', 'ZULS170101MMCXPFA'),
+                 ('RIVERAARIZA PAOLA', 'RIAP181111MMCVRLA'), ('SOTO CRUZ XOCHITLNAHOMI', 'SOCX190505MMCTRCA')]
+    texto = '\n'.join(f'{generar.curp(c)} {i} {nombre}' for i, (nombre, c) in enumerate(renglones, 1))
+    leidos = [(f['primer_apellido'], f['segundo_apellido'], f['nombres'], f['dudoso']) for f in lista_de_grupo(texto)]
+    assert leidos == [('DIAZ', 'GARCIA', 'FRANCO PAOLO', False), ('ROJAS', 'VEGA', 'IKER DANIEL', False),
+                      ('MUÑOZ', 'PEREZ', 'LUCIA', False), ('ZUÑIGA', 'LOPEZ', 'SOFIA', False),
+                      ('RIVERA', 'ARIZA', 'PAOLA', False), ('SOTO', 'CRUZ', 'XOCHITL NAHOMI', False)]

@@ -15,7 +15,7 @@ Sin PostgreSQL el cerebro funciona igual, solo que sin comparar contra los alumn
 
 En la PC 4, desde la raíz del repositorio:
     python -m validacion.base_cerebro                     # crea o actualiza la base y dice cómo está
-    python -m validacion.base_cerebro cargar LISTA.pdf    # carga la lista oficial de la SEP (toda la escuela)
+    python -m validacion.base_cerebro cargar LISTA.pdf    # carga la lista oficial de la SEP (o la lista revisada .csv)
     python -m validacion.base_cerebro informe             # números del 911, grupos y alertas (sin nombres)
 """
 import argparse
@@ -100,20 +100,24 @@ class BaseCerebro:
         return self._uno('SELECT sidp.cargar_alumnos(CAST(%s AS jsonb), %s, %s, %s)',
                          (json.dumps(list(alumnos), ensure_ascii=False), str(ciclo), origen, actor))
 
-    def importar_lista(self, contenido, ciclo, actor='lista oficial'):
-        """La lista oficial de la SEP (PDF con toda la escuela): la lee aquí y la carga una sola vez."""
-        from validacion.servicio import texto_por_hoja
-        textos = texto_por_hoja(contenido)
-        if not textos:
-            raise ErrorBase('el PDF no tiene texto: debe ser la lista exportada, no un escaneo')
-        grupos = extraer.grupos_de_hojas([(f'hoja {n}', t) for n, t in enumerate(textos, 1)], int(ciclo[:4]))
-        if not grupos or any(g['grado'] is None for g in grupos):
-            raise ErrorBase('no se encontraron los grupos en el PDF')
+    def importar_lista(self, contenido, ciclo, actor='lista oficial', es_csv=False):
+        """La lista oficial de la SEP (PDF con toda la escuela) o una lista revisada en CSV: se carga una sola vez."""
+        if es_csv:
+            grupos = extraer.grupos_de_csv(contenido.decode('utf-8-sig', errors='replace'))
+        else:
+            from validacion.servicio import texto_por_hoja
+            textos = texto_por_hoja(contenido)
+            if not textos:
+                raise ErrorBase('el PDF no tiene texto: debe ser la lista exportada, no un escaneo')
+            grupos = extraer.grupos_de_hojas([(f'hoja {n}', t) for n, t in enumerate(textos, 1)], int(ciclo[:4]))
+        if not grupos or any(g['grado'] is None or g['letra'] is None for g in grupos):
+            raise ErrorBase('no se encontraron los grupos (grado y letra) en el archivo')
         filas = [{**{k: f[k] for k in ('curp', 'primer_apellido', 'segundo_apellido', 'nombres')}, 'grado': g['grado'], 'letra': g['letra']}
                  for g in grupos for f in g['filas']]
+        # La huella es de lo leído, no del archivo: con un lector mejor, el mismo PDF corrige los nombres.
+        leido = json.dumps(filas, ensure_ascii=False, sort_keys=True)
         resultado = self._uno('SELECT sidp.importar(%s, %s, CAST(%s AS jsonb), %s, %s, %s)',
-                              (hashlib.sha256(contenido).hexdigest(), 'lista_oficial', json.dumps(filas, ensure_ascii=False),
-                               ciclo, 'lista_oficial', actor))
+                              (hashlib.sha256(leido.encode()).hexdigest(), 'lista_oficial', leido, ciclo, 'lista_oficial', actor))
         return {**resultado, 'grupos_leidos': [{'grupo': f'{g["grado"]}° {g["letra"]}', 'alumnos': len(g['filas']),
                                                 'dudosos': sum(f['dudoso'] for f in g['filas'])} for g in grupos]}
 
@@ -180,7 +184,7 @@ def _imprimir_resumen(resumen):
 def main(argumentos=None):
     parser = argparse.ArgumentParser(prog='python -m validacion.base_cerebro')
     parser.add_argument('accion', nargs='?', default='estado', choices=('estado', 'cargar', 'informe'))
-    parser.add_argument('archivo', nargs='?', type=Path, help='con "cargar": el PDF de la lista oficial (fuera del repositorio)')
+    parser.add_argument('archivo', nargs='?', type=Path, help='con "cargar": la lista oficial en PDF o la lista revisada en CSV (fuera del repositorio)')
     parser.add_argument('--ciclo', default=ciclo_de(datetime.date.today()), help='por ejemplo 2026-2027')
     parser.add_argument('--base', type=Path, default=ARCHIVO, help='archivo con la dirección de PostgreSQL')
     args = parser.parse_args(argumentos)
@@ -190,10 +194,10 @@ def main(argumentos=None):
         return 1
     if args.accion == 'cargar':
         if not args.archivo or not args.archivo.is_file():
-            print('Falta el PDF: python -m validacion.base_cerebro cargar RUTA\\DE\\LA\\LISTA.pdf')
+            print('Falta la lista: python -m validacion.base_cerebro cargar RUTA\\DE\\LA\\LISTA.pdf (o .csv)')
             return 1
         try:
-            resultado = base.importar_lista(args.archivo.read_bytes(), args.ciclo)
+            resultado = base.importar_lista(args.archivo.read_bytes(), args.ciclo, es_csv=args.archivo.suffix.lower() == '.csv')
         except ErrorBase as error:
             print(f'No se cargó: {error}')
             return 1
