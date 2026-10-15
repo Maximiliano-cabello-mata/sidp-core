@@ -214,6 +214,8 @@ Maximiliano lo revisa.
 ## Y GitHub Pages
 
 La página pública es `https://maximiliano-cabello-mata.github.io/sidp-core/`.
+Para publicarla (una vez): Settings > Pages > Source: **GitHub Actions**, y luego Actions >
+"Página de demostración" > **Run workflow** sobre `main`. Cada cambio a la página se publica igual, a mano.
 
 - Es una **demostración**: corre en el navegador el mismo código de validación, con 10 expedientes
   inventados. También deja subir PDF y los revisa ahí mismo; no los manda a ningún lado.

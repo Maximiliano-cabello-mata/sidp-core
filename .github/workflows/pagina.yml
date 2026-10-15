@@ -1,8 +1,8 @@
 name: Página de demostración
 # Demostración pública de la validación (GitHub Pages): corre en el navegador con expedientes inventados.
+# Se publica a mano (Actions > Página de demostración > Run workflow) después de activar Pages en
+# Settings > Pages > Source: GitHub Actions. Sin ese paso fallaría en cada cambio a main.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

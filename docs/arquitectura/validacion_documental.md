@@ -102,3 +102,15 @@ Sustituido el 2026-10-14 por los pasos de [PLAN.md](../PLAN.md#validación-de-do
 3. Nivel 2 con texto incrustado en PDF y luego OCR.
 4. Nivel 3 asistido con registro de constancia.
 5. Evaluar proveedor oficial de API solo si hay presupuesto y aprobacion.
+
+## Entorno de pruebas (2026-10-15)
+
+Lo construido hasta hoy, en versión de prueba:
+
+- **Lector** (`validacion/lector.py`): texto del PDF; páginas escaneadas a imagen; fotos recortadas, sin perspectiva, sin sombra y giradas; nitidez; QR y códigos de barras; OCR con PaddleOCR si está instalado, si no Tesseract.
+- **Franja de la INE** (`validacion/mrz.py`): nombre, fechas y sexo con dígito verificador. La INE vencida es hallazgo.
+- **Expediente** (`validacion/expediente.py`): lo capturado contra cada documento; tipo de documento por sus textos fijos, con tolerancia a errores del OCR.
+- **SIDP-Validador.exe** (PC del administrador): recibe a los padres, guarda archivos y datos como propuesta y deja autorizar o rechazar.
+- **Cerebro** (PC 4): valida por IP con clave y opina en la zona gris.
+
+Cómo se arma: [ENTORNO_PRUEBAS.md](../guias/ENTORNO_PRUEBAS.md). Resultados y errores: [bitácora del 2026-10-15](../bitacoras/2026-10-15.md).
