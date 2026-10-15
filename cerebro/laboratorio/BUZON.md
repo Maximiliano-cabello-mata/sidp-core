@@ -348,3 +348,61 @@ No hace falta PowerShell de administrador.
    git push origin claude/project-thread-vp6ab8
    ```
 9. Avísale a Maximiliano que la base quedó cargada.
+
+## Tarea 010: base de la PC 4 desde cero con la lista revisada (2026-10-15)
+
+Maximiliano pidió borrar todo lo que tiene la base de la PC 4 y volver a cargar la lista de alumnos ya
+revisada. Esa lista sale del mismo PDF oficial que ya está en `C:\SIDP-datos\lista_oficial.pdf`: con el
+código nuevo se separan los nombres pegados y se respetan las Ñ, y salen los 191 alumnos revisados uno por
+uno. Después, el panel de la PC del administrador trae la lista desde la PC 4 al conectarse al cerebro.
+
+**La lista tiene datos de menores: no se copia al repositorio, no se sube a GitHub y ningún nombre ni CURP
+va en el informe.** Todos los comandos de esta tarea imprimen solo números.
+
+No hace falta PowerShell de administrador.
+
+1. Actualiza la rama:
+   ```
+   git checkout claude/project-thread-vp6ab8
+   git pull
+   ```
+2. Revisa que el PDF siga en su lugar (debe decir `True`):
+   ```
+   Test-Path C:\SIDP-datos\lista_oficial.pdf
+   ```
+3. Borra toda la base. Esto quita alumnos, grupos, lecturas y bitácora, y la deja vacía con el esquema nuevo:
+   ```
+   python -m validacion.base_cerebro borrar --si-borrar-todo
+   ```
+   Debe decir `Base borrada: quedó vacía, con el esquema nuevo.` y luego `... 0 alumnos inscritos ...`.
+4. Carga la lista:
+   ```
+   python -m validacion.base_cerebro cargar C:\SIDP-datos\lista_oficial.pdf --ciclo 2026-2027
+   ```
+   Debe decir: 1° A 34, 2° A 31, 3° A 33, 4° A 32, 5° A 32, 6° A 29; `191 alumnos nuevos`, `191 inscritos`,
+   `0 renglones rechazados`. Si sale otro número, detente y anótalo en el informe.
+5. Saca el informe (solo números):
+   ```
+   python -m validacion.base_cerebro informe
+   ```
+   Debe haber 93 hombres y 98 mujeres en total, y una sola alerta `curp_digito` (una CURP del PDF que la
+   escuela debe confirmar).
+6. Reinicia el cerebro: cierra su ventana y abre otra vez `validacion\iniciar_cerebro.bat`. Debe decir
+   `Base de datos: PostgreSQL 17... con 191 alumnos inscritos`. La clave y la dirección no cambian.
+7. Comprueba que el cerebro entrega la lista al panel. Cambia `CLAVE` por la clave del cerebro (no la
+   escribas en el informe). Solo imprime cuántos alumnos hay por grupo:
+   ```
+   python -c "import json,sys,urllib.request as u; r=u.Request('http://127.0.0.1:8771/alumnos', headers={'X-SIDP-Clave': sys.argv[1]}); d=json.load(u.urlopen(r)); print(d['ciclo'], [(g['grado'], g['letra'], len(g['filas'])) for g in d['grupos']])" CLAVE
+   ```
+   Debe decir `2026-2027 [(1, 'A', 34), (2, 'A', 31), (3, 'A', 33), (4, 'A', 32), (5, 'A', 32), (6, 'A', 29)]`.
+8. Escribe `cerebro\laboratorio\resultados\2026-10-15_lista_pc4.md` con lo que imprimieron los pasos 3 a 7
+   (sin la clave) y cualquier error completo. Antes de subirlo, revisa que no tenga ningún nombre ni CURP.
+   No pongas contraseñas ni la IP.
+9. Sube solo ese archivo:
+   ```
+   git add cerebro/laboratorio/resultados/
+   git commit -m "laboratorio: resultado de la tarea 010"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+10. Avísale a Maximiliano que la lista ya está en la PC 4 y que ya puede abrir el panel.

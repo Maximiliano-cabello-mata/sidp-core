@@ -162,6 +162,7 @@ class Bandeja:
         self.registro = registro  # validacion.registro.Registro: la base con las 39 tablas, si se usa.
         self.cerebro = None  # (url, clave) del cerebro de la PC 4; sin él, los procesos corren aquí.
         self.padron_aviso = None  # Cómo quedó el padrón en la base del cerebro (PostgreSQL de la PC 4).
+        self.traidos_aviso = None  # Cuántos alumnos se trajeron de la PC 4.
         self.resultados = {}
         for identificador in self.expedientes():  # Lo ya revisado sobrevive a cerrar el programa.
             guardado = self.carpeta / 'expedientes' / identificador / 'resultado.json'
@@ -191,8 +192,40 @@ class Bandeja:
         problema = modelo.salud_remota(url, clave)
         self.cerebro = None if problema else (url, clave)
         if self.cerebro:
+            self.traer_alumnos()  # Primero se trae la lista de la PC 4; luego se le manda lo que haya aquí.
             self.enviar_padron()
         return problema
+
+    def traer_alumnos(self):
+        """Los alumnos de la base de la PC 4 entran a las listas de grupo de aquí.
+
+        Si un alumno ya estaba (misma CURP), toma el nombre de la PC 4, con su bitácora; si no, se agrega a su grupo.
+        """
+        if not (self.cerebro and self.grupos):
+            return None
+        try:
+            datos = cerebro_red.alumnos_de_cerebro(*self.cerebro)
+        except Exception as error:
+            detalle = getattr(error, 'code', None) == 503 and 'el cerebro no tiene PostgreSQL todavía' or str(error)
+            self.traidos_aviso = f'No se trajeron los alumnos de la PC 4 ({detalle}).'
+            return self.traidos_aviso
+        agregados = corregidos = 0
+        for grupo in datos.get('grupos', []):
+            try:
+                grupo_id = self.grupos.crear(grupo['grado'], grupo['letra'])
+                filas = self.grupos.revisar_filas(grupo['filas'])
+            except ErrorGrupo:
+                continue
+            for fila in filas:
+                alumno = self.registro.alumno_por(fila['curp'], None) if fila['curp'] else None
+                if alumno:
+                    antes = self.registro.db.execute('SELECT version FROM alumno WHERE id = ?', (alumno,)).fetchone()[0]
+                    self.registro.completar_alumno(alumno, fila, 'PC 4')
+                    corregidos += self.registro.db.execute('SELECT version FROM alumno WHERE id = ?', (alumno,)).fetchone()[0] != antes
+            agregados += self.grupos.guardar_lista(grupo_id, filas)['agregados']
+        self.traidos_aviso = (f'De la PC 4: {sum(len(g.get("filas", [])) for g in datos.get("grupos", []))} alumnos '
+                              f'({agregados} nuevos aquí, {corregidos} con el nombre corregido).')
+        return self.traidos_aviso
 
     def enviar_padron(self):
         """Manda los alumnos de las listas a la base del cerebro, para que compare lo que lee contra ellos."""
@@ -419,6 +452,17 @@ class Bandeja:
         return {'grupos': grupos, 'filas': primero['filas'], 'grado': primero['grado'],
                 'letra': None if primero['letra_supuesta'] else primero['letra'],
                 'procesado_en': procesado_en, 'sin_texto': sin_texto}
+
+    def lista_traer(self):
+        """El botón "Traer la lista de la PC 4": los alumnos de la base del cerebro entran aquí."""
+        if not self.grupos:
+            raise ErrorBandeja('Las listas de grupo necesitan la base de datos de SIDP.')
+        if not self.cerebro:
+            raise ErrorBandeja('Primero conecta el cerebro de la PC 4 en Ajustes.')
+        aviso = self.traer_alumnos()
+        if aviso.startswith('No se trajeron'):
+            raise ErrorBandeja(aviso)
+        return {'aviso': aviso, 'padron': self.enviar_padron(), **self.grupos.lista()}
 
     def lista_guardar(self, datos):
         """Guarda una lista (grado, letra, filas) o varias a la vez (grupos: [{grado, letra, filas}])."""

@@ -126,6 +126,13 @@ def padron_a_cerebro(ciclo, alumnos, url, clave, espera=60):
         return json.load(respuesta)
 
 
+def alumnos_de_cerebro(url, clave, espera=60):
+    """Lado del .exe: los alumnos inscritos en la base de la PC 4, por grupo."""
+    solicitud = urllib.request.Request(url.rstrip('/') + '/alumnos', headers={'X-SIDP-Clave': clave})
+    with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
+        return json.load(respuesta)
+
+
 def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None):
     class Puente(BaseHTTPRequestHandler):
         def _responder(self, codigo, datos):
@@ -143,9 +150,16 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
             return False
 
         def do_GET(self):
-            if self.path != '/salud':
+            if self.path not in ('/salud', '/alumnos'):
                 return self._responder(404, {'error': 'no existe'})
-            if self._autorizado():
+            if self.path == '/alumnos' and self._autorizado():
+                if not base:
+                    return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
+                try:
+                    return self._responder(200, base.alumnos())
+                except Exception as error:
+                    return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}'})
+            if self.path == '/salud' and self._autorizado():
                 try:
                     datos_base = base.resumen() if base else None
                 except Exception as error:

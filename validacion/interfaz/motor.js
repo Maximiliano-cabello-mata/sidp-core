@@ -75,6 +75,7 @@ function motorLocal() {
       return api('/api/listas/leer', formulario);
     },
     listaGuardar: (datos) => api('/api/listas/guardar', datos),
+    listaTraer: () => api('/api/listas/traer', {}),
     grupoCrear: (grado, letra) => api('/api/grupos/crear', { grado, letra }),
     ubicar: (alumnoId, grupoId, mismoQue) => api('/api/grupos/ubicar', { alumno_id: alumnoId, grupo_id: grupoId, mismo_que: mismoQue }),
     analisis: () => api('/api/analisis'),
@@ -237,6 +238,7 @@ def recibir(captura, archivos):
       return r.ok;
     },
     listaGuardar: (datos) => llamar('lista_guardar', datos),
+    listaTraer: async () => { throw new Error('En la demostración no hay PC 4: esto funciona en el .exe de la escuela.'); },
     grupoCrear: (grado, letra) => llamar('grupo_crear', grado, letra),
     ubicar: (alumnoId, grupoId, mismoQue) => llamar('ubicar_alumno', alumnoId, grupoId, mismoQue),
     analisis: () => llamar('analisis'),

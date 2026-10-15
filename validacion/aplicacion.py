@@ -162,7 +162,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     if url.path == '/api/curps':
                         return self._enviar(200, app.bandeja.curps())
                     if url.path == '/api/configuracion':
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso,
+                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso,
                                                   'direccion_padres': app.direccion_padres()})
                     if url.path == '/api/plantillas':
                         return self._enviar(200, app.bandeja.lista_plantillas())
@@ -243,6 +243,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.escaneo_descartar(datos.get('lote', '')))
                     if url.path == '/api/listas/guardar':
                         return self._enviar(200, app.bandeja.lista_guardar(datos))
+                    if url.path == '/api/listas/traer':
+                        return self._enviar(200, app.bandeja.lista_traer())
                     if url.path == '/api/grupos/ubicar':
                         return self._enviar(200, app.bandeja.ubicar_alumno(datos.get('alumno_id'), datos.get('grupo_id'), datos.get('mismo_que')))
                     if url.path == '/api/grupos/crear':
@@ -253,7 +255,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'problema': problema,
+                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso, 'problema': problema,
                                                   'direccion_padres': app.direccion_padres()})
                 self._enviar(404, {'error': 'no existe'})
             except (ErrorBandeja, ValueError) as error:

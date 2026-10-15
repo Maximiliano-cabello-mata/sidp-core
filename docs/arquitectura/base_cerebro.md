@@ -67,9 +67,13 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
 python -m validacion.base_cerebro                                  # crea o actualiza la base y dice cómo está
 python -m validacion.base_cerebro cargar C:\SIDP-datos\lista.pdf   # la lista oficial de la SEP
 python -m validacion.base_cerebro informe                          # 911, grupos, alertas y faltantes, sin nombres
+python -m validacion.base_cerebro borrar --si-borrar-todo          # deja la base vacía (solo a mano, para empezar de nuevo)
 ```
 
 La versión 1 (tabla `padron_alumno`) se pasa sola a la 2 la primera vez. La tabla vieja se queda
 renombrada como `padron_alumno_v1`. El cerebro y el .exe se comunican igual que antes:
 - el .exe manda el padrón en `/padron` al conectarse y al guardar listas;
-- en `/leer`, cada página regresa con las sugerencias de la base.
+- en `/leer`, cada página regresa con las sugerencias de la base;
+- en `/alumnos` (con la clave) el .exe trae los alumnos inscritos por grupo. Lo hace al conectarse al cerebro,
+  antes de mandar su padrón, y con el botón **Traer la lista de la PC 4** de Listas de grupo. Un alumno que
+  ya estaba en el .exe (misma CURP) toma el nombre de la PC 4, con su bitácora; los demás se agregan a su grupo.

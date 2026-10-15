@@ -44,6 +44,7 @@
       <p class="subtitulo">Paso 1. Antes de los expedientes, sube la lista de cada grupo. Así cada expediente queda en su grado y grupo.</p>
       <div class="barra">
         <button class="principal" id="ls-nueva">Subir la lista de un grupo</button>
+        <button id="ls-traer" class="oculto">Traer la lista de la PC 4</button>
         <span class="espacio"></span><span class="chico" id="ls-ciclo"></span>
       </div>
       <div class="panel oculto" id="ls-subir" style="margin-bottom:16px">
@@ -64,6 +65,7 @@
         <div id="ls-mensaje"></div>
         <div id="ls-revisar"></div>
       </div>
+      <div id="ls-mensaje-traer"></div>
       <div id="ls-grupos"></div>
       <div class="panel oculto" id="ls-detalle" style="margin-top:16px"></div>
     </section>
@@ -424,6 +426,16 @@ function nuevaLista(grado = null, letra = null) {
   $('ls-subir').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 $('ls-nueva').onclick = () => nuevaLista();
+if (motor.configuracion) $('ls-traer').classList.remove('oculto');
+$('ls-traer').onclick = async () => {
+  const r = await trabajar('Trayendo los alumnos de la PC 4…', () => motor.listaTraer(), (c, t) => avisoEn('ls-mensaje-traer', c, t));
+  if (!r) return;
+  avisoEn('ls-mensaje-traer', '', '');
+  datos.grupos = { ciclo: r.ciclo, grupos: r.grupos };
+  mostrarGrupos();
+  $('ls-grupos').insertAdjacentHTML('afterbegin', `<div class="mensaje bien">${esc(r.aviso)}` +
+    (r.padron ? ` <span class="chico">${esc(r.padron)}</span>` : '') + '</div>');
+};
 $('ls-cancelar').onclick = () => { $('ls-subir').classList.add('oculto'); listaArchivos = []; listaFilas = null; };
 $('ls-soltar').onclick = () => $('ls-elegir').click();
 $('ls-soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('ls-elegir').click(); };
@@ -974,14 +986,14 @@ if (motor.configuracion) {
   motor.configuracion().then((c) => {
     $('cerebro-url').value = c.cerebro_url || '';
     $('cerebro-clave').value = c.cerebro_clave || '';
-    $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.padron || ''}` : 'Sin cerebro: los procesos corren en esta PC.';
+    $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.traidos || ''} ${c.padron || ''}` : 'Sin cerebro: los procesos corren en esta PC.';
     const publica = `${PAGINA_PUBLICA}padres.html?escuela=${new URL(c.direccion_padres).host}`;
     $('padres-ip').innerHTML = `Los padres, conectados al Wi-Fi de la escuela, abren <b>${esc(c.direccion_padres)}</b>
       (o ${esc(publica)}, que los manda ahí). <a href="padres.html" target="_blank" rel="noopener">Abrir la página de padres</a>.`;
   });
   $('cerebro-guardar').onclick = async () => {
     const c = await trabajar('Probando el cerebro…', () => motor.guardarConfiguracion({ cerebro_url: $('cerebro-url').value, cerebro_clave: $('cerebro-clave').value }));
-    if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.padron || ''}` : 'No respondió: ' + (c.problema || '');
+    if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.traidos || ''} ${c.padron || ''}` : 'No respondió: ' + (c.problema || '');
   };
 }
 

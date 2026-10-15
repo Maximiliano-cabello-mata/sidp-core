@@ -17,6 +17,7 @@ En la PC 4, desde la raíz del repositorio:
     python -m validacion.base_cerebro                     # crea o actualiza la base y dice cómo está
     python -m validacion.base_cerebro cargar LISTA.pdf    # carga la lista oficial de la SEP (o la lista revisada .csv)
     python -m validacion.base_cerebro informe             # números del 911, grupos y alertas (sin nombres)
+    python -m validacion.base_cerebro borrar --si-borrar-todo   # deja la base vacía, para empezar de nuevo
 """
 import argparse
 import datetime
@@ -94,6 +95,24 @@ class BaseCerebro:
 
     def resumen(self):
         return self._uno('SELECT sidp.resumen()')
+
+    def borrar_todo(self):
+        """Deja la base vacía con el esquema nuevo. Solo a mano, desde la consola de la PC 4: la base misma no deja borrar."""
+        self._consulta('DROP SCHEMA IF EXISTS sidp CASCADE; DROP TABLE IF EXISTS public.padron_alumno_v1, public.lectura_v1, '
+                       'public.padron_alumno, public.lectura')
+        return self.preparar()
+
+    def alumnos(self, ciclo=None):
+        """Los alumnos inscritos por grupo (el último ciclo si no se dice): lo que el panel del .exe trae de aquí."""
+        filas = self._consulta(
+            "SELECT ciclo, grado, letra, curp, primer_apellido, coalesce(segundo_apellido, ''), nombres FROM sidp.v_inscritos "
+            "WHERE ciclo = coalesce(%s, (SELECT max(ciclo) FROM sidp.v_inscritos)) AND grado IS NOT NULL "
+            "ORDER BY grado, letra, primer_apellido, segundo_apellido, nombres", (ciclo,))
+        grupos = {}
+        for _, grado, letra, curp, primero, segundo, nombres in filas:
+            grupos.setdefault((grado, letra), {'grado': grado, 'letra': letra, 'filas': []})['filas'].append(
+                {'curp': curp or '', 'primer_apellido': primero, 'segundo_apellido': segundo, 'nombres': nombres})
+        return {'ciclo': filas[0][0] if filas else ciclo, 'grupos': list(grupos.values())}
 
     def cargar(self, ciclo, alumnos, origen='validador', actor='SIDP-Validador'):
         """alumnos: [{curp, primer_apellido, segundo_apellido, nombres, grado, letra}] -> lo que pasó (cuántos nuevos...)."""
@@ -183,15 +202,23 @@ def _imprimir_resumen(resumen):
 
 def main(argumentos=None):
     parser = argparse.ArgumentParser(prog='python -m validacion.base_cerebro')
-    parser.add_argument('accion', nargs='?', default='estado', choices=('estado', 'cargar', 'informe'))
+    parser.add_argument('accion', nargs='?', default='estado', choices=('estado', 'cargar', 'informe', 'borrar'))
     parser.add_argument('archivo', nargs='?', type=Path, help='con "cargar": la lista oficial en PDF o la lista revisada en CSV (fuera del repositorio)')
     parser.add_argument('--ciclo', default=ciclo_de(datetime.date.today()), help='por ejemplo 2026-2027')
     parser.add_argument('--base', type=Path, default=ARCHIVO, help='archivo con la dirección de PostgreSQL')
+    parser.add_argument('--si-borrar-todo', action='store_true', help='con "borrar": confirma que se borra todo')
     args = parser.parse_args(argumentos)
     base, problema = abrir(args.base)
     if problema:
         print(f'Sin base de datos: {problema}')
         return 1
+    if args.accion == 'borrar':
+        if not args.si_borrar_todo:
+            print('Esto borra todos los alumnos, documentos y la bitácora. Para hacerlo: '
+                  'python -m validacion.base_cerebro borrar --si-borrar-todo')
+            return 1
+        base.borrar_todo()
+        print('Base borrada: quedó vacía, con el esquema nuevo.')
     if args.accion == 'cargar':
         if not args.archivo or not args.archivo.is_file():
             print('Falta la lista: python -m validacion.base_cerebro cargar RUTA\\DE\\LA\\LISTA.pdf (o .csv)')

@@ -232,3 +232,45 @@ def test_sin_base_el_cerebro_responde_503_al_padron():
         assert error.value.code == 503
     finally:
         cerebro.shutdown()
+
+
+def test_el_panel_trae_la_lista_de_la_pc4_y_corrige_los_nombres(base, tmp_path):
+    base.cargar(base_cerebro.ciclo_de(HOY), alumnos() + alumnos(SEGUNDO, 2), 'lista_oficial', 'lista oficial')
+    cerebro = cerebro_red.crear_servidor('clave-de-prueba', 0, url='http://127.0.0.1:9/api/chat', anfitrion='127.0.0.1', base=base)
+    url_cerebro = iniciar(cerebro)
+    app = aplicacion.Aplicacion(tmp_path / 'datos', HOY, puerto=0)
+    servidor = aplicacion.crear_servidor(app, '127.0.0.1')
+    url = iniciar(servidor)
+    try:
+        with pytest.raises(urllib.error.HTTPError) as error:  # Sin la clave, nadie ve a los alumnos.
+            urllib.request.urlopen(url_cerebro + '/alumnos')
+        assert error.value.code == 401
+        token = {'X-SIDP-Token': app.token}
+        # En el panel ya estaba un alumno con el nombre mal leído (pegado): la PC 4 lo corrige, sin duplicarlo.
+        mal = {'curp': CURP_JUAN, 'primer_apellido': 'GARCIAHERNANDEZ', 'segundo_apellido': '', 'nombres': 'JUAN'}
+        pedir(url, '/api/listas/guardar', {'grado': 1, 'letra': 'A', 'filas': [mal]}, token)
+        assert app.configurar(url_cerebro, 'clave-de-prueba') is None
+        assert app.bandeja.traidos_aviso == 'De la PC 4: 7 alumnos (6 nuevos aquí, 1 con el nombre corregido).'
+        grupos = pedir(url, '/api/grupos', None, token)[1]['grupos']
+        assert [(g['nombre'], g['alumnos']) for g in grupos] == [('1° A', 3), ('2° A', 4)]
+        juan = [a for a in app.bandeja.grupos.alumnos(grupos[0]['id'])['alumnos'] if a['curp'] == CURP_JUAN]
+        assert [(a['primer_apellido'], a['segundo_apellido'], a['nombres']) for a in juan] == [('GARCIA', 'HERNANDEZ', 'JUAN')]
+        # El botón hace lo mismo y no repite a nadie.
+        traido = pedir(url, '/api/listas/traer', {}, token)[1]
+        assert traido['aviso'] == 'De la PC 4: 7 alumnos (0 nuevos aquí, 0 con el nombre corregido).'
+        assert base.resumen()['alumnos'] == 7
+    finally:
+        servidor.shutdown()
+        cerebro.shutdown()
+
+
+def test_borrar_todo_deja_la_base_vacia_solo_si_se_confirma(base, monkeypatch, capsys):
+    base.cargar('2026-2027', alumnos(), 'lista_oficial', 'lista oficial')
+    with pytest.raises(Exception):
+        base._consulta('DELETE FROM sidp.alumno')  # La base sola no deja borrar.
+    monkeypatch.setenv('SIDP_BASE', os.environ['SIDP_PRUEBA_BASE'])
+    assert base_cerebro.main(['borrar']) == 1  # Sin confirmar no pasa nada.
+    assert base.resumen()['alumnos'] == 3
+    assert base_cerebro.main(['borrar', '--si-borrar-todo']) == 0
+    assert 'Base borrada' in capsys.readouterr().out
+    assert base.resumen()['alumnos'] == 0 and base.alumnos() == {'ciclo': None, 'grupos': []}
