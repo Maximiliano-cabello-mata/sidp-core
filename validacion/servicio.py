@@ -14,7 +14,8 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from validacion import cerebro_red, comparador, expediente, extraer, lector, modelo, prueba, renapo
+from validacion import cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo
+from validacion.grupos import ErrorGrupo, Grupos
 from validacion import plantillas as plantillas_mod
 
 ESQUEMA = """
@@ -75,6 +76,11 @@ def unir_pdf(partes):
     return salida.getvalue()
 
 
+def sp_error():
+    from database.procedimientos import ProcedimientoError
+    return ProcedimientoError
+
+
 class ErrorBandeja(Exception):
     """Algo que la persona hizo mal (falta el motivo, no existe el expediente)."""
 
@@ -117,6 +123,7 @@ class Bandeja:
         self.libro = sqlite3.connect(str(base or self.carpeta / 'decisiones.db'), check_same_thread=False)
         self.libro.executescript(ESQUEMA)
         self.plantillas = plantillas_mod.Plantillas(self.carpeta / 'plantillas')
+        self.grupos = Grupos(registro, self.hoy) if registro else None
         if self.registro:
             self.registro.usar_plantillas(self.plantillas.activas())
 
@@ -259,8 +266,115 @@ class Bandeja:
                                        + ('' if self.cerebro else '. Conecta el cerebro de la PC 4 para leer escaneos.'))
         (carpeta / 'lote.json').write_text(json.dumps({'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo')} for p in paginas],
                                                        'extraidos': propuesta['extraidos']}, ensure_ascii=False), encoding='utf-8')
-        return {'lote': lote, 'procesado_en': procesado_en, 'tipos': self._tipos_escaneo(), 'propuesta': propuesta,
+        alumno = propuesta['alumno']
+        parecidos = self.grupos.parecidos(' '.join(filter(None, (alumno.get('nombres'), alumno.get('primer_apellido'),
+                                                                   alumno.get('segundo_apellido')))), alumno.get('curp')) if self.grupos else []
+        return {'lote': lote, 'procesado_en': procesado_en, 'tipos': self._tipos_escaneo(), 'propuesta': propuesta, 'parecidos': parecidos,
                 'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo', 'reconocido')} for p in paginas]}
+
+    # --- Grupos y listas (lo primero que se escanea) ---
+
+    def _con_grupos(self, accion):
+        if not self.grupos:
+            raise ErrorBandeja('No hay base de datos para los grupos')
+        try:
+            return accion()
+        except (ErrorGrupo, sp_error()) as error:
+            raise ErrorBandeja(str(error))
+
+    def _quien(self, identificador):
+        """Nombre del alumno de un expediente y su grupo, para ordenar los expedientes por grado."""
+        archivo = self.carpeta / 'expedientes' / identificador / 'registro.json'
+        alumno = json.loads(archivo.read_text(encoding='utf-8')).get('alumno') if archivo.exists() else None
+        if not alumno or not self.registro:
+            captura = self.carpeta / 'expedientes' / identificador / 'captura.json'
+            datos = json.loads(captura.read_text(encoding='utf-8')).get('alumno', {}) if captura.exists() else {}
+            return {'alumno': datos.get('nombre') or ' '.join(filter(None, (datos.get('nombres'), datos.get('primer_apellido')))) or None,
+                    'grupo': None, 'alumno_id': None}
+        fila = self.registro.db.execute('SELECT nombres, primer_apellido, segundo_apellido FROM alumno WHERE id = ?', (alumno,)).fetchone()
+        return {'alumno': ' '.join(x for x in (fila or ()) if x) or None, 'grupo': self.grupos.ubicacion(alumno), 'alumno_id': alumno}
+
+    def grupos_lista(self):
+        return self._con_grupos(self.grupos.lista)
+
+    def _expedientes_por_alumno(self):
+        salida = {}
+        decisiones = self.decisiones()
+        for identificador in self.expedientes():
+            archivo = self.carpeta / 'expedientes' / identificador / 'registro.json'
+            if archivo.exists():
+                alumno = json.loads(archivo.read_text(encoding='utf-8')).get('alumno')
+                resultado = self.resultados.get(identificador) or {}
+                decision = decisiones.get(identificador)
+                salida.setdefault(alumno, []).append({'id': identificador, 'estado': resultado.get('estado'),
+                                                      'decision': decision and decision['decision']})
+        return salida
+
+    def grupo_alumnos(self, grupo_id):
+        datos = self._con_grupos(lambda: self.grupos.alumnos(grupo_id))
+        por_alumno = self._expedientes_por_alumno()
+        for alumno in datos['alumnos']:
+            alumno['expedientes'] = por_alumno.get(alumno['id'], [])
+        return datos
+
+    def lista_leer(self, archivos=(), texto='', apellidos_primero=True):
+        """La lista de un grupo, escaneada o escrita: propone los renglones y el grado y grupo. No guarda nada."""
+        sin_texto, procesado_en = [], None
+        if archivos:
+            lecturas, procesado_en = self._leer(self._muestras(archivos))
+            sin_texto = [n for (n, _), l in zip(archivos, lecturas) if len(l['texto'].strip()) < lector.MINIMO_TEXTO]
+            texto = '\n'.join(l['texto'] for l in lecturas) + '\n' + (texto or '')
+        if not str(texto or '').strip():
+            raise ErrorBandeja('Sube la lista escaneada o escribe los nombres, uno por renglón')
+        grado, letra = extraer.grado_y_grupo(texto)
+        return {'filas': extraer.lista_de_grupo(texto, apellidos_primero), 'grado': grado, 'letra': letra,
+                'procesado_en': procesado_en, 'sin_texto': sin_texto}
+
+    def lista_guardar(self, datos):
+        def guardar():
+            grupo = self.grupos.crear(datos.get('grado'), datos.get('letra'))
+            return self.grupos.guardar_lista(grupo, datos.get('filas') or [])
+        resultado = self._con_grupos(guardar)
+        return {**resultado, **self.grupos.lista()}
+
+    def grupo_crear(self, grado, letra):
+        self._con_grupos(lambda: self.grupos.crear(grado, letra))
+        return self.grupos.lista()
+
+    def buscar_alumno(self, nombre, curp=None):
+        return {'parecidos': self._con_grupos(lambda: self.grupos.parecidos(nombre, (curp or '').upper() or None))}
+
+    # --- Análisis: lo que se exporta para el 911, el SAID y la escuela ---
+
+    def analisis(self):
+        datos = self._con_grupos(self.grupos.conteo)
+        filas = self.grupos.exportar_alumnos()[1:]
+        datos['faltan'] = {'sin_curp': sum(1 for f in filas if not f[5]), 'curp_sin_validar': sum(1 for f in filas if f[5] and f[6] != 'Sí'),
+                           'sin_sexo': sum(1 for f in filas if not f[7]), 'sin_fecha': sum(1 for f in filas if not f[8]),
+                           'sin_documentos': sum(1 for f in filas if not f[12]), 'total': len(filas)}
+        return datos
+
+    def exportar(self, que, formato='xlsx'):
+        """(nombre de archivo, contenido, tipo) para descargar desde el panel."""
+        if formato not in ('xlsx', 'csv'):
+            raise ErrorBandeja('Formato no válido')
+        if que == 'alumnos':
+            filas = self._con_grupos(self.grupos.exportar_alumnos)
+            hojas = [('Todos', filas)]
+            for grupo in sorted({(f[0], f[1]) for f in filas[1:]}):
+                hojas.append((f'{grupo[0]}° {grupo[1]}', [filas[0]] + [f for f in filas[1:] if (f[0], f[1]) == grupo]))
+        elif que == 'conteo':
+            conteo = self._con_grupos(self.grupos.conteo)
+            filas = [['Grado', 'Grupos', 'Hombres', 'Mujeres', 'Sin dato de sexo', 'Total']]
+            filas += [[f'{g["grado"]}°', g['grupos'], g['hombres'], g['mujeres'], g['sin_dato'], g['total']] for g in conteo['grados']]
+            filas.append(['Total', *[sum(g[k] for g in conteo['grados']) for k in ('grupos', 'hombres', 'mujeres', 'sin_dato', 'total')]])
+            hojas = [(f'Matrícula {conteo["ciclo"]}', filas)]
+        else:
+            raise ErrorBandeja('No existe esa exportación')
+        nombre = f'sidp_{que}_{self.hoy.isoformat()}.{formato}'
+        if formato == 'csv':
+            return nombre, hoja.csv_excel(hojas[0][1]), 'text/csv; charset=utf-8'
+        return nombre, hoja.xlsx(hojas), hoja.MIME_XLSX
 
     def _tipos_escaneo(self):
         propias = {p['clave']: p['nombre'] for p in self.plantillas.activas() if not p.get('fabrica')}
@@ -346,6 +460,12 @@ class Bandeja:
                 raise ErrorBandeja(f'La CURP {quien_es} no tiene la forma correcta: corrígela o déjala vacía')
             persona['nombre'] = ' '.join(filter(None, (persona.get('nombres'), persona.get('primer_apellido'), persona.get('segundo_apellido'))))
         tipos = datos.get('paginas') or {}
+        alumno_id = str(datos.get('alumno_id') or '') or None  # El alumno de la lista de su grupo, si la persona lo eligió.
+        if alumno_id and not (self.registro and self.registro.db.execute('SELECT 1 FROM alumno WHERE id = ?', (alumno_id,)).fetchone()):
+            raise ErrorBandeja('Ese alumno ya no está en las listas: elígelo otra vez')
+        if alumno_id and alumno['curp'] and self.registro.db.execute('SELECT 1 FROM alumno WHERE curp = ? AND id != ?',
+                                                                     (alumno['curp'], alumno_id)).fetchone():
+            raise ErrorBandeja(f'La CURP {alumno["curp"]} ya es de otro alumno: revisa que elegiste al alumno correcto')
         captura = {'alumno': alumno, 'tutor': tutor if tutor.get('nombres') and tutor.get('primer_apellido') else {}, 'origen': 'escaneo'}
         carpeta_expedientes = self.carpeta / 'expedientes'
         carpeta_expedientes.mkdir(parents=True, exist_ok=True)
@@ -374,7 +494,7 @@ class Bandeja:
         (destino / 'resultado.json').write_text(json.dumps(resultado, ensure_ascii=False), encoding='utf-8')
         self.resultados[identificador] = resultado
         if self.registro:
-            ids = self.registro.registrar(captura, guardados, resultado['extraidos'])
+            ids = self.registro.registrar(captura, guardados, resultado['extraidos'], alumno_id=alumno_id)
             (destino / 'registro.json').write_text(json.dumps(ids), encoding='utf-8')
         self.decidir(identificador, 'autorizado', 'Validado en papel por la escuela (escaneo)', quien)
         shutil.rmtree(carpeta_lote, ignore_errors=True)
@@ -480,7 +600,7 @@ class Bandeja:
             filas.append({'id': identificador, 'estado': resultado and resultado['estado'],
                           'reglas': reglas_de(resultado) if resultado else [],
                           'etiqueta': marca and ('falso' if marca['falso'] else 'verdadero'),
-                          'trampa': marca and marca['trampa'], 'decision': decisiones.get(identificador)})
+                          'trampa': marca and marca['trampa'], 'decision': decisiones.get(identificador), **self._quien(identificador)})
         autorizados_falsos = sum(1 for f in filas if f['etiqueta'] == 'falso' and f['decision']
                                  and f['decision']['decision'] == 'autorizado')
         return {'carpeta': str(self.carpeta), 'hoy': self.hoy.isoformat(), 'expedientes': filas,

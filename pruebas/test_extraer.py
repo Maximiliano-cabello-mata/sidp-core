@@ -43,3 +43,18 @@ def test_sin_curp_legible_se_usa_el_nombre_con_etiquetas_y_se_pide_la_curp():
     propuesta = extraer.proponer([{'tipo': 'acta_alumno', 'texto': texto}])
     assert propuesta['alumno'] == {'nombres': 'DIEGO', 'primer_apellido': 'CASTRO', 'segundo_apellido': 'NAVA'}
     assert 'No se encontró la CURP del alumno en el acta: escríbela.' in propuesta['avisos']
+
+
+def test_la_lista_de_un_grupo_se_lee_renglon_por_renglon():
+    sofia = generar.curp('MACS180512MMCRRFA')
+    texto = '\n'.join(['LISTA DE ASISTENCIA', 'TERCER GRADO GRUPO C', 'NO. NOMBRE DEL ALUMNO', '1 HERNANDEZ RAMOS LUIS',
+                       '2. PEREZ MARIA DEL CARMEN', f'3 MARTINEZ CRUZ SOFIA {sofia}', '4 LOPEZ DIAZ PEDRO LOPD18O512HMCPZDA1'])
+    assert extraer.grado_y_grupo(texto) == (3, 'C')
+    assert extraer.grado_y_grupo('2° B') == (2, 'B')
+    filas = extraer.lista_de_grupo(texto)
+    assert [(f['nombres'], f['primer_apellido'], f['segundo_apellido']) for f in filas] == [
+        ('LUIS', 'HERNANDEZ', 'RAMOS'), ('MARIA DEL CARMEN', 'PEREZ', ''), ('SOFIA', 'MARTINEZ', 'CRUZ'), ('PEDRO', 'LOPEZ', 'DIAZ')]
+    assert filas[2]['curp'] == sofia and not filas[2]['dudoso']
+    # La CURP mal leída no se mete al nombre: se propone y queda como duda para que la persona la corrija.
+    assert filas[3]['dudoso'] and filas[3]['curp']
+    assert extraer.lista_de_grupo('LUIS HERNANDEZ RAMOS', apellidos_primero=False)[0]['primer_apellido'] == 'HERNANDEZ'

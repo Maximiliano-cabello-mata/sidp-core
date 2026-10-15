@@ -72,6 +72,62 @@ class Registro:
                             "VALUES(?, ?, 'administrador', 'sin contraseña: entorno de pruebas', 'administrativo')", (usuario, personal))
         return usuario
 
+    def alumno_por(self, curp, nombre):
+        """El alumno con esa CURP; si no, el único alumno sin CURP que se llama exactamente igual (sin acentos)."""
+        curp = curp if curp and comparador.desglose_curp(curp) else None
+        if curp:
+            fila = self.db.execute('SELECT id FROM alumno WHERE curp = ?', (curp,)).fetchone()
+            if fila:
+                return fila[0]
+        buscado = comparador.normalizar(nombre or '')
+        iguales = [i for i, n, p, s in self.db.execute('SELECT id, nombres, primer_apellido, segundo_apellido FROM alumno WHERE curp IS NULL')
+                   if comparador.normalizar(' '.join(x for x in (n, p, s) if x)) == buscado] if buscado else []
+        return iguales[0] if len(iguales) == 1 else None
+
+    def nuevo_alumno(self, datos, origen='lista_de_grupo'):
+        desglose = comparador.desglose_curp(datos['curp']) if datos.get('curp') else None
+        # Con una CURP bien formada, la fecha de nacimiento y el sexo salen de ella (dato para el 911).
+        return self._insertar('alumno', {'curp': datos['curp'] if desglose else None, 'nombres': datos['nombres'],
+                                         'primer_apellido': datos['primer_apellido'], 'segundo_apellido': datos.get('segundo_apellido') or None,
+                                         'fecha_nacimiento': desglose and desglose['fecha'], 'sexo': desglose and desglose['sexo']}, origen)
+
+    def completar_alumno(self, alumno_id, datos, origen='escaneo'):
+        """El alumno de la lista recibe lo que confirmó la persona al escanear (nombre corregido, CURP, fecha, sexo)."""
+        fila = self.db.execute('SELECT curp, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, sexo, version FROM alumno WHERE id = ?',
+                               (alumno_id,)).fetchone()
+        if not fila:
+            raise sp.ProcedimientoError('Ese alumno no existe.')
+        antes = dict(zip(('curp', 'nombres', 'primer_apellido', 'segundo_apellido', 'fecha_nacimiento', 'sexo'), fila[:6]))
+        desglose = comparador.desglose_curp(datos['curp']) if datos.get('curp') else None
+        curp = datos['curp'] if desglose else None
+        if curp and curp != antes['curp'] and self.db.execute('SELECT 1 FROM alumno WHERE curp = ? AND id != ?', (curp, alumno_id)).fetchone():
+            raise sp.ProcedimientoError(f'La CURP {curp} ya es de otro alumno.')
+        despues = {'curp': curp or antes['curp'], 'nombres': datos.get('nombres') or antes['nombres'],
+                   'primer_apellido': datos.get('primer_apellido') or antes['primer_apellido'],
+                   'segundo_apellido': datos.get('segundo_apellido') or antes['segundo_apellido'],
+                   'fecha_nacimiento': datos.get('fecha_nacimiento') or antes['fecha_nacimiento'] or (desglose and desglose['fecha']),
+                   'sexo': datos.get('sexo') if datos.get('sexo') in ('H', 'M') else antes['sexo'] or (desglose and desglose['sexo'])}
+        cambios = {k: v for k, v in despues.items() if v != antes[k]}
+        if cambios:
+            with self.db:
+                self.db.execute(f'UPDATE alumno SET {", ".join(f"{k} = ?" for k in cambios)}, version = version + 1 WHERE id = ?',
+                                (*cambios.values(), alumno_id))
+                self.db.execute('INSERT INTO bitacora(fecha, actor, accion, objeto_tipo, objeto_id, antes, despues) VALUES(?,?,?,?,?,?,?)',
+                                (_ahora(), origen, 'alumno.completado', 'alumno', alumno_id,
+                                 json.dumps({k: antes[k] for k in cambios}, ensure_ascii=False), json.dumps(cambios, ensure_ascii=False)))
+        return alumno_id
+
+    def _insertar(self, tabla, columnas, origen):
+        identificador = str(uuid.uuid4())
+        columnas = {'id': identificador, **columnas}
+        with self.db:
+            self.db.execute(f'INSERT INTO {tabla}({", ".join(columnas)}) VALUES({", ".join("?" * len(columnas))})',
+                            tuple(columnas.values()))
+            self.db.execute('INSERT INTO bitacora(fecha, actor, accion, objeto_tipo, objeto_id, despues) VALUES(?,?,?,?,?,?)',
+                            (_ahora(), origen, f'{tabla}.registrado', tabla, identificador,
+                             json.dumps({k: v for k, v in columnas.items() if k != 'id'}, ensure_ascii=False)))
+        return identificador
+
     def _persona(self, tabla, datos, curp=None):
         curp = curp if curp and comparador.desglose_curp(curp) else None  # Una CURP mal escrita no entra como dato.
         if curp:
@@ -95,7 +151,7 @@ class Registro:
                              json.dumps({k: v for k, v in columnas.items() if k != 'id'}, ensure_ascii=False)))
         return identificador
 
-    def registrar(self, captura, archivos, extraidos=None):
+    def registrar(self, captura, archivos, extraidos=None, alumno_id=None):
         """captura: lo que escribió el padre; archivos: [(espacio, ruta relativa a la carpeta de datos, contenido)].
 
         extraidos: lo que el validador encontró (resultado['extraidos']); cada documento recibe lo suyo.
@@ -103,7 +159,10 @@ class Registro:
         """
         extraidos = extraidos or {}
         tipos = {**TIPO_DISENO, **self.tipos_escuela}
-        alumno = self._persona('alumno', captura['alumno'], captura['alumno'].get('curp', '').upper())
+        if alumno_id:  # El alumno de la lista de su grupo que eligió la persona.
+            alumno = self.completar_alumno(alumno_id, {**captura['alumno'], 'curp': captura['alumno'].get('curp', '').upper()})
+        else:
+            alumno = self._persona('alumno', captura['alumno'], captura['alumno'].get('curp', '').upper())
         datos_tutor = captura.get('tutor') or {}
         tutor = self._persona('tutor', datos_tutor, str(datos_tutor.get('curp') or '').upper()) if datos_tutor.get('nombres') else None
         parentesco = datos_tutor.get('parentesco', 'otro')

@@ -296,3 +296,71 @@ def proponer(paginas, hoy=None):
     if faltan:
         avisos.append('No se reconoció: ' + ', '.join(faltan) + '. Si sí está, elige su tipo en la lista de páginas.')
     return {'alumno': alumno, 'tutor': tutor, 'avisos': avisos, 'extraidos': extraidos}
+
+
+# --- Listas de grupo ---
+
+ENCABEZADOS = {'NOMBRE', 'NOMBRES', 'ALUMNO', 'ALUMNOS', 'ALUMNA', 'GRADO', 'GRUPO', 'ESCUELA', 'LISTA', 'CICLO', 'ESCOLAR', 'PROFESOR',
+               'PROFESORA', 'MAESTRO', 'MAESTRA', 'DOCENTE', 'CLAVE', 'CCT', 'TURNO', 'MATUTINO', 'VESPERTINO', 'PRIMARIA', 'SECRETARIA',
+               'EDUCACION', 'PUBLICA', 'APELLIDO', 'APELLIDOS', 'PATERNO', 'MATERNO', 'CURP', 'NO', 'NUM', 'FIRMA', 'TOTAL', 'HOMBRES',
+               'MUJERES', 'ASISTENCIA', 'FECHA', 'ZONA', 'SECTOR', 'GOBIERNO', 'ESTADO', 'MEXICO', 'DIRECTOR', 'DIRECTORA'}
+GRADOS_TEXTO = {'PRIMER': 1, 'PRIMERO': 1, 'SEGUNDO': 2, 'TERCER': 3, 'TERCERO': 3, 'CUARTO': 4, 'QUINTO': 5, 'SEXTO': 6}
+
+
+def grado_y_grupo(texto):
+    """(grado, letra) escritos en la hoja de la lista: "3° A", "GRADO: 3 GRUPO: A", "TERCER GRADO GRUPO B"; o (None, None)."""
+    texto = mayusculas(texto)
+    hallado = re.search(r'GRADO\W{0,3}([1-6])\b.{0,20}?GRUPO\W{0,3}([A-H])\b', texto)
+    if hallado:
+        return int(hallado.group(1)), hallado.group(2)
+    hallado = re.search(r'\b([1-6])\s*(?:°|º|O|ER|DO|RO|TO|VO)?\s*["\']?\s*([A-H])["\']?\s*(?:$|\n|GRUPO)', texto)
+    if hallado:
+        return int(hallado.group(1)), hallado.group(2)
+    hallado = re.search(r'\b(' + '|'.join(GRADOS_TEXTO) + r')\s+GRADO\b.{0,20}?GRUPO\W{0,3}([A-H])\b', texto)
+    if hallado:
+        return GRADOS_TEXTO[hallado.group(1)], hallado.group(2)
+    return None, None
+
+
+def lista_de_grupo(texto, apellidos_primero=True):
+    """Los alumnos de una lista de grupo, un renglón por alumno: [{nombres, primer_apellido, segundo_apellido, curp, dudoso}].
+
+    Se quitan números de lista y encabezados. Si el renglón trae CURP, el nombre se acomoda con sus letras;
+    si no, se usa el orden de la lista (casi siempre apellidos primero, como en las listas de la SEP).
+    """
+    filas = []
+    for linea in mayusculas(texto).splitlines():
+        curp = next(iter(curps(linea)), None)
+        # Una CURP mal leída (dígito verificador que no cuadra) se propone, pero como duda.
+        dudosa = None if curp else next(iter(curps(linea, exigir_digito=False)), None)
+        # Las palabras con números (una CURP rota, una fecha) no son parte del nombre.
+        limpia = ' '.join(p for p in linea.replace(curp or '\0', ' ').split() if not re.search(r'[A-Z]\d|\d[A-Z]', p))
+        palabras = [p for p in re.sub(r'[^A-Z]+', ' ', limpia).split()]
+        palabras = [p for p in palabras if len(p) > 1 or p == 'Y']
+        if not palabras or sum(p in ENCABEZADOS for p in palabras) >= max(1, len(palabras) // 2):
+            continue
+        if len(palabras) < 2 or len(palabras) > 7:
+            continue
+        persona = nombre_por_curp(' '.join(palabras), curp) if curp else None
+        if persona:
+            filas.append({**persona, 'curp': curp, 'dudoso': False})
+            continue
+        if apellidos_primero:
+            primero = (_apellido(palabras, 0) or ([palabras[0]], palabras[0], 1))[0]
+            resto = palabras[len(primero):]
+            # "PEREZ MARIA DEL CARMEN": MARIA y JOSE casi siempre son nombre, así que no hay segundo apellido.
+            segundo = _apellido(resto, 0) if len(resto) > 1 and resto[0] not in NOMBRES_COMUNES else None
+            segundo_palabras = segundo[0] if segundo else []
+            nombres = resto[len(segundo_palabras):]
+        else:
+            nombres, resto = palabras[:1], palabras[1:]
+            if len(palabras) >= 4:
+                nombres, resto = palabras[:2], palabras[2:]
+            primero = resto[:1]
+            segundo_palabras = resto[1:]
+        if not nombres or not primero:
+            continue
+        filas.append({'nombres': ' '.join(nombres), 'primer_apellido': ' '.join(primero), 'segundo_apellido': ' '.join(segundo_palabras),
+                      'curp': curp or dudosa or '', 'dudoso': bool(dudosa) or limpia != linea.strip() and not curp
+                      or len(palabras) > 5 or len(palabras) < 3})
+    return filas

@@ -410,3 +410,122 @@ def test_la_plantilla_pide_lo_necesario(entorno):
         codigo, respuesta = guardar(datos)
         assert codigo == 400 and error in respuesta['error'], (datos, respuesta)
     assert pedir(url, '/api/plantillas', cabeceras={'X-SIDP-Token': 'otro'})[0] == 403
+
+
+# --- Grupos: primero las listas de cada grupo, después el expediente de cada niño ---
+
+SOFIA = generar.curp('MACS180512MMCRRFA')
+LISTA = ['ESCUELA PRIMARIA BENITO JUAREZ', 'LISTA DE ASISTENCIA CICLO ESCOLAR 2026-2027', 'GRADO: 3 GRUPO: A',
+         'NO. NOMBRE DEL ALUMNO CURP', '1 HERNANDEZ RAMOS LUIS', '2 GARCIA LOPEZ ANA MARIA', f'3 MARTINEZ CRUZ SOFIA {SOFIA}']
+
+
+def descargar(url, ruta, token):
+    with urllib.request.urlopen(urllib.request.Request(url + ruta, headers={'X-SIDP-Token': token}), timeout=30) as respuesta:
+        return respuesta.headers, respuesta.read()
+
+
+def test_la_lista_escaneada_de_un_grupo_da_de_alta_a_sus_alumnos(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    # Escrita a mano en el panel o escaneada: las dos dan los mismos renglones, y nada se guarda todavía.
+    cuerpo, tipo = formulario({'texto': '\n'.join(LISTA)}, [])
+    codigo, escrita = pedir(url, '/api/listas/leer', cuerpo, token, tipo=tipo)
+    assert codigo == 200, escrita
+    cuerpo, tipo = formulario({}, [('archivo', 'lista_3A.pdf', pdf_de_texto(LISTA))])
+    escaneada = pedir(url, '/api/listas/leer', cuerpo, token, tipo=tipo)[1]
+    for leida in (escrita, escaneada):
+        assert (leida['grado'], leida['letra']) == (3, 'A')
+        assert [(f['nombres'], f['primer_apellido'], f['segundo_apellido'], f['curp']) for f in leida['filas']] == [
+            ('LUIS', 'HERNANDEZ', 'RAMOS', ''), ('ANA MARIA', 'GARCIA', 'LOPEZ', ''), ('SOFIA', 'MARTINEZ', 'CRUZ', SOFIA)]
+    assert pedir(url, '/api/grupos', cabeceras=token)[1]['grupos'] == []
+    # La persona revisa y guarda; guardar otra vez no duplica a nadie.
+    codigo, guardado = pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'a', 'filas': escrita['filas']}, token)
+    assert codigo == 200 and guardado['agregados'] == 3, guardado
+    otra_vez = pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'A', 'filas': escrita['filas']}, token)[1]
+    assert (otra_vez['agregados'], otra_vez['ya_estaban']) == (0, 3)
+    grupos = pedir(url, '/api/grupos', cabeceras=token)[1]
+    assert grupos['ciclo'] == '2026-2027'
+    assert [(g['nombre'], g['alumnos'], g['sin_curp']) for g in grupos['grupos']] == [('3° A', 3, 2)]
+    alumnos = pedir(url, f'/api/grupo?id={grupos["grupos"][0]["id"]}', cabeceras=token)[1]['alumnos']
+    assert [a['nombre'] for a in alumnos] == ['ANA MARIA GARCIA LOPEZ', 'LUIS HERNANDEZ RAMOS', 'SOFIA MARTINEZ CRUZ']
+    assert (alumnos[2]['fecha_nacimiento'], alumnos[2]['sexo']) == ('2018-05-12', 'M')  # Salen de su CURP.
+    # Lo que la persona debe corregir regresa con un mensaje claro.
+    for datos, error in (({'grado': 7, 'letra': 'A', 'filas': escrita['filas']}, 'grado'),
+                         ({'grado': 3, 'letra': 'A', 'filas': [{'nombres': 'LUIS'}]}, 'Renglón 1'),
+                         ({'grado': 3, 'letra': 'A', 'filas': [{'nombres': 'LUIS', 'primer_apellido': 'X', 'curp': 'ABC'}]}, 'CURP'),
+                         ({'grado': 3, 'letra': 'A', 'filas': []}, 'vacía')):
+        codigo, respuesta = pedir(url, '/api/listas/guardar', datos, token)
+        assert codigo == 400 and error in respuesta['error'], (datos, respuesta)
+    cuerpo, tipo = formulario({'texto': ''}, [])
+    assert pedir(url, '/api/listas/leer', cuerpo, token, tipo=tipo)[0] == 400
+    assert pedir(url, '/api/grupos', cabeceras={'X-SIDP-Token': 'otro'})[0] == 403
+
+
+def test_el_expediente_escaneado_se_liga_al_alumno_de_la_lista(entorno):
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'A', 'filas': [
+        {'nombres': 'LUIS', 'primer_apellido': 'HERNANDES', 'segundo_apellido': 'RAMOS'},  # Mal escrito en la lista.
+        {'nombres': 'ANA MARIA', 'primer_apellido': 'GARCIA', 'segundo_apellido': 'LOPEZ'}]}, token)
+    db = app.bandeja.registro.db
+    luis = db.execute("SELECT id FROM alumno WHERE nombres = 'LUIS'").fetchone()[0]
+    leido = escanear(url, app, expediente_escaneado())[1]
+    # El nombre del acta no es idéntico al de la lista, pero se propone como el mismo alumno.
+    assert leido['parecidos'][0]['id'] == luis and leido['parecidos'][0]['seguro'] and leido['parecidos'][0]['grupo'] == '3° A'
+    assert all(p['id'] != luis for p in leido['parecidos'][1:])
+    buscado = pedir(url, '/api/buscar_alumno?nombre=RAMOS%20HERNANDEZ%20LUIS', cabeceras=token)[1]['parecidos']
+    assert buscado[0]['id'] == luis
+    # Con un alumno que no existe no se guarda.
+    codigo, respuesta = pedir(url, '/api/escaneo/guardar', {'lote': leido['lote'], 'alumno': leido['propuesta']['alumno'],
+                                                             'alumno_id': 'no-existe'}, token)
+    assert codigo == 400 and 'listas' in respuesta['error']
+    codigo, guardado = pedir(url, '/api/escaneo/guardar', {'lote': leido['lote'], 'alumno': leido['propuesta']['alumno'],
+                                                             'tutor': leido['propuesta']['tutor'], 'alumno_id': luis}, token)
+    assert codigo == 200, guardado
+    # No hay alumno duplicado: el de la lista recibió el nombre corregido, la CURP y la fecha, con su bitácora.
+    assert db.execute('SELECT COUNT(*) FROM alumno').fetchone()[0] == 2
+    assert db.execute('SELECT primer_apellido, curp, fecha_nacimiento, sexo, version FROM alumno WHERE id = ?', (luis,)).fetchone() == (
+        'HERNANDEZ', CURP, '2018-03-14', 'H', 2)
+    assert db.execute("SELECT COUNT(*) FROM bitacora WHERE accion = 'alumno.completado' AND objeto_id = ?", (luis,)).fetchone()[0] == 1
+    estado = pedir(url, '/api/estado', cabeceras=token)[1]
+    assert (estado['expedientes'][0]['alumno'], estado['expedientes'][0]['grupo']) == ('LUIS HERNANDEZ RAMOS', '3° A')
+    grupo = pedir(url, '/api/grupos', cabeceras=token)[1]['grupos'][0]
+    assert (grupo['con_documentos'], grupo['sin_curp']) == (1, 1)
+    alumno = next(a for a in pedir(url, f'/api/grupo?id={grupo["id"]}', cabeceras=token)[1]['alumnos'] if a['id'] == luis)
+    assert alumno['expedientes'][0]['estado'] == 'validado en papel' and alumno['tutor'] == 'MARIA ELENA RAMOS SOTO'
+    # Otro escaneo del mismo niño con su CURP no puede ir a otro alumno.
+    otro = escanear(url, app, expediente_escaneado())[1]
+    ana = db.execute("SELECT id FROM alumno WHERE nombres = 'ANA MARIA'").fetchone()[0]
+    codigo, respuesta = pedir(url, '/api/escaneo/guardar', {'lote': otro['lote'], 'alumno': otro['propuesta']['alumno'], 'alumno_id': ana}, token)
+    assert codigo == 400 and 'otro alumno' in respuesta['error']
+
+
+def test_el_analisis_cuenta_por_grado_y_exporta_a_excel(entorno):
+    import csv
+    import io
+    import zipfile
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    lista = [{'nombres': 'LUIS', 'primer_apellido': 'HERNANDEZ', 'segundo_apellido': 'RAMOS', 'curp': CURP},
+             {'nombres': 'SOFIA', 'primer_apellido': 'MARTINEZ', 'segundo_apellido': 'CRUZ', 'curp': SOFIA}]
+    pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'A', 'filas': lista}, token)
+    pedir(url, '/api/listas/guardar', {'grado': 1, 'letra': 'B', 'filas': [{'nombres': '=CMD', 'primer_apellido': 'PEREZ'}]}, token)
+    analisis_ = pedir(url, '/api/analisis', cabeceras=token)[1]
+    tercero = analisis_['grados'][2]
+    assert (tercero['hombres'], tercero['mujeres'], tercero['total'], tercero['grupos']) == (1, 1, 2, 1)
+    assert analisis_['grados'][0]['sin_dato'] == 1
+    assert analisis_['faltan']['sin_curp'] == 1 and analisis_['faltan']['curp_sin_validar'] == 2 and analisis_['faltan']['total'] == 3
+    cabeceras, contenido = descargar(url, '/api/exportar?que=alumnos&formato=xlsx', app.token)
+    assert 'attachment' in cabeceras['Content-Disposition'] and contenido[:2] == b'PK'
+    with zipfile.ZipFile(io.BytesIO(contenido)) as libro:
+        hojas = libro.read('xl/workbook.xml').decode()
+        assert all(f'name="{n}"' in hojas for n in ('Todos', '1° B', '3° A'))
+        assert 'MARTINEZ' in libro.read('xl/worksheets/sheet3.xml').decode()
+    texto = descargar(url, '/api/exportar?que=alumnos&formato=csv', app.token)[1].decode('utf-8-sig')
+    renglones = list(csv.reader(io.StringIO(texto)))
+    assert renglones[0][:3] == ['Grado', 'Grupo', 'Primer apellido'] and len(renglones) == 4
+    assert "'=CMD" in texto  # Un nombre que parece fórmula no se ejecuta en Excel.
+    conteo = descargar(url, '/api/exportar?que=conteo&formato=csv', app.token)[1].decode('utf-8-sig')
+    assert conteo.splitlines()[-1] == 'Total,2,1,1,1,3'
+    with pytest.raises(urllib.error.HTTPError):
+        descargar(url, '/api/exportar?que=otra&formato=xlsx', app.token)

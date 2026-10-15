@@ -65,6 +65,24 @@ function motorLocal() {
       return api('/api/plantillas/guardar', formulario);
     },
     plantillaActiva: (clave, activa) => api('/api/plantillas/activa', { clave, activa }),
+    grupos: () => api('/api/grupos'),
+    grupo: (id) => api('/api/grupo?id=' + encodeURIComponent(id)),
+    buscarAlumno: (nombre, curp = '') => api(`/api/buscar_alumno?nombre=${encodeURIComponent(nombre)}&curp=${encodeURIComponent(curp)}`),
+    listaLeer: (archivos, texto, apellidosPrimero) => {
+      const formulario = new FormData();
+      formulario.append('captura', JSON.stringify({ texto, apellidos_primero: apellidosPrimero }));
+      for (const archivo of archivos) formulario.append('archivo', archivo, archivo.name);
+      return api('/api/listas/leer', formulario);
+    },
+    listaGuardar: (datos) => api('/api/listas/guardar', datos),
+    grupoCrear: (grado, letra) => api('/api/grupos/crear', { grado, letra }),
+    analisis: () => api('/api/analisis'),
+    descargar: async (que, formato) => {
+      const enlace = document.createElement('a');
+      enlace.href = `/api/exportar?que=${encodeURIComponent(que)}&formato=${encodeURIComponent(formato)}&t=${encodeURIComponent(SIDP.token || '')}`;
+      enlace.download = '';
+      document.body.appendChild(enlace); enlace.click(); enlace.remove();
+    },
     muestraUrl: (clave, archivo) => `/api/plantillas/muestra?clave=${encodeURIComponent(clave)}&archivo=${encodeURIComponent(archivo)}&t=${encodeURIComponent(SIDP.token || '')}`,
   };
 }
@@ -99,6 +117,18 @@ def plantilla(nombre, datos, archivos):
     try:
         salida = bandeja.plantilla_leer(lista) if nombre == 'leer' else bandeja.plantilla_guardar(json.loads(datos), lista, 'administrador (demostración)')
         return json.dumps({'ok': salida}, ensure_ascii=False, default=str)
+    except ErrorBandeja as error:
+        return json.dumps({'error': str(error)}, ensure_ascii=False)
+def lista(archivos, texto, apellidos_primero):
+    lista = [(a['nombre'], base64.b64decode(a['contenido'])) for a in json.loads(archivos)]
+    try:
+        return json.dumps({'ok': bandeja.lista_leer(lista, texto, apellidos_primero)}, ensure_ascii=False, default=str)
+    except ErrorBandeja as error:
+        return json.dumps({'error': str(error)}, ensure_ascii=False)
+def exportar(que, formato):
+    try:
+        nombre, contenido, tipo = bandeja.exportar(que, formato)
+        return json.dumps({'ok': {'nombre': nombre, 'contenido': base64.b64encode(contenido).decode(), 'tipo': tipo}})
     except ErrorBandeja as error:
         return json.dumps({'error': str(error)}, ensure_ascii=False)
 def recibir(captura, archivos):
@@ -187,6 +217,30 @@ def recibir(captura, archivos):
     plantillaLeer: (archivos) => plantillaDemo('leer', null, archivos),
     plantillaGuardar: (datos, archivos = []) => plantillaDemo('guardar', datos, archivos),
     plantillaActiva: (clave, activa) => llamar('plantilla_activa', clave, activa, 'administrador (demostración)'),
+    grupos: () => llamar('grupos_lista'),
+    grupo: (id) => llamar('grupo_alumnos', id),
+    buscarAlumno: (nombre, curp = '') => llamar('buscar_alumno', nombre, curp),
+    listaLeer: async (archivos, texto, apellidosPrimero) => {
+      await listo;
+      const lista = [];
+      for (const archivo of archivos) lista.push({ nombre: archivo.name, contenido: base64(await archivo.arrayBuffer()) });
+      const r = JSON.parse(py.globals.get('lista')(JSON.stringify(lista), texto, apellidosPrimero));
+      if (r.error) throw new Error(r.error);
+      return r.ok;
+    },
+    listaGuardar: (datos) => llamar('lista_guardar', datos),
+    grupoCrear: (grado, letra) => llamar('grupo_crear', grado, letra),
+    analisis: () => llamar('analisis'),
+    descargar: async (que, formato) => {
+      await listo;
+      const r = JSON.parse(py.globals.get('exportar')(que, formato));
+      if (r.error) throw new Error(r.error);
+      const bytes = Uint8Array.from(atob(r.ok.contenido), (c) => c.charCodeAt(0));
+      const enlace = document.createElement('a');
+      enlace.href = URL.createObjectURL(new Blob([bytes], { type: r.ok.tipo }));
+      enlace.download = r.ok.nombre;
+      document.body.appendChild(enlace); enlace.click(); enlace.remove();
+    },
     muestraUrl: null,
     enviar: async (formulario) => {
       await listo;

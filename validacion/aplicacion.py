@@ -93,6 +93,16 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
             self.end_headers()
             self.wfile.write(cuerpo)
 
+        def _descargar(self, nombre, cuerpo, tipo):
+            self.send_response(200)
+            self.send_header('Content-Type', tipo)
+            self.send_header('Content-Length', str(len(cuerpo)))
+            self.send_header('Content-Disposition', f'attachment; filename="{nombre}"')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.end_headers()
+            self.wfile.write(cuerpo)
+
         def _local(self):
             return self.client_address[0] in LOCALES
 
@@ -156,6 +166,16 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                                                   'direccion_padres': app.direccion_padres()})
                     if url.path == '/api/plantillas':
                         return self._enviar(200, app.bandeja.lista_plantillas())
+                    if url.path == '/api/grupos':
+                        return self._enviar(200, app.bandeja.grupos_lista())
+                    if url.path == '/api/grupo':
+                        return self._enviar(200, app.bandeja.grupo_alumnos(consulta.get('id', [''])[0]))
+                    if url.path == '/api/buscar_alumno':
+                        return self._enviar(200, app.bandeja.buscar_alumno(consulta.get('nombre', [''])[0], consulta.get('curp', [''])[0]))
+                    if url.path == '/api/analisis':
+                        return self._enviar(200, app.bandeja.analisis())
+                    if url.path == '/api/exportar':
+                        return self._descargar(*app.bandeja.exportar(consulta.get('que', [''])[0], consulta.get('formato', ['xlsx'])[0]))
                     if url.path == '/api/plantillas/muestra':
                         ruta = app.bandeja.plantilla_muestra(consulta.get('clave', [''])[0], consulta.get('archivo', [''])[0])
                         return self._enviar(200, ruta.read_bytes(), mimetypes.guess_type(ruta.name)[0] or 'application/octet-stream')
@@ -194,6 +214,11 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
                     with app.candado:
                         return self._enviar(200, app.bandeja.escaneo_leer(archivos))
+                if url.path == '/api/listas/leer':  # La lista de un grupo: escaneada (archivos) o escrita (campo "captura").
+                    datos, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.lista_leer([(n, c) for _, n, c in archivos], datos.get('texto', ''),
+                                                                        datos.get('apellidos_primero', True) is not False))
                 if url.path == '/api/plantillas/leer':  # Muestras de un documento: se proponen sus textos fijos.
                     archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
                     with app.candado:
@@ -216,6 +241,10 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.escaneo_guardar(datos.get('lote', ''), datos))
                     if url.path == '/api/escaneo/descartar':
                         return self._enviar(200, app.bandeja.escaneo_descartar(datos.get('lote', '')))
+                    if url.path == '/api/listas/guardar':
+                        return self._enviar(200, app.bandeja.lista_guardar(datos))
+                    if url.path == '/api/grupos/crear':
+                        return self._enviar(200, app.bandeja.grupo_crear(datos.get('grado'), datos.get('letra')))
                     if url.path == '/api/plantillas/activa':
                         return self._enviar(200, app.bandeja.plantilla_activa(datos.get('clave', ''), datos.get('activa')))
                     if url.path == '/api/renapo/no_encontrada':
