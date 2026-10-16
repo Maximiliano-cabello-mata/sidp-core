@@ -71,6 +71,16 @@ def preparar(contenido, lado=None):
     lado = lado or LADO
     imagen = Image.open(io.BytesIO(contenido))
     imagen = ImageOps.exif_transpose(imagen).convert('RGB')
+    try:
+        import numpy as np
+        gris = np.asarray(imagen.convert('L'), dtype=np.float32)
+        if gris.shape[0] > 32 and gris.shape[1] > 32:
+            horiz = float(np.mean(np.abs(np.diff(gris, axis=0)).mean(axis=1) ** 2))
+            vert = float(np.mean(np.abs(np.diff(gris, axis=1)).mean(axis=0) ** 2))
+            if vert > horiz * 1.15:  # Hoja tomada de lado (90°) sin etiqueta EXIF: se endereza.
+                imagen = imagen.transpose(Image.Transpose.ROTATE_270)
+    except Exception:
+        pass
     imagen.thumbnail((lado, lado))
     salida = io.BytesIO()
     imagen.save(salida, 'JPEG', quality=82)
@@ -116,7 +126,7 @@ def preguntar(imagenes, pregunta, esquema=None, nombre_modelo=None, url=modelo.U
     # La imagen va antes que la pregunta: en la segunda lectura de la misma hoja Ollama reusa lo que ya vio.
     cuerpo = {
         'model': nombre_modelo, 'stream': False, 'keep_alive': '30m', 'think': False,
-        'options': {'temperature': 0, 'num_ctx': CONTEXTO},
+        'options': {'temperature': 0, 'num_ctx': CONTEXTO, 'repeat_penalty': 1.15, 'num_predict': 768},
         'messages': [{'role': 'user', 'content': pregunta,
                       'images': [base64.b64encode(preparar(i)).decode() for i in imagenes]}],
     }
