@@ -33,7 +33,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from validacion import base_cerebro, expediente, lector, modelo, respaldo
+from validacion import base_cerebro, campos, expediente, lector, modelo, respaldo, taller as taller_mod, vision
 
 PUERTO = 8771
 MAXIMO = 4096  # Una pregunta son dos textos cortos; nada más grande pasa.
@@ -162,7 +162,7 @@ def alumnos_de_cerebro(url, clave, espera=60):
         return json.load(respuesta)
 
 
-def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None,
+def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None, taller=None,
                    almacen=None, carpeta_respaldos=None):
     almacen = almacen or respaldo.Almacen()
     carpeta_respaldos = Path(carpeta_respaldos or base_cerebro.CARPETA_RESPALDOS)
@@ -184,7 +184,7 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
 
         def do_GET(self):
             ruta, _, consulta = self.path.partition('?')
-            if ruta not in ('/salud', '/alumnos', '/inventario', '/analisis', '/respaldo'):
+            if ruta not in ('/salud', '/alumnos', '/inventario', '/analisis', '/respaldo', '/trabajos', '/alumno', '/por_confirmar'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
@@ -203,6 +203,16 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                     return self._responder(200, base.alumnos())
                 if ruta == '/inventario':
                     return self._responder(200, base.inventario())
+                if ruta == '/trabajos':
+                    return self._responder(200, taller.estado() if taller else {'trabajos': {}, 'sin_taller': True})
+                if ruta == '/por_confirmar':
+                    return self._responder(200, {'datos': base.por_confirmar()})
+                if ruta == '/alumno':
+                    from urllib.parse import parse_qs
+                    try:
+                        return self._responder(200, base.expediente_alumno(parse_qs(consulta).get('curp', [''])[0]))
+                    except base_cerebro.ErrorBase as error:
+                        return self._responder(404, {'error': str(error)})
                 from validacion import analisis_datos
                 try:
                     resultado = analisis_datos.analizar(base)
@@ -267,12 +277,54 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 return self._responder(400, {'error': detalle[:300]})
             return self._responder(200, {'ok': True, 'hecho': hecho, **base.inventario()})
 
+        def _expediente(self, ruta):
+            """Trabajos de extracción, datos del alumno y su baja: todo en la base de la PC 4."""
+            if not base:
+                return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
+            pedido = self._leer_json(MAXIMO_EXPEDIENTE if ruta in ('/trabajo', '/plantilla/campos') else MAXIMO_INVENTARIO)
+            if pedido is None:
+                return
+            try:
+                if ruta == '/trabajo':
+                    if not taller:
+                        return self._responder(503, {'error': 'el taller de la PC 4 no está trabajando'})
+                    return self._responder(200, {'trabajo': taller.encargar(pedido)})
+                if ruta == '/plantilla/campos':
+                    hojas = vision.paginas(base64.b64decode(pedido['contenido']), pedido.get('nombre', ''))[:2]
+                    vistos, segundos = vision.preguntar(hojas, campos.PROPONER, campos.ESQUEMA_PROPONER, url=url)
+                    etiquetas = [e for e in dict.fromkeys(str(x).strip() for x in vistos.get('campos', [])) if e][:40]
+                    return self._responder(200, {'campos': [campos.proponer(e) for e in etiquetas], 'segundos': segundos})
+                persona = pedido.get('persona') or 'administrador'
+                if ruta == '/dato/confirmar':
+                    hecho = base.confirmar_dato(pedido['id'], pedido.get('valor'), persona, pedido.get('descartar'))
+                elif ruta == '/dato/agregar':
+                    hecho = base.agregar_dato(pedido['curp'], pedido['categoria'], pedido['campo'], pedido['valor'], persona,
+                                              {'de': pedido['de']} if pedido.get('de') else None)
+                elif ruta == '/alumno/baja':
+                    hecho = base.dar_baja_alumno(pedido['curp'], pedido.get('motivo'), persona)
+                else:
+                    hecho = base.borrar_alumno(pedido['curp'], pedido.get('motivo'), persona)
+                return self._responder(200, {'ok': True, 'hecho': hecho})
+            except vision.ErrorVision as error:
+                return self._responder(503, {'error': str(error)})
+            except (LookupError, base_cerebro.ErrorBase) as error:
+                return self._responder(409, {'error': str(error)})
+            except (ValueError, KeyError, TypeError) as error:
+                return self._responder(400, {'error': f'pedido mal formado: {error}'})
+            except Exception as error:  # Las reglas de la base (motivo vacío, dato que no existe) llegan aquí.
+                mensaje = getattr(error, 'args', [None])[0]
+                detalle = mensaje.get('M') if isinstance(mensaje, dict) else str(error)
+                return self._responder(400, {'error': detalle[:300]})
+
         def do_POST(self):
             if self.path not in ('/opinar', '/validar', '/leer', '/padron', '/inventario/alta', '/inventario/cambiar',
-                                 '/respaldo/faltan', '/respaldo/archivo', '/respaldo/listo'):
+                                 '/respaldo/faltan', '/respaldo/archivo', '/respaldo/listo', '/trabajo', '/plantilla/campos',
+                                 '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
+            if self.path in ('/trabajo', '/plantilla/campos', '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
+                return self._expediente(self.path)
             if self.path.startswith('/respaldo/'):
                 return self._respaldo(self.path)
             if self.path.startswith('/inventario/'):
@@ -337,7 +389,8 @@ def main(argumentos=None):
     while base is None and time.monotonic() < limite:
         time.sleep(5)
         base, problema = base_cerebro.abrir(args.base)
-    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base)
+    taller = taller_mod.arrancar(base, url=args.ollama) if base else None  # Saca los datos de lo escaneado, en fila.
+    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base, taller=taller)
     print(f'Cerebro escuchando en http://{ip_local()}:{args.puerto}  (modelo {args.modelo})')
     if base:
         resumen = base.resumen()

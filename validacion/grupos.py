@@ -227,6 +227,17 @@ class Grupos:
                                    'parecido': puntos, 'seguro': puntos >= PARECIDO_SEGURO})
         return sorted(candidatos, key=lambda c: (-c['parecido'], c['nombre']))[:8 if buscar else 5]
 
+    def dar_baja(self, alumno_id, motivo):
+        """El alumno deja las listas (baja o borrado en la PC 4). Su historial se queda en la bitácora."""
+        fila = self.db.execute('SELECT estado, version FROM alumno WHERE id = ?', (alumno_id,)).fetchone()
+        if not fila or fila[0] != 'activo':
+            return False
+        vigentes = dict(self.db.execute(
+            "SELECT i.id, i.version FROM inscripcion i JOIN ciclo c ON c.id = i.ciclo_id "
+            "WHERE i.alumno_id = ? AND i.estado IN ('incompleta', 'completa') AND c.estado <> 'cerrado'", (alumno_id,)).fetchall())
+        sp.sp_baja_alumno(self.db, alumno_id, motivo, self.registro.actor, fila[1], vigentes)
+        return True
+
     def ubicacion(self, alumno_id):
         """'3° A' del alumno en el ciclo actual, o None."""
         ciclo, _ = self.ciclo()

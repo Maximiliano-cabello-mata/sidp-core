@@ -164,6 +164,9 @@ class Vigia:
                 problema = diagnostico(url) if not encontrados else 'La PC 4 contesta, pero la clave no coincide.'
         elif not self.app.bandeja.cerebro:
             problema = self.app.configurar(url, clave)
+        if not problema and list(self.app.bandeja._pendientes().glob('*.json')):
+            with self.app.candado:  # Lo que se escaneó mientras la PC 4 no estaba.
+                self.app.bandeja.enviar_pendientes()
         self.estado.update(conectado=not problema, problema=problema, revisado=time.strftime('%H:%M'), url=self.app.configuracion.get('cerebro_url'))
         return self.estado
 

@@ -281,6 +281,10 @@ ON CONFLICT (clave) DO NOTHING;  -- Si la escuela cambió algo, se respeta.
 CREATE OR REPLACE FUNCTION sidp.no_borrar() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
+    -- La única excepción: sidp.borrar_alumno, cuando un administrador borra a un alumno (queda en la bitácora).
+    IF current_setting('sidp.borrando', true) = 'si' THEN
+        RETURN CASE WHEN TG_LEVEL = 'ROW' THEN OLD END;
+    END IF;
     RAISE EXCEPTION 'En SIDP no se borra nada (tabla %): usa un estado como baja, archivado o reemplazado', TG_TABLE_NAME;
 END $$;
 
@@ -854,10 +858,175 @@ FROM sidp.inventario_pieza p
 JOIN sidp.inventario_lote l ON l.id = p.lote_id
 JOIN sidp.inventario_categoria c ON c.clave = l.categoria;
 
+
+-- ============================================================ Datos sacados de los documentos (versión 3)
+--
+-- Los documentos traen datos muy variables: un certificado médico trae 3 campos o 20, un domicilio viene
+-- completo o a medias, y un alumno tiene uno o cinco teléfonos. Por eso cada dato es un renglón (alumno,
+-- categoría, campo, valor) y no una columna fija: una plantilla nueva puede traer campos nuevos sin cambiar
+-- la base. Lo que tiene partes (un domicilio, de quién es un teléfono) va en "detalle".
+-- Confianza: confirmado (lo vio una persona), alta (lo dio un proceso fijo: QR, CURP con dígito correcto, o
+-- coincide con otro documento), media (lo leyó el modelo y pasa las reglas) y baja (dudoso: por confirmar).
+
+CREATE TABLE IF NOT EXISTS sidp.trabajo (
+    id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    alumno_id    bigint NOT NULL REFERENCES sidp.alumno(id) ON DELETE RESTRICT,
+    expediente   text,                        -- El número del expediente en el servidor.
+    documentos   jsonb NOT NULL,              -- [{archivo, tipo, nombre, campos}]
+    estado       text NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'trabajando', 'hecho', 'error')),
+    intentos     integer NOT NULL DEFAULT 0,
+    problema     text,
+    resumen      jsonb,                       -- Cuántos campos se llenaron y con qué confianza (solo números).
+    creado       timestamptz NOT NULL DEFAULT now(),
+    terminado    timestamptz
+);
+CREATE INDEX IF NOT EXISTS trabajo_estado ON sidp.trabajo (estado, id);
+
+CREATE TABLE IF NOT EXISTS sidp.dato (
+    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    alumno_id   bigint NOT NULL REFERENCES sidp.alumno(id) ON DELETE RESTRICT,
+    categoria   text NOT NULL CHECK (categoria IN ('alumno', 'salud', 'contacto', 'domicilio', 'madre', 'padre', 'tutor', 'escolar', 'otro')),
+    campo       text NOT NULL CHECK (campo ~ '^[a-z0-9_]{1,40}$'),
+    valor       text NOT NULL CHECK (btrim(valor) <> ''),
+    detalle     jsonb NOT NULL DEFAULT '{}',
+    confianza   text NOT NULL CHECK (confianza IN ('confirmado', 'alta', 'media', 'baja')),
+    metodo      text NOT NULL,               -- qr, texto, ocr, vision, padron, persona
+    documento   text,                        -- De qué documento o plantilla salió.
+    trabajo_id  bigint REFERENCES sidp.trabajo(id) ON DELETE RESTRICT,
+    estado      text NOT NULL DEFAULT 'vigente' CHECK (estado IN ('vigente', 'por_confirmar', 'reemplazado', 'descartado')),
+    quien       text NOT NULL DEFAULT 'sistema',
+    creado      timestamptz NOT NULL DEFAULT now(),
+    actualizado timestamptz NOT NULL DEFAULT now(),
+    version     integer NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS dato_alumno ON sidp.dato (alumno_id, categoria, campo) WHERE estado IN ('vigente', 'por_confirmar');
+CREATE INDEX IF NOT EXISTS dato_por_confirmar ON sidp.dato (estado) WHERE estado = 'por_confirmar';
+
+DO $$
+DECLARE
+    tabla text;
+BEGIN
+    FOREACH tabla IN ARRAY ARRAY['trabajo', 'dato'] LOOP
+        EXECUTE format('CREATE OR REPLACE TRIGGER no_borrar BEFORE DELETE ON sidp.%I FOR EACH ROW EXECUTE FUNCTION sidp.no_borrar()', tabla);
+        EXECUTE format('CREATE OR REPLACE TRIGGER no_vaciar BEFORE TRUNCATE ON sidp.%I FOR EACH STATEMENT EXECUTE FUNCTION sidp.no_borrar()', tabla);
+    END LOOP;
+END $$;
+CREATE OR REPLACE TRIGGER subir_version BEFORE UPDATE ON sidp.dato FOR EACH ROW EXECUTE FUNCTION sidp.subir_version();
+CREATE OR REPLACE TRIGGER anotar_cambio AFTER INSERT OR UPDATE ON sidp.dato FOR EACH ROW EXECUTE FUNCTION sidp.anotar_cambio();
+
+-- Guarda un dato sin perder lo anterior. Un campo de un solo valor (tipo de sangre) reemplaza al anterior si es
+-- distinto; uno de varios valores (teléfono) se agrega si no estaba. Un dato confirmado por una persona no lo
+-- reemplaza una lectura: la lectura nueva queda por confirmar. Devuelve el id del dato vigente o por confirmar.
+CREATE OR REPLACE FUNCTION sidp.guardar_dato(alumno bigint, cat text, nombre_campo text, nuevo_valor text, nuevo_detalle jsonb,
+                                             nivel text, metodo_dato text, de_documento text, trabajo bigint, persona text,
+                                             varios boolean DEFAULT false)
+RETURNS bigint
+LANGUAGE plpgsql AS $$
+DECLARE
+    igual   sidp.dato;
+    actual  sidp.dato;
+    nuevo   bigint;
+    estado_nuevo text := CASE WHEN nivel = 'baja' THEN 'por_confirmar' ELSE 'vigente' END;
+BEGIN
+    nuevo_valor := btrim(nuevo_valor);
+    IF coalesce(nuevo_valor, '') = '' THEN
+        RETURN NULL;
+    END IF;
+    PERFORM set_config('sidp.actor', persona, true);
+    SELECT * INTO igual FROM sidp.dato
+    WHERE alumno_id = alumno AND categoria = cat AND campo = nombre_campo AND estado IN ('vigente', 'por_confirmar')
+      AND sidp.normalizar(valor) = sidp.normalizar(nuevo_valor)
+    ORDER BY id DESC LIMIT 1;
+    IF FOUND THEN  -- Ya estaba: si ahora es más seguro, se sube su confianza.
+        IF array_position(ARRAY['baja', 'media', 'alta', 'confirmado'], nivel) > array_position(ARRAY['baja', 'media', 'alta', 'confirmado'], igual.confianza) THEN
+            UPDATE sidp.dato SET confianza = nivel, estado = 'vigente', metodo = metodo_dato, quien = persona WHERE id = igual.id;
+        END IF;
+        RETURN igual.id;
+    END IF;
+    IF nivel <> 'confirmado' AND EXISTS (SELECT 1 FROM sidp.dato WHERE alumno_id = alumno AND categoria = cat AND campo = nombre_campo
+                                         AND estado = 'descartado' AND sidp.normalizar(valor) = sidp.normalizar(nuevo_valor)) THEN
+        RETURN NULL;  -- Una persona ya vio esa lectura y la corrigió o la descartó: no se le vuelve a preguntar.
+    END IF;
+    IF NOT varios THEN
+        SELECT * INTO actual FROM sidp.dato
+        WHERE alumno_id = alumno AND categoria = cat AND campo = nombre_campo AND estado = 'vigente' ORDER BY id DESC LIMIT 1;
+        IF FOUND AND actual.confianza = 'confirmado' AND nivel <> 'confirmado' THEN
+            estado_nuevo := 'por_confirmar';
+        ELSIF FOUND AND estado_nuevo = 'vigente' THEN
+            UPDATE sidp.dato SET estado = 'reemplazado' WHERE id = actual.id;
+        END IF;
+    END IF;
+    INSERT INTO sidp.dato (alumno_id, categoria, campo, valor, detalle, confianza, metodo, documento, trabajo_id, estado, quien)
+    VALUES (alumno, cat, nombre_campo, nuevo_valor, coalesce(nuevo_detalle, '{}'), nivel, metodo_dato, de_documento, trabajo,
+            estado_nuevo, persona)
+    RETURNING id INTO nuevo;
+    RETURN nuevo;
+END $$;
+
+-- Una persona confirma (o corrige) un dato dudoso; o lo descarta si no sirve.
+CREATE OR REPLACE FUNCTION sidp.confirmar_dato(id_dato bigint, valor_correcto text, persona text, descartar boolean DEFAULT false)
+RETURNS bigint
+LANGUAGE plpgsql AS $$
+DECLARE
+    d sidp.dato;
+    nuevo bigint;
+BEGIN
+    SELECT * INTO d FROM sidp.dato WHERE id = id_dato;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No existe el dato %', id_dato;
+    END IF;
+    PERFORM set_config('sidp.actor', persona, true);
+    UPDATE sidp.dato SET estado = 'descartado', quien = persona WHERE id = id_dato;
+    IF descartar THEN
+        RETURN NULL;
+    END IF;
+    nuevo := sidp.guardar_dato(d.alumno_id, d.categoria, d.campo, coalesce(nullif(btrim(valor_correcto), ''), d.valor), d.detalle,
+                               'confirmado', 'persona', d.documento, d.trabajo_id, persona,
+                               d.campo IN ('telefono', 'correo', 'alergia', 'padecimiento', 'medicamento'));
+    RETURN nuevo;
+END $$;
+
+-- Un administrador borra a un alumno (por ejemplo, se cargó por error). Se quita de todas las tablas; la
+-- bitácora guarda qué se borró, quién y por qué. Para un alumno que se va de la escuela se usa dar_baja.
+CREATE OR REPLACE FUNCTION sidp.borrar_alumno(id_alumno bigint, persona text, motivo text) RETURNS void
+LANGUAGE plpgsql AS $$
+DECLARE
+    registro sidp.alumno;
+    doc bigint;
+BEGIN
+    IF coalesce(btrim(motivo), '') = '' THEN
+        RAISE EXCEPTION 'Borrar a un alumno necesita un motivo';
+    END IF;
+    SELECT * INTO registro FROM sidp.alumno WHERE id = id_alumno;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No existe el alumno %', id_alumno;
+    END IF;
+    PERFORM set_config('sidp.actor', persona, true);
+    PERFORM set_config('sidp.borrando', 'si', true);
+    INSERT INTO sidp.bitacora (actor, accion, tabla, registro, antes, despues)
+    VALUES (persona, 'borrar', 'alumno', id_alumno::text, to_jsonb(registro), jsonb_build_object('motivo', motivo));
+    DELETE FROM sidp.dato WHERE alumno_id = id_alumno;
+    DELETE FROM sidp.trabajo WHERE alumno_id = id_alumno;
+    UPDATE sidp.lectura SET alumno_id = NULL WHERE alumno_id = id_alumno;
+    DELETE FROM sidp.revision_documento WHERE documento_id IN (SELECT id FROM sidp.documento WHERE alumno_id = id_alumno);
+    FOR doc IN SELECT id FROM sidp.documento WHERE alumno_id = id_alumno ORDER BY id DESC LOOP
+        DELETE FROM sidp.documento WHERE id = doc;  -- Del más nuevo al más viejo (uno reemplaza al anterior).
+    END LOOP;
+    DELETE FROM sidp.inscripcion WHERE alumno_id = id_alumno;
+    DELETE FROM sidp.alumno_tutor WHERE alumno_id = id_alumno;
+    DELETE FROM sidp.alumno WHERE id = id_alumno;
+    PERFORM set_config('sidp.borrando', '', true);
+END $$;
+
+-- Todo lo del alumno vigente, por categoría: lo que muestra el expediente.
+CREATE OR REPLACE VIEW sidp.v_datos AS
+    SELECT d.alumno_id, d.categoria, d.campo, d.valor, d.detalle, d.confianza, d.metodo, d.documento, d.estado, d.id, d.creado
+    FROM sidp.dato d WHERE d.estado IN ('vigente', 'por_confirmar');
+
 -- ============================================================ Velocidad
 
 CREATE INDEX IF NOT EXISTS inscripcion_ciclo_estado ON sidp.inscripcion (ciclo, estado);
 CREATE INDEX IF NOT EXISTS documento_alumno_tipo ON sidp.documento (alumno_id, tipo, estado);
 CREATE INDEX IF NOT EXISTS lectura_recibida ON sidp.lectura (recibida);
 
-INSERT INTO sidp.meta (clave, valor) VALUES ('version', '2') ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor;
+INSERT INTO sidp.meta (clave, valor) VALUES ('version', '3') ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor;

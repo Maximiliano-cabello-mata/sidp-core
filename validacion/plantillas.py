@@ -22,6 +22,7 @@ import re
 import unicodedata
 from pathlib import Path
 
+from validacion import campos as campos_mod
 from validacion import comparador
 from validacion.expediente import TIPOS, fechas, mayusculas, parece
 
@@ -57,7 +58,7 @@ def fabrica():
     """Los documentos que trae el sistema, como plantillas versión 0."""
     return {clave: {'clave': clave, 'nombre': nombre, 'de': FABRICA_DE[clave], 'obligatorio': obligatorio, 'para_padres': True,
                     'textos': list(marcas), 'minimo': 1, 'reglas': FABRICA_REVISA[clave], 'meses': 3 if clave == 'comprobante' else None,
-                    'fabrica': True, 'activa': True, 'version': 0}
+                    'fabrica': True, 'activa': True, 'version': 0, 'campos': campos_mod.FABRICA.get(clave, [])}
             for clave, (nombre, obligatorio, marcas) in TIPOS.items()}
 
 
@@ -130,7 +131,11 @@ def normalizar(datos, existentes):
     if anterior and anterior.get('fabrica'):
         reglas = anterior['reglas']  # Las revisiones de fábrica son código y no cambian desde aquí.
         meses = anterior['meses']
-    return {'clave': clave, 'nombre': nombre, 'de': de, 'obligatorio': bool(datos.get('obligatorio')),
+    try:  # Los datos que se sacan del documento al escanearlo (validacion/campos.py).
+        lista_campos = campos_mod.revisar_campos(datos['campos']) if 'campos' in datos else (anterior or {}).get('campos', [])
+    except ValueError as error:
+        raise ErrorPlantilla(str(error))
+    return {'campos': lista_campos, 'clave': clave, 'nombre': nombre, 'de': de, 'obligatorio': bool(datos.get('obligatorio')),
             'para_padres': bool(datos.get('para_padres')), 'textos': textos, 'minimo': minimo, 'reglas': reglas, 'meses': meses,
             'fabrica': bool(anterior and anterior.get('fabrica')), 'activa': datos.get('activa', True) is not False}
 

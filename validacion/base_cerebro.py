@@ -107,6 +107,74 @@ class BaseCerebro:
                        'public.padron_alumno, public.lectura')
         return self.preparar()
 
+    # ---------------------------------------------------------------- Expediente del alumno (datos sacados de los documentos)
+
+    def _alumno_id(self, curp):
+        filas = self._consulta('SELECT id FROM sidp.alumno WHERE curp = %s', ((curp or '').upper(),))
+        if not filas:
+            raise ErrorBase('Ese alumno no está en la base de la PC 4')
+        return filas[0][0]
+
+    def expediente_alumno(self, curp):
+        """Todo lo que se sabe del alumno, por categoría: lo que muestra su expediente en el panel."""
+        alumno = self._alumno_id(curp)
+        fila = self._consulta(
+            "SELECT curp, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, sexo, estado, curp_renapo, grado, letra, inscripcion "
+            "FROM sidp.v_alumnos WHERE id = %s", (alumno,))[0]
+        claves = ('curp', 'nombres', 'primer_apellido', 'segundo_apellido', 'fecha_nacimiento', 'sexo', 'estado', 'curp_renapo', 'grado', 'letra',
+                  'inscripcion')
+        ficha = dict(zip(claves, fila))
+        ficha['fecha_nacimiento'] = ficha['fecha_nacimiento'].isoformat() if ficha['fecha_nacimiento'] else None
+        datos = {}
+        for id_dato, categoria, campo, valor, detalle, confianza, metodo, documento, estado in self._consulta(
+                'SELECT id, categoria, campo, valor, detalle, confianza, metodo, documento, estado FROM sidp.v_datos '
+                'WHERE alumno_id = %s ORDER BY categoria, campo, id', (alumno,)):
+            datos.setdefault(categoria, []).append({'id': id_dato, 'campo': campo, 'valor': valor, 'detalle': detalle, 'confianza': confianza,
+                                                    'metodo': metodo, 'documento': documento, 'estado': estado})
+        tutores = [dict(zip(('nombres', 'primer_apellido', 'segundo_apellido', 'curp', 'telefono', 'correo', 'domicilio', 'parentesco'), t))
+                   for t in self._consulta('SELECT t.nombres, t.primer_apellido, t.segundo_apellido, t.curp, t.telefono, t.correo, t.domicilio, '
+                                           'at.parentesco FROM sidp.alumno_tutor at JOIN sidp.tutor t ON t.id = at.tutor_id '
+                                           'WHERE at.alumno_id = %s AND at.vigente', (alumno,))]
+        trabajos = [dict(zip(('id', 'estado', 'resumen', 'creado', 'problema'), (t[0], t[1], t[2], t[3].isoformat(timespec='minutes'), t[4])))
+                    for t in self._consulta('SELECT id, estado, resumen, creado, problema FROM sidp.trabajo WHERE alumno_id = %s ORDER BY id DESC LIMIT 20', (alumno,))]
+        return {'alumno': ficha, 'datos': datos, 'tutores': tutores, 'trabajos': trabajos}
+
+    def por_confirmar(self, limite=300):
+        """Los datos dudosos de todos los alumnos, para confirmarlos de corrido."""
+        filas = self._consulta(
+            "SELECT d.id, a.curp, a.primer_apellido || ' ' || a.segundo_apellido || ' ' || a.nombres, i.grado, i.letra, d.categoria, d.campo, "
+            "d.valor, d.detalle, d.documento FROM sidp.dato d JOIN sidp.alumno a ON a.id = d.alumno_id "
+            "LEFT JOIN sidp.v_alumnos i ON i.id = a.id WHERE d.estado = 'por_confirmar' "
+            "ORDER BY i.grado, i.letra, a.primer_apellido, d.id LIMIT %s", (limite,))
+        return [dict(zip(('id', 'curp', 'alumno', 'grado', 'letra', 'categoria', 'campo', 'valor', 'detalle', 'documento'), f)) for f in filas]
+
+    def confirmar_dato(self, id_dato, valor, persona, descartar=False):
+        return self._uno('SELECT sidp.confirmar_dato(%s, %s, %s, %s)', (int(id_dato), valor or '', persona or 'administrador', bool(descartar)))
+
+    def agregar_dato(self, curp, categoria, campo, valor, persona, detalle=None):
+        """Un dato que escribe una persona (por ejemplo, un teléfono nuevo): queda confirmado."""
+        from validacion import campos as campos_mod
+        nombre = campos_mod.clave_de(campo)
+        return self._uno('SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)',
+                         (self._alumno_id(curp), categoria, nombre, valor, json.dumps(detalle or {}, ensure_ascii=False), 'confirmado',
+                          'persona', None, None, persona or 'administrador', nombre in campos_mod.VARIOS))
+
+    def dar_baja_alumno(self, curp, motivo, persona):
+        """El alumno se va de la escuela: deja de contar en listas y análisis, pero su expediente se queda."""
+        alumno = self._alumno_id(curp)
+        if not (motivo or '').strip():
+            raise ErrorBase('La baja necesita un motivo')
+        ciclo = self._uno("SELECT ciclo FROM sidp.v_inscritos WHERE id = %s", (alumno,))
+        if ciclo:
+            self._consulta('SELECT sidp.dar_baja(%s, %s, %s, %s)', (alumno, ciclo, motivo, persona or 'administrador'))
+        self._consulta("UPDATE sidp.alumno SET estado = 'baja' WHERE id = %s", (alumno,))
+        return {'baja': curp}
+
+    def borrar_alumno(self, curp, motivo, persona):
+        """Quita al alumno de la base (por ejemplo, se cargó por error). La bitácora guarda quién y por qué."""
+        self._consulta('SELECT sidp.borrar_alumno(%s, %s, %s)', (self._alumno_id(curp), persona or 'administrador', motivo))
+        return {'borrado': curp}
+
     # ---------------------------------------------------------------- Inventario
 
     def inventario(self):

@@ -188,6 +188,14 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                     return self._enviar(200, app.bandeja.analisis_pc4(consulta.get('ia', [''])[0] == '1'))
                 if url.path == '/api/respaldo':
                     return self._enviar(200, {'aviso': app.bandeja.respaldo_aviso, 'conectado': bool(app.bandeja.cerebro)})
+                if url.path == '/api/trabajos':
+                    return self._enviar(200, app.bandeja.trabajos_pc4())
+                if url.path == '/api/por_confirmar':
+                    return self._enviar(200, app.bandeja.por_confirmar())
+                if url.path == '/api/alumno':
+                    return self._enviar(200, app.bandeja.alumno_pc4(consulta.get('curp', [''])[0]))
+                if url.path == '/api/pdf':  # Un PDF de C:\SIDP\Expedientes, para verlo en la ventana.
+                    return self._enviar(200, app.bandeja.pdf(consulta.get('ruta', [''])[0]), 'application/pdf')
                 if url.path == '/api/etiquetas':  # Página para imprimir las etiquetas con código de barras.
                     pedidos = [c for c in consulta.get('codigos', [''])[0].upper().split(',') if c]
                     piezas = {p['codigo']: p for p in app.bandeja.inventario()['piezas']}
@@ -275,6 +283,11 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                     archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
                     with app.candado:
                         return self._enviar(200, app.bandeja.plantilla_leer(archivos))
+                if url.path == '/api/plantillas/campos':  # Una muestra: el modelo que ve de la PC 4 propone sus campos.
+                    archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
+                    if not archivos:
+                        raise ErrorBandeja('Sube una muestra del documento')
+                    return self._enviar(200, app.bandeja.campos_proponer(*archivos[0]))
                 if url.path == '/api/plantillas/guardar':  # Los datos de la plantilla (campo "captura") y sus muestras.
                     datos, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())
                     with app.candado:
@@ -286,6 +299,13 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                 datos = json.loads(self._cuerpo() or b'{}')
                 if url.path == '/api/inventario/alta':
                     return self._enviar(200, app.bandeja.inventario_alta(datos))
+                if url.path == '/api/dato/confirmar':
+                    return self._enviar(200, app.bandeja.dato_confirmar(datos))
+                if url.path == '/api/dato/agregar':
+                    return self._enviar(200, app.bandeja.dato_agregar(datos))
+                if url.path in ('/api/alumno/baja', '/api/alumno/borrar'):
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.alumno_baja(datos, borrar=url.path.endswith('borrar')))
                 if url.path == '/api/inventario/cambiar':
                     return self._enviar(200, app.bandeja.inventario_cambiar(datos))
                 if url.path == '/api/respaldo':

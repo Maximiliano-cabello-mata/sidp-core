@@ -5,6 +5,7 @@ este mismo código en el navegador con expedientes inventados. Las decisiones va
 SQLite en la carpeta (`decisiones.db`): solo se agregan, nunca se cambian ni se borran, y la
 última de cada expediente es la que cuenta.
 """
+import base64
 import datetime
 import hashlib
 import io
@@ -14,7 +15,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from validacion import archivero, cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo, respaldo
+from validacion import archivero, campos as campos_mod, cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo, respaldo
 from validacion.grupos import ErrorGrupo, Grupos, ciclo_de
 from validacion import plantillas as plantillas_mod
 
@@ -156,6 +157,7 @@ class Bandeja:
         self.expedientes_alumno = Path(expedientes) if expedientes else None
         self.archivero = archivero.Archivero(expedientes) if expedientes else None
         self.archivo_aviso = None
+        self.datos_aviso = None  # Si la PC 4 no ha recibido algún expediente para sacarle los datos.
         self.hoy = hoy or datetime.date.today()
         self.opciones = {'usar_modelo': usar_modelo}
         if nombre_modelo:
@@ -737,6 +739,7 @@ class Bandeja:
         respuesta = {'expediente': identificador, 'decision': decision}
         if decision == 'autorizado':
             self.archivar(identificador)
+            self.encargar_datos(identificador)
         if decision == 'rechazado':
             respuesta['reporte_para_padre'] = reporte_para_padre(resultado, motivo)
         return respuesta
@@ -775,6 +778,140 @@ class Bandeja:
             return None
         self.archivo_aviso = None
         return {'carpeta': str(destino), 'documentos': hecho}
+
+    # --- Sacar los datos en la PC 4 (validacion/taller.py) ---
+
+    def _pendientes(self):
+        carpeta = self.carpeta / 'pendientes_pc4'
+        carpeta.mkdir(exist_ok=True)
+        return carpeta
+
+    def encargar_datos(self, identificador):
+        """Le encarga a la PC 4 sacar los datos de un expediente autorizado. Si no está, queda pendiente y se manda solo después."""
+        (self._pendientes() / f'{identificador}.json').write_text(json.dumps({'expediente': identificador}), encoding='utf-8')
+        if self.cerebro:
+            self.enviar_pendientes()
+
+    def _pedido_datos(self, identificador):
+        carpeta = self.carpeta / 'expedientes' / identificador
+        quien = self._quien(identificador)
+        curp = None
+        if quien['alumno_id'] and self.registro:
+            fila = self.registro.db.execute('SELECT curp FROM alumno WHERE id = ?', (quien['alumno_id'],)).fetchone()
+            curp = fila and fila[0]
+        if not curp:
+            try:
+                curp = (json.loads((carpeta / 'captura.json').read_text(encoding='utf-8')).get('alumno') or {}).get('curp')
+            except (OSError, ValueError):
+                curp = None
+        if not curp or not carpeta.is_dir():
+            return None
+        plantillas = self.plantillas.todas()
+        nombres = self._tipos_escaneo()
+        documentos = []
+        for archivo in sorted(carpeta.iterdir()):
+            if not archivo.is_file() or archivo.suffix.lower() not in ('.pdf', *archivero.IMAGENES):
+                continue
+            tipo = archivo.stem.rsplit('_', 1)[0] if archivo.stem.rsplit('_', 1)[-1].isdigit() else archivo.stem
+            lista = campos_mod.de_documento(tipo, plantillas.get(tipo))
+            if not lista:
+                continue
+            documentos.append({'archivo': archivo.name, 'tipo': tipo, 'nombre': nombres.get(tipo, tipo), 'campos': lista,
+                               'contenido': base64.b64encode(archivo.read_bytes()).decode()})
+        return {'curp': curp.upper(), 'expediente': identificador, 'documentos': documentos} if documentos else None
+
+    def enviar_pendientes(self):
+        """Manda a la PC 4 los expedientes que esperan que les saquen los datos. Devuelve cuántos se mandaron."""
+        if not self.cerebro:
+            return 0
+        enviados, padron = 0, False
+        for archivo in sorted(self._pendientes().glob('*.json')):
+            identificador = archivo.stem
+            pedido = self._pedido_datos(identificador)
+            if pedido is None:
+                archivo.unlink()  # Sin CURP o sin documentos con campos: no hay qué sacar.
+                continue
+            try:
+                cerebro_red.pedir_a_cerebro(*self.cerebro, '/trabajo', pedido, 300)
+            except cerebro_red.ErrorCerebro as error:
+                if error.code != 409 or padron:
+                    self.datos_aviso = f'La PC 4 no recibió el expediente {identificador}: {error}'
+                    continue
+                padron = True  # El alumno es nuevo: primero va la lista de alumnos y luego otra vez el expediente.
+                self.enviar_padron()
+                try:
+                    cerebro_red.pedir_a_cerebro(*self.cerebro, '/trabajo', pedido, 300)
+                except Exception as otro:
+                    self.datos_aviso = f'La PC 4 no recibió el expediente {identificador}: {otro}'
+                    continue
+            except OSError as error:
+                self.datos_aviso = f'La PC 4 no respondió; los datos se sacan cuando vuelva ({error}).'
+                break
+            archivo.unlink()
+            enviados += 1
+        if enviados:
+            self.datos_aviso = None
+        return enviados
+
+    def trabajos_pc4(self):
+        estado = self._pc4('/trabajos')
+        estado['pendientes_de_enviar'] = len(list(self._pendientes().glob('*.json')))
+        estado['aviso'] = self.datos_aviso
+        return estado
+
+    def alumno_pc4(self, curp):
+        """El expediente completo del alumno: sus datos (PC 4) y sus PDF (carpeta de este servidor)."""
+        from urllib.parse import quote
+        datos = self._pc4('/alumno?curp=' + quote((curp or '').upper()))
+        datos['pdf'] = []
+        if self.archivero:
+            ruta = self.archivero._indice().get((curp or '').upper())
+            carpeta = self.archivero.raiz / ruta if ruta else None
+            if carpeta and carpeta.is_dir():
+                datos['carpeta'] = str(carpeta)
+                datos['pdf'] = [{'nombre': a.stem, 'ruta': a.relative_to(self.archivero.raiz).as_posix()} for a in sorted(carpeta.glob('*.pdf'))]
+        return datos
+
+    def pdf(self, ruta):
+        """Un PDF de la carpeta de expedientes (para verlo desde el panel)."""
+        if not self.archivero:
+            raise ErrorBandeja('Aquí no hay carpeta de expedientes')
+        raiz = self.archivero.raiz.resolve()
+        try:
+            destino = (raiz / respaldo.ruta_segura(ruta)).resolve()
+        except ValueError:
+            raise ErrorBandeja('No existe ese documento')
+        if destino.suffix.lower() != '.pdf' or not destino.is_file() or raiz not in destino.parents:
+            raise ErrorBandeja('No existe ese documento')
+        return destino.read_bytes()
+
+    def dato_confirmar(self, datos):
+        return self._pc4('/dato/confirmar', datos)
+
+    def dato_agregar(self, datos):
+        return self._pc4('/dato/agregar', datos)
+
+    def por_confirmar(self):
+        return self._pc4('/por_confirmar')
+
+    def alumno_baja(self, datos, borrar=False):
+        """Da de baja (o borra) al alumno en la PC 4 y lo quita de las listas de grupo de aquí."""
+        curp = (datos.get('curp') or '').upper()
+        motivo = (datos.get('motivo') or '').strip()
+        if not motivo:
+            raise ErrorBandeja('Escribe el motivo')
+        if borrar and datos.get('confirmar') != 'BORRAR':
+            raise ErrorBandeja('Para borrar, escribe BORRAR con mayúsculas')
+        hecho = self._pc4('/alumno/borrar' if borrar else '/alumno/baja', {'curp': curp, 'motivo': motivo, 'persona': datos.get('persona')})
+        if self.grupos and self.registro:
+            fila = self.registro.db.execute('SELECT id FROM alumno WHERE curp = ?', (curp,)).fetchone()
+            if fila:
+                self._con_grupos(lambda: self.grupos.dar_baja(fila[0], ('Borrado: ' if borrar else '') + motivo))
+        return hecho
+
+    def campos_proponer(self, nombre, contenido):
+        """El modelo que ve de la PC 4 lee una muestra y propone los campos de la plantilla (tarda unos minutos)."""
+        return self._pc4('/plantilla/campos', {'nombre': nombre, 'contenido': base64.b64encode(contenido).decode()}, 900)
 
     def archivar_todo(self):
         """Pone en carpetas todo lo ya autorizado (al instalar en una PC que ya tenía expedientes)."""
