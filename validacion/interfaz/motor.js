@@ -94,6 +94,20 @@ function motorLocal() {
     etiquetasUrl: (codigos) => `/api/etiquetas?codigos=${encodeURIComponent(codigos.join(','))}&t=${encodeURIComponent(SIDP.token || '')}`,
     analisisPC4: (conIA) => api('/api/analisis_pc4' + (conIA ? '?ia=1' : '')),
     respaldar: () => api('/api/respaldo', {}),
+    // El expediente del alumno: sus datos viven en la PC 4 y sus PDF en este servidor.
+    alumno: (curp) => api('/api/alumno?curp=' + encodeURIComponent(curp)),
+    pdfUrl: (ruta) => `/api/pdf?ruta=${encodeURIComponent(ruta)}&t=${encodeURIComponent(SIDP.token || '')}`,
+    trabajos: () => api('/api/trabajos'),
+    porConfirmar: () => api('/api/por_confirmar'),
+    datoConfirmar: (id, valor, descartar = false) => api('/api/dato/confirmar', { id, valor, descartar }),
+    datoAgregar: (datos) => api('/api/dato/agregar', datos),
+    alumnoBaja: (datos) => api('/api/alumno/baja', datos),
+    alumnoBorrar: (datos) => api('/api/alumno/borrar', datos),
+    camposProponer: (archivo) => {
+      const formulario = new FormData();
+      formulario.append('archivo', archivo, archivo.name);
+      return api('/api/plantillas/campos', formulario);
+    },
   };
 }
 
@@ -211,6 +225,10 @@ def recibir(captura, archivos):
     inventario: null,
     analisisPC4: null,
     respaldar: null,
+    alumno: null,
+    porConfirmar: null,
+    trabajos: null,
+    camposProponer: null,
     guardarConfiguracion: null,
     buscarCerebro: null,
     base: () => llamar('base'),

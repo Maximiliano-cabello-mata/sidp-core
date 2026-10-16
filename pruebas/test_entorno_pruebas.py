@@ -149,6 +149,8 @@ def test_la_pagina_publica_solo_lleva_codigo_y_expedientes_inventados(tmp_path):
     assert '"modo": "demo"' in (destino / 'index.html').read_text(encoding='utf-8')
     codigo = json.loads((destino / 'codigo.json').read_text(encoding='utf-8'))
     assert 'validacion/servicio.py' in codigo and 'database/diseno_integral.sql' in codigo
+    # Todo lo que importa servicio.py va en la página (si falta uno, la demostración no arranca).
+    assert {'validacion/registro.py', 'validacion/mrz.py', 'validacion/archivero.py', 'validacion/campos.py', 'validacion/respaldo.py'} <= set(codigo)
     ejemplo = json.loads((destino / 'ejemplo.json').read_text(encoding='utf-8'))
     assert 'expedientes/E01/captura.json' in ejemplo
     assert all(r.endswith(('.txt', '.json', '.csv')) and not r.endswith('resultado.json') for r in ejemplo)

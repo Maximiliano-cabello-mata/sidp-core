@@ -592,7 +592,8 @@ class Bandeja:
                 for p in self.plantillas.activas() if p['para_padres']]
 
     def lista_plantillas(self):
-        return {'plantillas': list(self.plantillas.todas().values()), 'reglas': plantillas_mod.REGLAS, 'de': plantillas_mod.DE_QUIEN}
+        return {'plantillas': list(self.plantillas.todas().values()), 'reglas': plantillas_mod.REGLAS, 'de': plantillas_mod.DE_QUIEN,
+                'campos': {'tipos': campos_mod.TIPOS, 'categorias': campos_mod.CATEGORIAS, 'de': campos_mod.DE_NOMBRES}}
 
     def _muestras(self, archivos):
         if not archivos:

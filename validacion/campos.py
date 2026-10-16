@@ -31,6 +31,8 @@ CATEGORIAS = {
     'madre': 'Madre', 'padre': 'Padre', 'tutor': 'Tutor', 'escolar': 'Escolar', 'otro': 'Otros datos',
 }
 DE = ('', 'alumno', 'madre', 'padre', 'tutor', 'emergencia', 'otro')
+DE_NOMBRES = {'': '—', 'alumno': 'Alumno', 'madre': 'Madre', 'padre': 'Padre', 'tutor': 'Tutor', 'emergencia': 'Contacto de emergencia',
+              'otro': 'Otra persona'}
 VARIOS = {'telefono', 'correo', 'alergia', 'padecimiento', 'medicamento'}  # Campos que pueden tener varios valores.
 # Lo que ya está en la ficha del alumno (lista oficial): solo se compara, no se guarda otra vez.
 IDENTIDAD = {'curp', 'nombre', 'nombres', 'primer_apellido', 'segundo_apellido', 'fecha_nacimiento', 'sexo'}

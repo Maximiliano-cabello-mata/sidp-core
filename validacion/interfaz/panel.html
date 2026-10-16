@@ -137,6 +137,54 @@
       </div>
     </section>
 
+    <!-- ============ EXPEDIENTE DEL ALUMNO ============ -->
+    <section class="pestana" data-pestana="alumno">
+      <h1 id="al-titulo">Expediente del alumno</h1>
+      <p class="subtitulo" id="al-sub">Todo lo del alumno en un lugar: sus datos (los saca la PC 4 de sus documentos) y sus PDF (guardados en este servidor).</p>
+      <div class="panel" id="al-elegir">
+        <label for="al-buscar">Busca al alumno por nombre o CURP</label>
+        <input id="al-buscar" type="search" autocomplete="off" placeholder="Apellidos y nombre, o la CURP">
+        <div id="al-resultados"></div>
+      </div>
+      <div id="al-mensaje"></div>
+      <div id="al-contenido" class="oculto">
+        <div class="barra">
+          <span id="al-insignias"></span><span class="espacio"></span>
+          <button id="al-agregar">Agregar un dato</button>
+          <button id="al-baja">Dar de baja</button>
+          <button class="rojo" id="al-borrar">Borrar</button>
+        </div>
+        <div class="panel oculto" id="al-formulario" style="margin-bottom:16px"></div>
+        <div class="kpis" id="al-kpis"></div>
+        <div class="con-visor">
+          <div id="al-datos"></div>
+          <div class="panel visor">
+            <div class="barra" style="margin:0 0 8px"><select id="al-pdf" aria-label="Documento"></select><span class="espacio"></span>
+              <a id="al-pdf-abrir" class="boton" target="_blank" rel="noopener">Abrir aparte</a></div>
+            <iframe id="al-visor" title="Documento del alumno"></iframe>
+            <p class="chico" id="al-carpeta"></p>
+          </div>
+        </div>
+        <div class="panel"><h2>Lectura de sus documentos en la PC 4</h2><div id="al-trabajos"></div></div>
+      </div>
+    </section>
+
+    <!-- ============ DATOS POR CONFIRMAR ============ -->
+    <section class="pestana" data-pestana="confirmar">
+      <h1>Datos por confirmar</h1>
+      <p class="subtitulo">Lo que la PC 4 no leyó con seguridad (letra a mano, dos lecturas distintas, algo que no cuadra con la lista).
+        Compáralo con la hoja de al lado y da <b>Está bien</b>, corrígelo o descártalo. Lo demás ya quedó guardado solo.</p>
+      <div class="kpis" id="cf-kpis"></div>
+      <div id="cf-mensaje"></div>
+      <div class="con-visor">
+        <div class="panel"><div id="cf-lista"></div></div>
+        <div class="panel visor">
+          <p class="chico" id="cf-visor-titulo">Elige un dato para ver la hoja de donde salió.</p>
+          <iframe id="cf-visor" class="oculto" title="Hoja del dato"></iframe>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ ANÁLISIS, 911 Y SAID ============ -->
     <section class="pestana" data-pestana="analisis">
       <h1>Reportes oficiales: 911 y SAID</h1>
@@ -262,8 +310,16 @@
       <div class="panel">
         <div class="tabla-envoltura"><table id="plantillas"></table></div>
         <p><button class="principal" id="pl-nueva">Agregar un documento</button></p>
-        <div id="pl-mensaje"></div>
+        <div id="pl-lista-mensaje"></div>
+      </div>
+    </section>
+
+    <!-- ============ UNA PLANTILLA (su propia página) ============ -->
+    <section class="pestana" data-pestana="plantilla">
+      <p><button class="enlace" data-ir="plantillas">← Todas las plantillas</button></p>
+      <div class="panel">
         <div id="pl-formulario"></div>
+        <div id="pl-mensaje"></div>
       </div>
     </section>
 
@@ -349,6 +405,8 @@ const PESTANAS = [
   { id: 'escanear', nombre: 'Escanear expediente', icono: 'escanear', paso: 2, titulo: 'Escanear expediente · validación manual' },
   { id: 'revision', nombre: 'Fila de revisión', icono: 'revision', paso: 3, titulo: 'Fila de revisión · validación automática' },
   { id: 'curp', nombre: 'CURP y RENAPO', icono: 'curp', paso: 4 },
+  { id: 'alumno', nombre: 'Expediente del alumno', icono: 'alumnos' },
+  { id: 'confirmar', nombre: 'Datos por confirmar', icono: 'bien', titulo: 'Datos por confirmar · lo que la PC 4 no leyó con seguridad' },
   { separador: 'Análisis' },
   { id: 'datos', nombre: 'Análisis de datos', icono: 'datos', titulo: 'Análisis de datos · PC 4' },
   { id: 'analisis', nombre: '911 y SAID', icono: 'analisis', titulo: 'Reportes oficiales: 911 y SAID' },
@@ -356,24 +414,29 @@ const PESTANAS = [
   { id: 'inventario', nombre: 'Inventario', icono: 'inventario', titulo: 'Inventario · códigos de barras' },
   { separador: 'Sistema' },
   { id: 'plantillas', nombre: 'Plantillas', icono: 'plantillas', titulo: 'Plantillas de documentos' },
+  { id: 'plantilla', nombre: 'Plantilla', icono: 'plantillas', titulo: 'Plantilla de un documento', oculta: true },
   { id: 'ajustes', nombre: 'Ajustes y respaldo', icono: 'ajustes' },
 ];
 let pestana = 'inicio';
-$('menu').innerHTML = PESTANAS.map((p) => p.separador ? `<div class="separador">${esc(p.separador)}</div>`
+$('menu').innerHTML = PESTANAS.filter((p) => !p.oculta).map((p) => p.separador ? `<div class="separador">${esc(p.separador)}</div>`
   : `<button data-ir="${p.id}">${icono(p.icono)} <span>${esc(p.nombre)}</span><span class="contador oculto" data-contador="${p.id}"></span>${p.paso ? `<span class="numero-paso">${p.paso}</span>` : ''}</button>`).join('');
 document.addEventListener('click', (e) => {
   const boton = e.target.closest('[data-ir]');
   if (boton) irA(boton.dataset.ir);
+  const alumno = e.target.closest('[data-ver-alumno]');
+  if (alumno) abrirAlumno(alumno.dataset.verAlumno);
 });
-function irA(id) {
-  const p = PESTANAS.find((x) => x.id === id) || PESTANAS[0];
+function irA(destino) {
+  const [id, extra = ''] = String(destino || '').split('/');
+  const p = PESTANAS.find((x) => x.id === id && !x.separador) || PESTANAS[0];
   pestana = p.id;
   for (const s of document.querySelectorAll('.pestana')) s.classList.toggle('activa', s.dataset.pestana === p.id);
-  for (const b of $('menu').querySelectorAll('button')) b.classList.toggle('activo', b.dataset.ir === p.id);
+  for (const b of $('menu').querySelectorAll('button')) b.classList.toggle('activo', b.dataset.ir === p.id || (p.id === 'plantilla' && b.dataset.ir === 'plantillas'));
   $('titulo').textContent = p.titulo || p.nombre;
-  if (location.hash.slice(1) !== p.id) history.replaceState(null, '', '#' + p.id);
+  const hash = p.id === 'plantilla' && extra ? `${p.id}/${extra}` : p.id;  // La CURP de un alumno no va en la dirección.
+  if (location.hash.slice(1) !== hash) history.replaceState(null, '', '#' + hash);
   window.scrollTo(0, 0);
-  setTimeout(() => entrarPestana(p.id));  // Las pestañas de la PC 4 se cargan al abrirlas.
+  setTimeout(() => entrarPestana(p.id, decodeURIComponent(extra)));  // Las pestañas de la PC 4 se cargan al abrirlas.
 }
 window.addEventListener('hashchange', () => irA(location.hash.slice(1)));
 irA(location.hash.slice(1) || 'inicio');
@@ -418,6 +481,7 @@ async function refrescar() {
   mostrarPlantillas(plantillasActuales);
   mostrarAnalisis();
   if (grupoAbierto) await abrirGrupo(grupoAbierto, null, false);
+  if (motor.trabajos) motor.trabajos().then((t) => contador('confirmar', t.por_confirmar || 0)).catch(() => {});
   const base = await motor.base();
   $('base').innerHTML = base ? '<tr><th>Tabla</th><th class="cifra">Registros</th></tr>' +
     Object.entries(base).map(([t, n]) => `<tr><td>${esc(t)}</td><td class="cifra">${esc(n)}</td></tr>`).join('') : '';
@@ -517,7 +581,7 @@ async function abrirGrupo(id, resaltar = null, desplazar = true) {
       ${faltan ? `<button class="principal" data-escanear-grupo>Escanear expedientes de este grupo (faltan ${faltan})</button>` : ''}</div>
     <div class="tabla-envoltura"><table><tr><th>#</th><th>Alumno</th><th>CURP</th><th>Sexo</th><th>Nacimiento</th><th>Expediente</th><th>Tutor</th><th></th></tr>
     ${r.alumnos.map((a, i) => `<tr class="${a.id === resaltar ? 'resaltado' : ''}" data-fila="${esc(a.id)}">
-      <td>${i + 1}</td><td><b>${esc(a.primer_apellido)} ${esc(a.segundo_apellido)}</b> ${esc(a.nombres)}</td>
+      <td>${i + 1}</td><td>${a.curp && motor.alumno ? `<button class="enlace" data-ver-alumno="${esc(a.curp)}" title="Ver su expediente">` : ''}<b>${esc(a.primer_apellido)} ${esc(a.segundo_apellido)}</b> ${esc(a.nombres)}${a.curp && motor.alumno ? '</button>' : ''}</td>
       <td>${insigniaCurp(a)}</td><td>${esc(a.sexo || '—')}</td><td>${esc(a.fecha_nacimiento || '—')}</td>
       <td>${a.expedientes.length ? a.expedientes.map((x) => insignia(x.estado)).join(' ') + ` <span class="chico">${a.documentos} doc.</span>`
         : '<span class="insignia pendiente">falta</span>'}</td>
@@ -759,6 +823,9 @@ async function guardarEscaneo() {
     else siguiente = ' Ya están todos los de este grupo.';
   }
   avisoEn('escaneo-mensaje', 'bien', `Listo: el expediente ${r.expediente} de ${r.alumno}${r.grupo ? ` (${r.grupo})` : ''} quedó guardado.${siguiente}`);
+  const curp = (guardar.alumno || {}).curp;
+  if (curp && motor.alumno) $('escaneo-mensaje').querySelector('.mensaje').insertAdjacentHTML('beforeend',
+    ` La PC 4 saca sus datos sin prisa. <button class="enlace" data-ver-alumno="${esc(curp)}">Ver su expediente</button>`);
 }
 
 async function subirEscaneo(archivos) {
@@ -1012,16 +1079,55 @@ let plantillas = null, muestras = [];
 function mostrarPlantillas(d) {
   plantillas = d;
   const si = (v) => (v ? 'Sí' : 'No');
-  $('plantillas').innerHTML = `<tr><th>Documento</th><th>De</th><th>Obligatorio</th><th>Se pide a padres</th><th>Textos fijos</th><th></th></tr>` +
+  $('plantillas').innerHTML = `<tr><th>Documento</th><th>De</th><th>Obligatorio</th><th>Se pide a padres</th><th>Textos fijos</th><th>Datos que se sacan</th><th></th></tr>` +
     d.plantillas.map((p) => `<tr class="${p.activa ? '' : 'apagada'}">
       <td>${esc(p.nombre)} ${p.fabrica ? '<span class="chico">(del sistema)</span>' : ''} ${p.activa ? '' : '<span class="insignia rechazado">de baja</span>'}</td>
       <td>${esc(p.de === 'alumno' ? 'Alumno' : 'Tutor')}</td><td>${si(p.obligatorio)}</td><td>${si(p.para_padres)}</td>
       <td>${p.textos.length}${p.version ? ` <span class="chico">(versión ${p.version})</span>` : ''}</td>
+      <td>${(p.campos || []).length || '<span class="chico">ninguno</span>'}</td>
       <td><button class="chico-boton" data-editar="${esc(p.clave)}">Abrir</button>
         ${p.fabrica ? '' : `<button class="chico-boton" data-activa="${esc(p.clave)}" data-valor="${p.activa ? '' : '1'}">${p.activa ? 'Dar de baja' : 'Volver a pedir'}</button>`}</td></tr>`).join('');
-  for (const boton of $('plantillas').querySelectorAll('[data-editar]')) boton.onclick = () => formularioPlantilla(d.plantillas.find((p) => p.clave === boton.dataset.editar));
+  for (const boton of $('plantillas').querySelectorAll('[data-editar]')) boton.onclick = () => irA('plantilla/' + boton.dataset.editar);
+  if (pestana === 'plantilla' && plantillaPendiente !== null) { const clave = plantillaPendiente; plantillaPendiente = null; abrirPlantilla(clave); }
   for (const boton of $('plantillas').querySelectorAll('[data-activa]')) boton.onclick = () =>
     trabajar('Guardando…', () => motor.plantillaActiva(boton.dataset.activa, !!boton.dataset.valor));
+}
+
+let plantillaPendiente = null;
+function abrirPlantilla(clave) {
+  if (!plantillas) { plantillaPendiente = clave; return; }  // Todavía se están cargando.
+  const p = clave && clave !== 'nueva' ? plantillas.plantillas.find((x) => x.clave === clave) : null;
+  if (clave && clave !== 'nueva' && !p) { irA('plantillas'); return; }
+  formularioPlantilla(p);
+  $('titulo').textContent = p ? `Plantilla · ${p.nombre}` : 'Plantilla · documento nuevo';
+}
+
+// --- Los datos que se sacan del documento al escanearlo (campos) ---
+let camposPlantilla = [];
+function opcionesLista(lista, elegida, automatico) {
+  return (automatico ? `<option value="">${esc(automatico)}</option>` : '') +
+    Object.entries(lista).map(([k, v]) => `<option value="${esc(k)}" ${k === elegida ? 'selected' : ''}>${esc(v)}</option>`).join('');
+}
+function leerCampos() {
+  return [...$('pl-campos').querySelectorAll('tr[data-campo]')].map((fila) => {
+    const valor = (n) => fila.querySelector(`[data-c="${n}"]`).value;
+    const original = camposPlantilla[Number(fila.dataset.campo)] || {};
+    return { ...original, etiqueta: valor('etiqueta').trim(), tipo: valor('tipo'), categoria: valor('categoria'), de: valor('de') };
+  }).filter((c) => c.etiqueta);
+}
+function mostrarCampos() {
+  const o = plantillas.campos;
+  $('pl-campos').innerHTML = camposPlantilla.length ? `<tr><th>Dato (como viene en la hoja)</th><th>Qué es</th><th>Dónde se guarda</th><th>De quién</th><th></th></tr>` +
+    camposPlantilla.map((c, i) => `<tr data-campo="${i}">
+      <td><input data-c="etiqueta" value="${esc(c.etiqueta)}" maxlength="80"></td>
+      <td><select data-c="tipo">${opcionesLista(o.tipos, c.tipo, 'Que lo decida el sistema')}</select></td>
+      <td><select data-c="categoria">${opcionesLista(o.categorias, c.categoria, 'Que lo decida el sistema')}</select></td>
+      <td><select data-c="de">${opcionesLista(o.de, c.de || '')}</select></td>
+      <td><button class="chico-boton" data-quitar-campo="${i}">Quitar</button></td></tr>`).join('')
+    : '<tr><td class="chico">Sin campos: este documento solo se guarda en PDF; no se saca ningún dato.</td></tr>';
+  for (const b of $('pl-campos').querySelectorAll('[data-quitar-campo]')) b.onclick = () => {
+    camposPlantilla = leerCampos().filter((_, i) => i !== Number(b.dataset.quitarCampo)); mostrarCampos();
+  };
 }
 
 function formularioPlantilla(p) {
@@ -1053,23 +1159,60 @@ function formularioPlantilla(p) {
     <h3>3. Qué más se revisa</h3>
     <p>${Object.entries(plantillas.reglas).map(([k, v]) => `<label class="casilla"><input type="checkbox" data-regla="${k}" ${p.reglas.includes(k) ? 'checked' : ''} ${fijo}> ${esc(v)}</label>`).join('<br>')}</p>
     <p><label for="pl-meses">Vigencia en meses (si se revisa la fecha)</label><input id="pl-meses" type="number" min="1" max="24" value="${p.meses || 3}" style="max-width:90px" ${fijo}></p>
+    <h3>4. Datos que se sacan al escanear</h3>
+    <p class="chico">Cada renglón es un dato que la PC 4 copia de la hoja a la base del alumno (por ejemplo "Teléfono de la madre", "Alergias"
+      o "Tipo de sangre"), aunque venga escrito a mano. Escribe el dato como aparece impreso en la hoja; si no sabes a dónde va, deja
+      "Que lo decida el sistema". Lo que la PC 4 no lea con seguridad aparece en <b>Datos por confirmar</b>.</p>
+    <div class="tabla-envoltura"><table id="pl-campos"></table></div>
+    <p><button id="pl-campo-mas">Agregar un dato</button>
+      ${motor.camposProponer ? '<button id="pl-campos-ia">Que la IA de la PC 4 lea la muestra y proponga los datos</button>' : ''}</p>
+    <div id="pl-campos-mensaje"></div>
     <p><button class="verde" id="pl-guardar">Guardar plantilla</button> <button id="pl-cancelar">Cancelar</button></p>`;
+  camposPlantilla = (p.campos || []).map((c) => ({ ...c }));
+  mostrarCampos();
+  $('pl-campo-mas').onclick = () => {
+    camposPlantilla = [...leerCampos(), { etiqueta: '', tipo: '', categoria: '', de: '' }]; mostrarCampos();
+    const filas = $('pl-campos').querySelectorAll('[data-c="etiqueta"]'); filas[filas.length - 1].focus();
+  };
+  if ($('pl-campos-ia')) $('pl-campos-ia').onclick = () => proponerCampos(p);
   $('pl-soltar').onclick = () => $('pl-elegir').click();
   $('pl-soltar').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') $('pl-elegir').click(); };
   $('pl-elegir').onchange = () => { leerMuestras($('pl-elegir').files); $('pl-elegir').value = ''; };
-  $('pl-cancelar').onclick = () => { $('pl-formulario').innerHTML = ''; avisoEn('pl-mensaje', '', ''); };
+  $('pl-cancelar').onclick = () => irA('plantillas');
   $('pl-guardar').onclick = async () => {
     const textos = $('pl-textos').value.split('\n').map((x) => x.trim()).filter(Boolean);
     const guardar = { clave: p.clave, nombre: $('pl-nombre').value, de: $('pl-de').value, obligatorio: $('pl-obligatorio').checked,
       para_padres: $('pl-padres').checked, textos, minimo: Number($('pl-minimo').value),
-      reglas: [...document.querySelectorAll('[data-regla]')].filter((c) => c.checked).map((c) => c.dataset.regla), meses: Number($('pl-meses').value) };
+      reglas: [...document.querySelectorAll('[data-regla]')].filter((c) => c.checked).map((c) => c.dataset.regla), meses: Number($('pl-meses').value),
+      campos: leerCampos() };
     const r = await trabajar('Guardando la plantilla…', () => motor.plantillaGuardar(guardar, muestras), (c, x) => avisoEn('pl-mensaje', c, x));
     if (!r) return;
-    $('pl-formulario').innerHTML = '';
-    avisoEn('pl-mensaje', 'bien', `Listo: "${r.guardada.nombre}" quedó guardada (versión ${r.guardada.version}).` +
+    history.replaceState(null, '', '#plantilla/' + r.guardada.clave);
+    abrirPlantilla(r.guardada.clave);
+    avisoEn('pl-mensaje', 'bien', `Listo: "${r.guardada.nombre}" quedó guardada (versión ${r.guardada.version}), con ${(r.guardada.campos || []).length} dato(s) que se sacan al escanear.` +
       (r.guardada.para_padres ? ' La página de padres ya lo pide.' : ''));
   };
-  $('pl-formulario').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function proponerCampos(p) {
+  let muestra = muestras[0];
+  if (!muestra && (p.muestras || []).length && motor.muestraUrl) {  // La muestra que ya estaba guardada.
+    const nombre = p.muestras[p.muestras.length - 1];
+    const respuesta = await fetch(motor.muestraUrl(p.clave, nombre));
+    if (respuesta.ok) muestra = new File([await respuesta.blob()], nombre);
+  }
+  if (!muestra) { avisoEn('pl-campos-mensaje', 'ojo', 'Primero sube una muestra del documento (paso 1).'); return; }
+  const r = await trabajar('La IA de la PC 4 está leyendo la muestra. Puede tardar unos minutos…', () => motor.camposProponer(muestra),
+    (c, x) => avisoEn('pl-campos-mensaje', c, x));
+  if (!r) return;
+  const actuales = leerCampos();
+  const ya = new Set(actuales.map((c) => c.etiqueta.toUpperCase()));
+  const nuevos = r.campos.filter((c) => !ya.has(c.etiqueta.toUpperCase()));
+  camposPlantilla = [...actuales, ...nuevos];
+  mostrarCampos();
+  avisoEn('pl-campos-mensaje', nuevos.length ? 'bien' : 'ojo', nuevos.length
+    ? `La IA propuso ${nuevos.length} dato(s) en ${Math.round(r.segundos)} s. Revísalos: quita los que no sirvan, corrige a dónde va cada uno y guarda.`
+    : 'La IA no encontró datos nuevos en la muestra.');
 }
 
 async function leerMuestras(archivos) {
@@ -1093,7 +1236,7 @@ async function leerMuestras(archivos) {
     avisoEn('pl-mensaje', 'mal', error.message);
   }
 }
-$('pl-nueva').onclick = () => formularioPlantilla(null);
+$('pl-nueva').onclick = () => irA('plantilla/nueva');
 
 // ================= AJUSTES =================
 if (motor.configuracion) {
@@ -1126,9 +1269,12 @@ if (motor.configuracion) {
 
 
 // ================= PESTAÑAS DE LA PC 4 =================
-function entrarPestana(id) {
+function entrarPestana(id, extra) {
   if (id === 'datos' && !analisisPC4) cargarAnalisisPC4(false);
   if (id === 'inventario') cargarInventario();
+  if (id === 'plantilla') abrirPlantilla(extra);
+  if (id === 'confirmar') cargarPorConfirmar();
+  if (id === 'alumno' && !alumnoAbierto) $('al-buscar').focus();
 }
 const SIN_PC4 = 'Esto vive en la PC 4: abre el SIDP-Validador.exe de la escuela con el cerebro conectado (Ajustes).';
 var analisisPC4 = null;
@@ -1290,6 +1436,266 @@ if (motor.respaldar) {
   };
 }
 
+// ================= EXPEDIENTE DEL ALUMNO =================
+const CATEGORIAS = [['alumno', 'Datos del alumno'], ['salud', 'Salud'], ['contacto', 'Medios de contacto'], ['domicilio', 'Domicilio'],
+  ['madre', 'Madre'], ['padre', 'Padre'], ['tutor', 'Tutor'], ['escolar', 'Escolar'], ['otro', 'Otros datos']];
+const CAMPOS = {
+  curp: 'CURP', nombre: 'Nombre', nombres: 'Nombre(s)', lugar_nacimiento: 'Lugar de nacimiento', fecha_nacimiento: 'Fecha de nacimiento',
+  tipo_sangre: 'Tipo de sangre', alergia: 'Alergia', padecimiento: 'Enfermedad o padecimiento', medicamento: 'Medicamento',
+  peso: 'Peso (kg)', talla: 'Talla (m)', apto: 'Apto para actividades escolares', observaciones: 'Observaciones del médico',
+  medico: 'Médico', cedula: 'Cédula del médico', fecha_certificado: 'Fecha del certificado', servicio_medico: 'Servicio médico',
+  telefono: 'Teléfono', correo: 'Correo', nombre_emergencia: 'Contacto de emergencia', domicilio: 'Domicilio', cp: 'Código postal',
+  titular: 'Titular del recibo', fecha_comprobante: 'Fecha del comprobante', vigencia_ine: 'Vigencia de la INE', ocupacion: 'Ocupación',
+  escolaridad: 'Escolaridad', grado_cursado: 'Grado que cursó', ciclo_boleta: 'Ciclo de la boleta', promedio: 'Promedio',
+  escuela_procedencia: 'Escuela de procedencia', cct_procedencia: 'CCT de procedencia',
+};
+const nombreCampo = (c) => CAMPOS[c] || (c.charAt(0).toUpperCase() + c.slice(1)).replace(/_/g, ' ');
+const DE_QUIEN = { madre: 'de la madre', padre: 'del padre', tutor: 'del tutor', emergencia: 'contacto de emergencia', alumno: 'del alumno', otro: 'de otra persona' };
+const CONFIANZA = { confirmado: ['conf-confirmado', 'confirmado'], alta: ['conf-alta', 'seguro'], media: ['conf-media', 'leído'], baja: ['conf-baja', 'por confirmar'] };
+let alumnoAbierto = null, alumnoDatos = null;
+
+function insigniaConfianza(d) {
+  const [clase, texto] = d.estado === 'por_confirmar' ? CONFIANZA.baja : (CONFIANZA[d.confianza] || CONFIANZA.media);
+  const como = { qr: 'el código QR', texto: 'el texto del documento', ocr: 'el lector de texto', vision: 'el modelo que ve', persona: 'una persona' };
+  const metodo = String(d.metodo || '').split('+').map((m) => como[m] || m).join(' y ');
+  return `<span class="insignia ${clase}" title="${esc(metodo ? 'Lo leyó ' + metodo : '')}">${texto}</span>`;
+}
+
+function detalleDato(d) {
+  const x = d.detalle || {};
+  const partes = [];
+  if (x.de) partes.push(DE_QUIEN[x.de] || x.de);
+  const nombres = { calle: 'calle', numero: 'núm.', colonia: 'col.', cp: 'CP', municipio: 'mun.' };
+  for (const k of Object.keys(nombres)) if (x[k]) partes.push(`${nombres[k]} ${x[k]}`);
+  if (x.otra_lectura) partes.push(`la otra lectura dice "${x.otra_lectura}"`);
+  if (x.en_lista) partes.push(`la lista de su grupo dice "${x.en_lista}"`);
+  if (x.no_paso_reglas) partes.push('no tiene la forma que se espera');
+  if (d.documento) partes.push(`salió de: ${d.documento}`);
+  return partes.length ? `<div class="chico">${esc(partes.join(' · '))}</div>` : '';
+}
+
+function filasDatos(lista, conHoja = false) {
+  return lista.map((d) => `<tr class="${d.estado === 'por_confirmar' ? 'dudoso' : ''}" data-valor="${esc(d.valor)}">
+    <td>${conHoja ? `${esc((CATEGORIAS.find(([k]) => k === d.categoria) || ['', ''])[1])} · ` : ''}${esc(nombreCampo(d.campo))}</td>
+    <td><b>${esc(d.valor)}</b> ${insigniaConfianza(d)}${detalleDato(d)}</td>
+    <td class="derecha"><span class="acciones-dato">
+      ${conHoja ? `<button class="chico-boton" data-ver-hoja="${esc(d.curp)}" data-documento="${esc(d.documento || '')}">Ver hoja</button>` : ''}
+      ${d.estado === 'por_confirmar' ? `<button class="chico-boton verde" data-bien="${d.id}">Está bien</button>` : ''}
+      <button class="chico-boton" data-corregir="${d.id}">Corregir</button>
+      ${d.confianza !== 'confirmado' ? `<button class="chico-boton" data-descartar="${d.id}">Descartar</button>` : ''}</span></td></tr>`).join('');
+}
+
+// "Está bien", "Corregir" y "Descartar": lo decide una persona y queda en la bitácora de la PC 4.
+function activarDatos(contenedor, mensaje, recargar) {
+  const guardar = async (id, valor, descartar) => {
+    const r = await trabajar(descartar ? 'Descartando…' : 'Guardando en la PC 4…', () => motor.datoConfirmar(Number(id), valor, descartar),
+      (c, t) => avisoEn(mensaje, c, t));
+    if (r) await recargar();
+  };
+  for (const b of contenedor.querySelectorAll('[data-bien]')) b.onclick = () => guardar(b.dataset.bien, '', false);
+  for (const b of contenedor.querySelectorAll('[data-descartar]')) b.onclick = () => guardar(b.dataset.descartar, '', true);
+  for (const b of contenedor.querySelectorAll('[data-corregir]')) b.onclick = () => {
+    const caja = b.closest('.acciones-dato');
+    caja.innerHTML = `<input class="corregir" value="${esc(b.closest('[data-valor]').dataset.valor)}" aria-label="Valor correcto">
+      <button class="chico-boton verde">Guardar</button> <button class="chico-boton">Cancelar</button>`;
+    const entrada = caja.querySelector('input');
+    const [ok, no] = caja.querySelectorAll('button');
+    entrada.focus(); entrada.select();
+    ok.onclick = () => entrada.value.trim() && guardar(b.dataset.corregir, entrada.value.trim(), false);
+    no.onclick = () => recargar();
+    entrada.onkeydown = (e) => { if (e.key === 'Enter') ok.click(); if (e.key === 'Escape') no.click(); };
+  };
+}
+
+async function abrirAlumno(curp) {
+  if (pestana !== 'alumno') irA('alumno');
+  if (!motor.alumno) { avisoEn('al-mensaje', 'ojo', SIN_PC4); return; }
+  avisoEn('al-mensaje', 'ojo', 'Trayendo el expediente de la PC 4…');
+  let r;
+  try { r = await motor.alumno(curp); } catch (error) { avisoEn('al-mensaje', 'mal', error.message); return; }
+  avisoEn('al-mensaje', '', '');
+  alumnoAbierto = curp; alumnoDatos = r;
+  $('al-buscar').value = ''; $('al-resultados').innerHTML = '';
+  mostrarAlumno();
+}
+
+function mostrarAlumno() {
+  const r = alumnoDatos, a = r.alumno;
+  $('al-contenido').classList.remove('oculto');
+  $('al-formulario').classList.add('oculto');
+  $('al-titulo').textContent = `${a.primer_apellido} ${a.segundo_apellido || ''} ${a.nombres}`.replace(/\s+/g, ' ');
+  $('al-sub').textContent = `${a.grado ? `${a.grado}° ${a.letra}` : 'Sin grupo'} · ciclo actual · CURP ${a.curp}`;
+  $('al-insignias').innerHTML = (a.estado === 'activo' ? '<span class="insignia autorizado">activo</span>' : `<span class="insignia rechazado">${esc(a.estado)}</span>`)
+    + (a.curp_renapo === 'validada' ? ' <span class="insignia validada">CURP validada en RENAPO</span>' : '');
+  const todos = Object.values(r.datos).flat();
+  const dudosos = todos.filter((d) => d.estado === 'por_confirmar').length;
+  const ultimo = r.trabajos.find((t) => t.estado === 'hecho' && t.resumen);
+  $('al-kpis').innerHTML = kpi('azul', 'datos', todos.length, 'Datos guardados')
+    + kpi(dudosos ? 'ambar' : 'verde', dudosos ? 'alerta' : 'bien', dudosos, 'Por confirmar')
+    + kpi('morado', 'plantillas', r.pdf.length, 'Documentos en PDF')
+    + (ultimo ? kpi('verde', 'escanear', `${ultimo.resumen.utiles}%`, 'Campos que se llenaron solos (última lectura)') : '');
+  const fila = (que, valor) => `<tr><td>${esc(que)}</td><td colspan="2"><b>${esc(valor || '—')}</b></td></tr>`;
+  const tarjeta = (titulo, filas) => `<div class="panel tarjeta-datos"><h2>${esc(titulo)}</h2><table>${filas}</table></div>`;
+  let html = tarjeta('Datos del alumno', fila('CURP', a.curp) + fila('Nombre', `${a.nombres} ${a.primer_apellido} ${a.segundo_apellido || ''}`)
+    + fila('Fecha de nacimiento', a.fecha_nacimiento) + fila('Sexo', { H: 'Hombre', M: 'Mujer' }[a.sexo] || a.sexo)
+    + fila('Grado y grupo', a.grado ? `${a.grado}° ${a.letra}` : '') + fila('Inscripción', a.inscripcion)
+    + filasDatos(r.datos.alumno || []));
+  if (r.tutores.length) {
+    html += tarjeta('Tutores registrados', r.tutores.map((t) => `<tr><td>${esc(t.parentesco || 'tutor')}</td><td colspan="2">
+      <b>${esc(`${t.nombres} ${t.primer_apellido} ${t.segundo_apellido || ''}`)}</b>
+      <div class="chico">${esc([t.telefono, t.correo, t.domicilio].filter(Boolean).join(' · ') || 'Sin teléfono ni correo')}</div></td></tr>`).join(''));
+  }
+  for (const [categoria, titulo] of CATEGORIAS.slice(1)) if ((r.datos[categoria] || []).length) html += tarjeta(titulo, filasDatos(r.datos[categoria]));
+  if (!todos.length) {
+    html += `<div class="panel"><p>Todavía no hay datos sacados de sus documentos.</p><p class="chico">Se llenan solos: al guardar su expediente
+      escaneado (o al autorizar el que subieron sus padres), la PC 4 lee cada hoja y guarda aquí lo que encuentre.</p></div>`;
+  }
+  $('al-datos').innerHTML = html;
+  activarDatos($('al-datos'), 'al-mensaje', () => abrirAlumno(alumnoAbierto));
+  $('al-pdf').innerHTML = r.pdf.length ? r.pdf.map((d, i) => `<option value="${i}">${esc(d.nombre)}</option>`).join('') : '<option>No hay PDF todavía</option>';
+  verPdfAlumno(0);
+  $('al-carpeta').textContent = r.carpeta ? `Carpeta: ${r.carpeta}` : 'Todavía no hay carpeta: se crea cuando se autoriza su expediente.';
+  const estados = { pendiente: 'en fila', trabajando: 'leyendo', hecho: 'leído', error: 'no se pudo leer' };
+  $('al-trabajos').innerHTML = r.trabajos.length ? `<div class="tabla-envoltura"><table><tr><th>Fecha</th><th>Estado</th><th class="cifra">Campos</th>
+      <th class="cifra">Se llenaron solos</th><th class="cifra">Por confirmar</th><th>Notas</th></tr>` +
+    r.trabajos.map((t) => `<tr><td>${esc(t.creado.replace('T', ' ').slice(0, 16))}</td><td>${esc(estados[t.estado] || t.estado)}</td>
+      <td class="cifra">${t.resumen ? t.resumen.esperados : '—'}</td><td class="cifra">${t.resumen ? t.resumen.utiles + '%' : '—'}</td>
+      <td class="cifra">${t.resumen ? t.resumen.baja : '—'}</td>
+      <td class="chico">${esc(t.problema || (t.resumen && t.resumen.modelo ? `con ${t.resumen.modelo}, ${Math.round(t.resumen.segundos_vision)} s` : t.resumen ? 'sin modelo que ve' : ''))}</td></tr>`).join('') + '</table></div>'
+    : '<p class="chico">Sus documentos todavía no se han leído en la PC 4.</p>';
+}
+
+function verPdfAlumno(i) {
+  const d = alumnoDatos && alumnoDatos.pdf[i];
+  $('al-visor').classList.toggle('oculto', !d);
+  $('al-pdf-abrir').classList.toggle('oculto', !d);
+  if (!d) { $('al-visor').removeAttribute('src'); return; }
+  $('al-visor').src = $('al-pdf-abrir').href = motor.pdfUrl(d.ruta);
+}
+$('al-pdf').onchange = () => verPdfAlumno(Number($('al-pdf').value));
+
+function formularioAlumno(html) {
+  $('al-formulario').innerHTML = html;
+  $('al-formulario').classList.remove('oculto');
+  $('al-formulario').querySelector('[data-cancelar]').onclick = () => $('al-formulario').classList.add('oculto');
+  $('al-formulario').querySelector('input, select').focus();
+}
+
+$('al-agregar').onclick = () => {
+  const sugerencias = ['Teléfono', 'Correo', 'Alergia', 'Medicamento', 'Enfermedad o padecimiento', 'Tipo de sangre', 'Contacto de emergencia',
+    'Domicilio', 'Servicio médico', 'Ocupación'];
+  formularioAlumno(`<h2>Agregar un dato</h2>
+    <div class="rejilla">
+      <div><label for="ad-categoria">Va en</label><select id="ad-categoria">${CATEGORIAS.map(([k, v]) => `<option value="${k}" ${k === 'contacto' ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+      <div><label for="ad-campo">Qué dato</label><input id="ad-campo" list="ad-sugerencias" placeholder="Teléfono, alergia, correo…">
+        <datalist id="ad-sugerencias">${sugerencias.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
+      <div><label for="ad-valor">Valor</label><input id="ad-valor"></div>
+      <div><label for="ad-de">De quién (teléfonos y correos)</label><select id="ad-de"><option value="">—</option>
+        ${Object.entries(DE_QUIEN).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
+    </div>
+    <p><button class="verde" id="ad-guardar">Guardar</button> <button data-cancelar>Cancelar</button></p><div id="ad-mensaje"></div>`);
+  $('ad-categoria').focus();
+  $('ad-guardar').onclick = async () => {
+    const texto = $('ad-campo').value.trim();
+    const clave = Object.keys(CAMPOS).find((k) => CAMPOS[k].toUpperCase() === texto.toUpperCase()) || texto;
+    if (!clave || !$('ad-valor').value.trim()) { avisoEn('ad-mensaje', 'ojo', 'Escribe qué dato es y su valor.'); return; }
+    const r = await trabajar('Guardando en la PC 4…', () => motor.datoAgregar({ curp: alumnoAbierto, categoria: $('ad-categoria').value, campo: clave,
+      valor: $('ad-valor').value.trim(), de: $('ad-de').value }), (c, t) => avisoEn('ad-mensaje', c, t));
+    if (r) await abrirAlumno(alumnoAbierto);
+  };
+};
+
+$('al-baja').onclick = () => {
+  formularioAlumno(`<h2>Dar de baja</h2>
+    <p>El alumno sale de las listas de grupo, del 911 y del análisis. Su expediente (datos y PDF) se queda guardado y la bitácora anota quién y por qué.</p>
+    <label for="bj-motivo">Motivo</label><input id="bj-motivo" placeholder="Cambio de domicilio, cambio de escuela…">
+    <p><button class="principal" id="bj-ok">Dar de baja</button> <button data-cancelar>Cancelar</button></p><div id="bj-mensaje"></div>`);
+  $('bj-ok').onclick = async () => {
+    const r = await trabajar('Dando de baja…', () => motor.alumnoBaja({ curp: alumnoAbierto, motivo: $('bj-motivo').value }), (c, t) => avisoEn('bj-mensaje', c, t));
+    if (r) { await abrirAlumno(alumnoAbierto); avisoEn('al-mensaje', 'bien', 'Listo: quedó dado de baja. Su expediente se queda guardado.'); }
+  };
+};
+
+$('al-borrar').onclick = () => {
+  formularioAlumno(`<h2>Borrar al alumno</h2>
+    <div class="mensaje mal">Borrar lo quita de la base de la PC 4 con todos sus datos y no se puede deshacer. Úsalo solo si se cargó por error o
+      está repetido. Si el alumno se va de la escuela, usa <b>Dar de baja</b>. Sus PDF se quedan en la carpeta del servidor y la bitácora guarda quién lo borró y por qué.</div>
+    <div class="rejilla"><div><label for="br-motivo">Motivo</label><input id="br-motivo" placeholder="Se cargó dos veces…"></div>
+      <div><label for="br-confirmar">Para confirmar, escribe BORRAR</label><input id="br-confirmar" autocomplete="off"></div></div>
+    <p><button class="rojo" id="br-ok">Borrar para siempre</button> <button data-cancelar>Cancelar</button></p><div id="br-mensaje"></div>`);
+  $('br-ok').onclick = async () => {
+    const nombre = $('al-titulo').textContent;
+    const r = await trabajar('Borrando…', () => motor.alumnoBorrar({ curp: alumnoAbierto, motivo: $('br-motivo').value, confirmar: $('br-confirmar').value }),
+      (c, t) => avisoEn('br-mensaje', c, t));
+    if (!r) return;
+    alumnoAbierto = null; alumnoDatos = null;
+    $('al-contenido').classList.add('oculto');
+    $('al-titulo').textContent = 'Expediente del alumno';
+    avisoEn('al-mensaje', 'bien', `Listo: ${nombre} se borró de la base. La bitácora guarda el motivo.`);
+  };
+};
+
+let esperaAlumno = null;
+$('al-buscar').oninput = () => {
+  clearTimeout(esperaAlumno);
+  const texto = $('al-buscar').value.trim();
+  if (texto.length < 3) { $('al-resultados').innerHTML = ''; return; }
+  esperaAlumno = setTimeout(async () => {
+    const curp = /^[A-Z]{4}\d{6}[HM]/i.test(texto) ? texto.toUpperCase() : '';
+    let r;
+    try { r = await motor.buscarAlumno(curp ? '' : texto, curp); } catch (error) { avisoEn('al-mensaje', 'mal', error.message); return; }
+    $('al-resultados').innerHTML = r.parecidos.length ? `<div class="eleccion">${r.parecidos.map((p) => p.curp
+      ? `<button data-ver-alumno="${esc(p.curp)}"><b>${esc(p.nombre)}</b> · ${esc(p.grupo || 'sin grupo')} <span class="chico curp">${esc(p.curp)}</span></button>`
+      : `<button disabled><b>${esc(p.nombre)}</b> · ${esc(p.grupo || 'sin grupo')} <span class="chico">sin CURP: se llena al escanear su acta</span></button>`).join('')}</div>`
+      : '<p class="chico">No hay alumnos con ese nombre en las listas.</p>';
+  }, 250);
+};
+
+// ================= DATOS POR CONFIRMAR =================
+const pdfsDe = {};
+async function cargarPorConfirmar() {
+  if (!motor.porConfirmar) { avisoEn('cf-mensaje', 'ojo', SIN_PC4); return; }
+  let lista, trabajos;
+  try { [lista, trabajos] = await Promise.all([motor.porConfirmar(), motor.trabajos()]); } catch (error) { avisoEn('cf-mensaje', 'mal', error.message); return; }
+  const t = trabajos.trabajos || {};
+  const avisos = [];
+  if (trabajos.aviso) avisos.push(trabajos.aviso);
+  if (t.error) avisos.push(`${t.error} expediente(s) no se pudieron leer en la PC 4; se reintentan al volver a escanearlos.`);
+  avisoEn('cf-mensaje', avisos.length ? 'ojo' : '', avisos.join(' '));
+  contador('confirmar', lista.datos.length);
+  const enFila = (t.pendiente || 0) + (t.trabajando || 0) + (trabajos.pendientes_de_enviar || 0);
+  $('cf-kpis').innerHTML = kpi(lista.datos.length ? 'ambar' : 'verde', lista.datos.length ? 'alerta' : 'bien', lista.datos.length, 'Datos por confirmar')
+    + kpi('azul', 'escanear', enFila, enFila ? 'Expedientes en fila (la PC 4 los lee sin prisa)' : 'Nada en fila')
+    + kpi('verde', 'bien', t.hecho || 0, 'Expedientes ya leídos')
+    + kpi('morado', 'datos', trabajos.porcentaje_util == null ? '—' : trabajos.porcentaje_util + '%',
+      trabajos.modelo_vision ? `Campos que se llenaron solos (lee con ${trabajos.modelo_vision})` : 'Campos que se llenaron solos (sin modelo que ve)');
+  if (!lista.datos.length) {
+    $('cf-lista').innerHTML = '<p>No hay nada por confirmar.</p><p class="chico">Cuando la PC 4 lea un expediente y algo no quede claro, aparece aquí.</p>';
+    return;
+  }
+  const porAlumno = {};
+  for (const d of lista.datos) (porAlumno[d.curp] = porAlumno[d.curp] || []).push(d);
+  $('cf-lista').innerHTML = Object.entries(porAlumno).map(([curp, datosAlumno]) => `<div class="caja-alumno">
+      <div class="barra" style="margin:0 0 6px"><b>${esc(datosAlumno[0].alumno)}</b>
+        <span class="chico">${datosAlumno[0].grado ? `${datosAlumno[0].grado}° ${esc(datosAlumno[0].letra)}` : ''}</span><span class="espacio"></span>
+        <button class="enlace" data-ver-alumno="${esc(curp)}">Ver su expediente</button></div>
+      <table>${filasDatos(datosAlumno.map((d) => ({ ...d, estado: 'por_confirmar', confianza: 'baja' })), true)}</table></div>`).join('');
+  activarDatos($('cf-lista'), 'cf-mensaje', cargarPorConfirmar);
+  for (const b of $('cf-lista').querySelectorAll("[data-ver-hoja]")) b.onclick = () => verHoja(b.dataset.verHoja, b.dataset.documento);
+  const primero = $("cf-lista").querySelector("[data-ver-hoja]");
+  if (primero && $('cf-visor').classList.contains('oculto')) primero.click();
+}
+
+async function verHoja(curp, documento) {
+  if (!pdfsDe[curp]) {
+    try { pdfsDe[curp] = (await motor.alumno(curp)).pdf; } catch (error) { $('cf-visor-titulo').textContent = error.message; return; }
+  }
+  const d = pdfsDe[curp].find((x) => x.nombre === documento) || pdfsDe[curp][0];
+  $('cf-visor').classList.toggle('oculto', !d);
+  $('cf-visor-titulo').textContent = d ? d.nombre : 'Este alumno todavía no tiene PDF en el servidor.';
+  if (d) $('cf-visor').src = motor.pdfUrl(d.ruta);
+}
+
 // ================= BUSCADOR =================
 let esperaBusqueda = null;
 $('buscar').oninput = () => {
@@ -1299,12 +1705,13 @@ $('buscar').oninput = () => {
   esperaBusqueda = setTimeout(async () => {
     let r;
     try { r = await motor.buscarAlumno(texto); } catch (error) { return; }
-    $('buscar-resultados').innerHTML = r.parecidos.length ? r.parecidos.map((p) => `<button data-grupo-id="${esc(p.grupo_id)}" data-alumno="${esc(p.id)}">
+    $('buscar-resultados').innerHTML = r.parecidos.length ? r.parecidos.map((p) => `<button data-grupo-id="${esc(p.grupo_id)}" data-alumno="${esc(p.id)}" data-curp="${esc(p.curp || '')}">
         <b>${esc(p.nombre)}</b> · ${esc(p.grupo)}<br><span class="chico curp">${esc(p.curp || 'sin CURP')}</span></button>`).join('')
       : '<p class="chico" style="margin:6px">No hay alumnos con ese nombre en las listas.</p>';
     $('buscar-resultados').classList.remove('oculto');
     for (const b of $('buscar-resultados').querySelectorAll('button')) b.onclick = async () => {
       $('buscar-resultados').classList.add('oculto'); $('buscar').value = '';
+      if (b.dataset.curp && motor.alumno) { abrirAlumno(b.dataset.curp); return; }
       irA('listas');
       await abrirGrupo(b.dataset.grupoId, b.dataset.alumno);
     };
