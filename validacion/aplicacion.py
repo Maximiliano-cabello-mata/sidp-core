@@ -18,6 +18,7 @@ import mimetypes
 import secrets
 import sys
 import threading
+import time
 import webbrowser
 from email.parser import BytesParser
 from email.policy import default as politica_correo
@@ -45,6 +46,9 @@ class Aplicacion:
     def __init__(self, carpeta, hoy=None, puerto=PUERTO, usar_modelo=True, expedientes=None, conectar_al_abrir=True):
         self.carpeta = Path(carpeta).resolve()
         self.vigia = None  # En el .exe instalado (escritorio.Vigia) cuida la conexión con la PC 4.
+        self.actualizador = None  # En el .exe instalado (actualizar.Actualizador) toma de la PC 4 la versión nueva.
+        self.servidor = None
+        self.ultimo_cambio = time.time()  # La versión nueva se pone cuando nadie ha cambiado nada en un rato.
         self.carpeta.mkdir(parents=True, exist_ok=True)
         self.token = secrets.token_urlsafe(16)  # Sin él, otra página del navegador no puede usar el panel.
         self.puerto = puerto
@@ -70,6 +74,8 @@ class Aplicacion:
                   'expedientes': str(self.bandeja.expedientes_alumno) if self.bandeja.expedientes_alumno else None}
         if self.vigia:
             estado['vigia'] = self.vigia.estado
+        if self.actualizador:
+            estado['actualizacion'] = self.actualizador.estado
         if problema is not None:
             estado['problema'] = problema
         return estado
@@ -243,6 +249,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
 
         def do_POST(self):
             url = urlparse(self.path)
+            app.ultimo_cambio = time.time()
             try:
                 if url.path == '/api/padres/enviar':
                     captura, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())

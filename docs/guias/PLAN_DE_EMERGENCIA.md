@@ -44,3 +44,20 @@ SI SE DESCOMPONE EL SERVIDOR
 SI SE DESCOMPONE LA PC 4
 - El servidor sigue trabajando solo. La base de la PC 4 tiene una copia diaria en C:\SIDP-datos\respaldos
   (archivos .dump) que se restaura con pg_restore en la PC 4 nueva. Pídeselo al agente con la tarea de la PC 4.
+
+ACTUALIZACIONES (solas)
+- Cuando se fusiona algo a main, GitHub publica la versión nueva de SIDP (Releases, v1.0.N). La PC 4 la revisa
+  cada hora, la baja a C:\SIDP-datos\actualizaciones y comprueba que llegó completa.
+- El servidor le pregunta a la PC 4 cada hora. Si hay una versión nueva, la baja y la pone cuando nadie ha hecho
+  cambios en SIDP en 10 minutos: SIDP se reinicia solo en unos segundos. El servidor no se conecta a GitHub.
+- En Ajustes > Cerebro de la PC 4 se ve qué versión tiene SIDP y si ya hay otra lista.
+- Si la versión nueva no arranca, SIDP regresa solo a la anterior y ya no la vuelve a intentar.
+
+SI UNA ACTUALIZACIÓN SALE MAL
+1. Menú Inicio > SIDP > Apagar SIDP.
+2. Abre la carpeta C:\Program Files\SIDP. Ahí está SIDP.anterior.exe (la versión de antes).
+3. Cambia el nombre de SIDP.exe a SIDP.malo.exe y el de SIDP.anterior.exe a SIDP.exe.
+4. Abre SIDP con el ícono del escritorio.
+5. Para que no se vuelva a poner la mala: en la PC 4 publica la anterior a mano
+   (python -m validacion.actualizar publicar RUTA\SIDP.exe --version 1.0.N --forzar).
+Sin PC 4 ni internet: instala otra vez con SIDP-Instalador.exe; no borra C:\SIDP.

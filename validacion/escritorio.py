@@ -10,6 +10,8 @@
 - Busca sola a la PC 4: primero en la dirección guardada y, si cambió (la red le dio otra IP), en toda la red
   local. La clave del cerebro se escribe una sola vez. Si la PC 4 no aparece, todo sigue funcionando en esta PC y
   se reintenta cada minuto (ver docs/guias/PLAN_DE_EMERGENCIA.md).
+- Se actualiza solo desde la PC 4, sin depender del repositorio (validacion/actualizar.py): cada hora pregunta si
+  hay versión nueva y la pone cuando nadie la está usando.
 
     SIDP.exe                    abre la ventana (y arranca el servidor si no estaba)
     SIDP.exe --segundo-plano    solo el servidor (así arranca con Windows)
@@ -32,7 +34,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-from validacion import archivero
+from validacion import actualizar, archivero
 
 PUERTO_CEREBRO = 8771
 CADA = 60  # Segundos entre revisiones de la conexión con la PC 4.
@@ -168,7 +170,33 @@ class Vigia:
             with self.app.candado:  # Lo que se escaneó mientras la PC 4 no estaba.
                 self.app.bandeja.enviar_pendientes()
         self.estado.update(conectado=not problema, problema=problema, revisado=time.strftime('%H:%M'), url=self.app.configuracion.get('cerebro_url'))
+        if not problema and self.app.actualizador:
+            self.actualizar(self.app.configuracion.get('cerebro_url'), clave)
         return self.estado
+
+    def actualizar(self, url, clave):
+        """Versión nueva en la PC 4: se baja y, cuando nadie ha cambiado nada en un rato, se pone y SIDP se reinicia."""
+        actualizador = self.app.actualizador
+        try:
+            actualizador.revisar(url, clave)
+        except Exception as error:
+            actualizador.estado['problema'] = f'{type(error).__name__}: {error}'
+            return
+        if not actualizador.estado['lista'] or not actualizador.quieto_ahora():
+            return
+
+        def apagar():
+            with self.app.candado:  # Que no quede nada a medio guardar.
+                self.app.servidor.shutdown()
+                self.app.servidor.server_close()
+
+        self.app.actualizando = True
+        try:
+            resultado = actualizador.aplicar(apagar)
+        finally:
+            self.app.actualizando = False
+        if resultado:
+            os._exit(0)  # Ya contesta la versión nueva (o se regresó a la anterior y ya arrancó): este proceso sobra.
 
     def trabajar(self):
         while True:
@@ -244,6 +272,10 @@ def main(argumentos=None):
     clave_apagar = secrets.token_urlsafe(16)
     (sistema / 'apagar.clave').write_text(clave_apagar, encoding='utf-8')
     servidor = aplicacion.crear_servidor(app, clave_apagar=clave_apagar)
+    app.servidor = servidor
+    programa = actualizar.programa_instalado()
+    if programa:
+        app.actualizador = actualizar.Actualizador(app, programa, version())
     app.vigia = Vigia(app)
     threading.Thread(target=app.vigia.trabajar, daemon=True).start()
     threading.Thread(target=aplicacion.respaldar_seguido, args=(app,), daemon=True).start()
@@ -259,4 +291,6 @@ def main(argumentos=None):
         servidor.serve_forever()
     except KeyboardInterrupt:
         pass
+    while getattr(app, 'actualizando', False):  # Se está poniendo la versión nueva: ese hilo termina el proceso.
+        time.sleep(1)
     return 0

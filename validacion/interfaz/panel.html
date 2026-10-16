@@ -336,6 +336,7 @@
         <p><button class="principal" id="cerebro-guardar">Conectar</button> <button id="cerebro-buscar">Buscar la PC 4 en la red</button>
           <span class="chico" id="cerebro-estado"></span></p>
         <p class="chico" id="cerebro-vigia"></p>
+        <p class="chico" id="sidp-version"></p>
         <details class="emergencia"><summary>Si no conecta (plan de emergencia)</summary>
           <ol>
             <li>Revisa que la PC 4 tenga luz encendida y que las dos PC estén en la misma red (mismo Wi-Fi o cable al mismo módem).</li>
@@ -1247,6 +1248,12 @@ if (motor.configuracion) {
     $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.traidos || ''} ${c.padron || ''}` : 'Sin cerebro: los procesos corren en esta PC.';
     if (c.vigia) $('cerebro-vigia').textContent = c.vigia.conectado ? `SIDP revisa la conexión cada minuto (última: ${c.vigia.revisado || ''}).`
       : `SIDP la busca solo cada minuto. ${c.vigia.problema || ''}`;
+    if (c.actualizacion) {
+      const a = c.actualizacion;
+      $('sidp-version').textContent = a.lista ? `SIDP ${a.version}. La versión ${a.lista} ya está lista: se pone sola cuando nadie esté haciendo cambios (SIDP se reinicia en unos segundos).`
+        : `SIDP ${a.version}. Se actualiza solo desde la PC 4 (revisa cada hora${a.revisado ? '; última: ' + a.revisado : ''}).`
+          + (a.fallida ? ` La versión ${a.fallida} no arrancó y se regresó a la anterior.` : '') + (a.problema ? ` ${a.problema}` : '');
+    }
     if (c.expedientes) { $('panel-carpetas').classList.remove('oculto'); $('ruta-expedientes').textContent = c.expedientes; }
     $('respaldo-estado').textContent = c.respaldo || (c.cerebro_conectado ? 'El primer respaldo se hace 2 minutos después de abrir.' : 'Conecta el cerebro para respaldar.');
     const publica = `${PAGINA_PUBLICA}padres.html?escuela=${new URL(c.direccion_padres).host}`;

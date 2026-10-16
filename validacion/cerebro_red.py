@@ -24,16 +24,18 @@ import argparse
 import base64
 import datetime
 import json
+import os
 import secrets
 import socket
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from validacion import base_cerebro, campos, expediente, lector, modelo, respaldo, taller as taller_mod, vision
+from validacion import actualizar, base_cerebro, campos, expediente, lector, modelo, respaldo, taller as taller_mod, vision
 
 PUERTO = 8771
 MAXIMO = 4096  # Una pregunta son dos textos cortos; nada más grande pasa.
@@ -134,6 +136,13 @@ def padron_a_cerebro(ciclo, alumnos, url, clave, espera=60):
         return json.load(respuesta)
 
 
+def bajar_de_cerebro(url, clave, ruta, espera=600):
+    """Lado del .exe: un archivo (bytes) del cerebro, por ejemplo la versión nueva de SIDP.exe."""
+    solicitud = urllib.request.Request(url.rstrip('/') + ruta, headers={'X-SIDP-Clave': clave})
+    with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
+        return respuesta.read()
+
+
 def pedir_a_cerebro(url, clave, ruta, datos=None, espera=120):
     """Lado del .exe: GET (sin datos) o POST con JSON a una ruta del cerebro. Un error del cerebro sube con su mensaje."""
     cuerpo = None if datos is None else json.dumps(datos, ensure_ascii=False).encode()
@@ -163,8 +172,9 @@ def alumnos_de_cerebro(url, clave, espera=60):
 
 
 def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None, taller=None,
-                   almacen=None, carpeta_respaldos=None):
+                   almacen=None, carpeta_respaldos=None, actualizaciones=None):
     almacen = almacen or respaldo.Almacen()
+    actualizaciones = Path(actualizaciones or actualizar.carpeta_pc4())
     carpeta_respaldos = Path(carpeta_respaldos or base_cerebro.CARPETA_RESPALDOS)
 
     class Puente(BaseHTTPRequestHandler):
@@ -184,9 +194,25 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
 
         def do_GET(self):
             ruta, _, consulta = self.path.partition('?')
-            if ruta not in ('/salud', '/alumnos', '/inventario', '/analisis', '/respaldo', '/trabajos', '/alumno', '/por_confirmar'):
+            if ruta not in ('/salud', '/alumnos', '/inventario', '/analisis', '/respaldo', '/trabajos', '/alumno', '/por_confirmar',
+                            '/actualizacion', '/actualizacion/programa'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
+                return
+            if ruta.startswith('/actualizacion'):  # La versión de SIDP.exe que guarda la PC 4 (validacion/actualizar.py).
+                ofrece = actualizar.disponible(actualizaciones)
+                if ruta == '/actualizacion':
+                    return self._responder(200, ofrece or {'version': None})
+                if not ofrece:
+                    return self._responder(404, {'error': 'la PC 4 no tiene ninguna versión guardada'})
+                archivo = actualizaciones / ofrece['archivo']
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/octet-stream')
+                self.send_header('Content-Length', str(archivo.stat().st_size))
+                self.end_headers()
+                with open(archivo, 'rb') as entrada:
+                    while trozo := entrada.read(1024 * 1024):
+                        self.wfile.write(trozo)
                 return
             if ruta == '/salud':
                 try:
@@ -382,6 +408,8 @@ def main(argumentos=None):
     # clave no se escribe en el registro, que se queda en el disco.
     parser.add_argument('--esperar-base', type=int, default=0, help='segundos que espera a PostgreSQL al arrancar')
     parser.add_argument('--sin-mostrar-clave', action='store_true')
+    parser.add_argument('--actualizaciones', type=Path, default=actualizar.carpeta_pc4(),
+                        help='dónde guarda la PC 4 las versiones de SIDP.exe que toma el servidor')
     args = parser.parse_args(argumentos)
     clave = clave_guardada(args.clave)
     base, problema = base_cerebro.abrir(args.base)
@@ -390,7 +418,9 @@ def main(argumentos=None):
         time.sleep(5)
         base, problema = base_cerebro.abrir(args.base)
     taller = taller_mod.arrancar(base, url=args.ollama) if base else None  # Saca los datos de lo escaneado, en fila.
-    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base, taller=taller)
+    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base, taller=taller, actualizaciones=args.actualizaciones)
+    if os.environ.get('SIDP_ACTUALIZAR_GITHUB', '1') != '0':  # Cada hora baja de GitHub la versión nueva de SIDP.exe.
+        threading.Thread(target=actualizar.vigilar_github, args=(args.actualizaciones,), daemon=True).start()
     print(f'Cerebro escuchando en http://{ip_local()}:{args.puerto}  (modelo {args.modelo})')
     if base:
         resumen = base.resumen()

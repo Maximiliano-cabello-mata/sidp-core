@@ -44,6 +44,8 @@ jobs:
     # Ejecutables sin paquete de instalación: los secretos nunca pasan por CI.
     needs: pruebas
     runs-on: windows-latest
+    permissions:
+      contents: write  # Solo para publicar la versión al fusionar a main (último paso).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -102,9 +104,21 @@ jobs:
         with:
           name: sidp-windows
           path: |
+            dist/SIDP.exe
             dist/SIDP-Servidor.exe
             dist/SIDP-Equipo.exe
             dist/SIDP-Validador.exe
             dist/SIDP-Instalador.exe
             dist/PRUEBA_DOS_EQUIPOS.md
             dist/ENTORNO_PRUEBAS.md
+      # Al fusionar a main: versión v1.0.N con SIDP.exe y el instalador. La PC 4 la baja sola cada hora y el
+      # servidor de la escuela se actualiza desde la PC 4 (validacion/actualizar.py), sin conectarse a GitHub.
+      - name: Publicar la versión (solo en main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.0.${{ github.run_number }}" dist/SIDP.exe dist/SIDP-Instalador.exe `
+            --target "${{ github.sha }}" --title "SIDP 1.0.${{ github.run_number }}" `
+            --notes "Compilado de main. La PC 4 lo baja sola y el servidor se actualiza desde ella."

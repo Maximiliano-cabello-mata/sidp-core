@@ -33,6 +33,14 @@ if (Test-Path $archivoAjustes) {
     Write-Host 'Ajustes: no hay ajustes.ps1 (se crea al correr instalar_servicios.ps1)'
 }
 
+$version = 'C:\SIDP-datos\actualizaciones\actual.json'
+if (Test-Path $version) {
+    $v = Get-Content $version -Raw | ConvertFrom-Json
+    Write-Host "Actualización que ofrece al servidor: SIDP $($v.version) ($($v.origen), $($v.guardada))"
+} else {
+    Write-Host 'Actualización que ofrece al servidor: ninguna todavía (se baja sola de GitHub al fusionar a main)'
+}
+
 $archivoClave = Join-Path $env:USERPROFILE '.sidp\clave_cerebro.txt'
 try {
     $clave = (Get-Content $archivoClave -Raw).Trim()
