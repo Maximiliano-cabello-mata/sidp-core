@@ -39,6 +39,7 @@ BEGIN SELECT RAISE(ABORT, 'Las decisiones no se borran'); END;
 LISTO = 'listo para autorizar'
 EN_PAPEL = 'validado en papel'  # Expedientes que la escuela ya revisó y solo se escanean.
 MAXIMO_ESCANEO = 60 * 1024 * 1024
+MAXIMO_CLASIFICAR = 3  # Hojas no reconocidas por lote que la IA de la PC 4 mira para decir qué documento parecen.
 MAXIMO_TANDA = 40 * 1024 * 1024  # Lo que se manda al cerebro de una vez (en base64 crece un tercio).
 ESPACIOS = ('acta_alumno', 'certificado_medico', 'boleta', 'ine_tutor', 'acta_tutor', 'comprobante')
 ACEPTADOS = lector.PDF | lector.IMAGEN
@@ -362,6 +363,7 @@ class Bandeja:
             pagina.update(texto=lectura['texto'], qr=lectura['qr'], problemas=lectura['problemas'],
                           sugerencias=lectura.get('sugerencias') or [])
         extraer.agrupar(paginas, self.plantillas.activas())
+        self._clasificar(carpeta, paginas)
         propuesta = extraer.proponer(paginas, self.hoy)
         con_padron(propuesta, paginas)
         sin_texto = [p['origen'] for p in paginas if len(p['texto'].strip()) < lector.MINIMO_TEXTO]
@@ -374,7 +376,33 @@ class Bandeja:
         parecidos = self.grupos.parecidos(' '.join(filter(None, (alumno.get('nombres'), alumno.get('primer_apellido'),
                                                                    alumno.get('segundo_apellido')))), alumno.get('curp')) if self.grupos else []
         return {'lote': lote, 'procesado_en': procesado_en, 'tipos': self._tipos_escaneo(), 'propuesta': propuesta, 'parecidos': parecidos,
-                'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo', 'reconocido')} for p in paginas]}
+                'paginas': [{k: p[k] for k in ('archivo', 'origen', 'tipo', 'reconocido', 'ia') if k in p} for p in paginas]}
+
+    def _clasificar(self, carpeta, paginas):
+        """Las hojas que no se reconocieron por sus textos fijos: la IA de la PC 4 las mira y dice qué documento parecen.
+
+        Solo propone: la persona que escanea ve "La IA cree que es..." y confirma o cambia el tipo. Sin PC 4, nada cambia.
+        """
+        dudosas = [p for p in paginas if not p['reconocido'] and len(p['texto'].strip()) >= lector.MINIMO_TEXTO][:MAXIMO_CLASIFICAR]
+        if not (self.cerebro and dudosas):
+            return
+        activas = {p['clave']: p for p in self.plantillas.activas()}
+        tipos = [{'clave': clave, 'nombre': nombre, 'senas': (activas.get(clave) or {}).get('textos', [])[:5]}
+                 for clave, nombre in self._tipos_escaneo().items()]
+        for pagina in dudosas:
+            try:
+                visto = cerebro_red.pedir_a_cerebro(*self.cerebro, '/clasificar', {
+                    'nombre': pagina['archivo'], 'tipos': tipos,
+                    'contenido': base64.b64encode((carpeta / pagina['archivo']).read_bytes()).decode()}, 330)
+            except (cerebro_red.ErrorCerebro, OSError, ValueError):
+                return  # La IA no está o tardó demasiado: la persona elige el tipo, como siempre.
+            pagina['ia'] = {k: visto.get(k) for k in ('tipo', 'titulo', 'motivo')}
+            pagina['tipo'] = visto.get('tipo') if visto.get('tipo') in {t['clave'] for t in tipos} else 'otro'
+        anterior = None  # Las hojas que siguen a una que la IA reconoció (su reverso) van con ella.
+        for pagina in paginas:
+            if not pagina['reconocido'] and 'ia' not in pagina and anterior:
+                pagina['tipo'] = anterior
+            anterior = pagina['tipo']
 
     # --- Grupos y listas (lo primero que se escanea) ---
 
@@ -482,7 +510,7 @@ class Bandeja:
         return self._pc4('/inventario/cambiar', datos)
 
     def analisis_pc4(self, con_ia=False):
-        return self._pc4('/analisis?ia=1' if con_ia else '/analisis', espera=300 if con_ia else 120)
+        return self._pc4('/analisis?ia=1' if con_ia else '/analisis', espera=660 if con_ia else 120)
 
     def respaldar(self):
         """Copia a la PC 4 lo nuevo o cambiado de la carpeta de datos de este .exe (bases y expedientes)."""

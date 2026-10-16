@@ -7,7 +7,7 @@ import urllib.request
 import uuid
 import pytest
 from pruebas.pdf_sencillo import pdf_de_texto
-from validacion import analisis, aplicacion, cerebro_red
+from validacion import analisis, aplicacion, cerebro_red, comparador
 from validacion.ejemplo import generar
 
 pypdf = pytest.importorskip('pypdf')
@@ -199,6 +199,25 @@ def test_la_constancia_con_otro_nombre_queda_por_revisar(entorno):
     fila = estado_curp(url, app)[0]
     assert fila['estado'] == 'no_coincide' and 'RAMOS' in fila['detalle']
     assert app.bandeja.registro.db.execute('SELECT curp_confirmada FROM alumno').fetchone()[0] == 0
+
+
+def test_un_nombre_pegado_en_la_lista_se_valida_y_queda_como_lo_escribe_renapo(entorno):
+    """En el PDF de la lista oficial a veces se pierde el espacio entre dos apellidos: RENAPO dice cómo va."""
+    app, url = entorno
+    token = {'X-SIDP-Token': app.token}
+    pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'A', 'filas': [
+        {'nombres': 'ALBERTO', 'primer_apellido': 'HERNANDEZRAMOS', 'segundo_apellido': 'LUIS', 'curp': CURP}]}, token)
+    codigo, respuesta = subir_constancia(url, app, constancia(nombre='LUIS ALBERTO HERNANDEZ RAMOS'))
+    assert codigo == 200 and respuesta['estado'] == 'validada', respuesta
+    assert 'venía pegado' in respuesta['mensaje']
+    fila = app.bandeja.registro.db.execute('SELECT primer_apellido, segundo_apellido, nombres, curp_confirmada FROM alumno WHERE curp = ?',
+                                           (CURP,)).fetchone()
+    assert tuple(fila) == ('HERNANDEZ', 'RAMOS', 'LUIS ALBERTO', 1)
+    # Si de verdad falta una palabra, sigue quedando por revisar.
+    from validacion import renapo
+    texto = comparador.normalizar('LUIS ALBERTO HERNANDEZ RAMOS')
+    assert renapo.faltan_del_nombre(texto, 'ALBERTO HERNANDEZRAMIREZ LUIS') == ['HERNANDEZRAMIREZ']
+    assert renapo.nombre_de_renapo(texto, 'XXXX180314HMCRMSA1', 'HERNANDEZ', 'RAMOS', 'LUIS ALBERTO') is None  # Ya estaba bien.
 
 
 def test_la_constancia_de_otra_curp_avisa_cual_escribio_el_padre(entorno):

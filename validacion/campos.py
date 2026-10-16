@@ -33,7 +33,10 @@ CATEGORIAS = {
 DE = ('', 'alumno', 'madre', 'padre', 'tutor', 'emergencia', 'otro')
 DE_NOMBRES = {'': '—', 'alumno': 'Alumno', 'madre': 'Madre', 'padre': 'Padre', 'tutor': 'Tutor', 'emergencia': 'Contacto de emergencia',
               'otro': 'Otra persona'}
-VARIOS = {'telefono', 'correo', 'alergia', 'padecimiento', 'medicamento'}  # Campos que pueden tener varios valores.
+VARIOS = {'telefono', 'correo', 'alergia', 'padecimiento', 'medicamento', 'discapacidad', 'cirugia', 'otro_dato', 'materia'}  # Varios valores.
+# Los datos de la boleta que se guardan por grado cursado (promedio_1 ... promedio_6): uno por cada boleta.
+BOLETA = ('ciclo_boleta', 'promedio', 'lenguajes', 'saberes', 'etica', 'humano', 'materia', 'inasistencias', 'observaciones_boleta',
+          'escuela_procedencia', 'cct_procedencia')
 # Lo que ya está en la ficha del alumno (lista oficial): solo se compara, no se guarda otra vez.
 IDENTIDAD = {'curp', 'nombre', 'nombres', 'primer_apellido', 'segundo_apellido', 'fecha_nacimiento', 'sexo'}
 
@@ -57,22 +60,48 @@ FABRICA = {
         campo('curp_padre', 'CURP del padre', 'curp', 'padre', 'curp'),
     ],
     'certificado_medico': [
+        # Cada certificado viene distinto: se piden los datos de salud que suelen traer y, al final, todo lo demás
+        # que esté escrito (otros_datos), para conocer el estado de salud completo del alumno.
         campo('tipo_sangre', 'Tipo de sangre (grupo y RH)', 'sangre', 'salud'),
         campo('alergias', 'Alergias', 'lista', 'salud', 'alergia'),
-        campo('padecimientos', 'Enfermedades o padecimientos', 'lista', 'salud', 'padecimiento'),
-        campo('medicamentos', 'Medicamentos que toma', 'lista', 'salud', 'medicamento'),
+        campo('padecimientos', 'Enfermedades o padecimientos (crónicos o actuales)', 'lista', 'salud', 'padecimiento'),
+        campo('medicamentos', 'Medicamentos o tratamiento que toma', 'lista', 'salud', 'medicamento'),
         campo('peso', 'Peso en kilos', 'numero', 'salud'),
         campo('talla', 'Talla o estatura en metros', 'numero', 'salud'),
+        campo('estado_nutricional', 'Estado nutricional o diagnóstico de peso (normal, bajo peso, sobrepeso, obesidad)', 'texto', 'salud'),
+        campo('presion', 'Presión arterial', 'texto', 'salud'),
+        campo('frecuencia_cardiaca', 'Frecuencia cardiaca', 'numero', 'salud'),
+        campo('agudeza_visual', 'Agudeza visual o revisión de la vista', 'texto', 'salud'),
+        campo('usa_lentes', '¿Usa lentes o necesita lentes?', 'si_no', 'salud'),
+        campo('audicion', 'Audición o revisión del oído', 'texto', 'salud'),
+        campo('salud_bucal', 'Salud bucal o dental (caries, revisión dental)', 'texto', 'salud'),
+        campo('vacunas', 'Vacunas o cartilla de vacunación (completa, incompleta)', 'texto', 'salud'),
+        campo('discapacidad', 'Discapacidad o condición especial', 'lista', 'salud', 'discapacidad'),
+        campo('cirugias', 'Cirugías, fracturas u hospitalizaciones', 'lista', 'salud', 'cirugia'),
+        campo('educacion_fisica', 'Restricciones para educación física o deporte', 'texto', 'salud'),
         campo('apto', '¿Dice que está sano o apto para actividades escolares?', 'si_no', 'salud'),
         campo('observaciones', 'Observaciones o diagnóstico del médico', 'texto', 'salud'),
+        campo('recomendaciones', 'Recomendaciones del médico', 'texto', 'salud'),
+        campo('servicio_medico', 'Institución o servicio médico (IMSS, ISSSTE, centro de salud, particular)', 'texto', 'salud'),
         campo('medico', 'Nombre del médico', 'nombre', 'salud'),
         campo('cedula', 'Cédula profesional del médico', 'texto', 'salud'),
         campo('fecha_certificado', 'Fecha del certificado', 'fecha', 'salud'),
+        campo('otros_datos', 'Cualquier otro dato de salud que esté escrito (uno por renglón, con su nombre: "Vista: usa lentes")',
+              'lista', 'salud', 'otro_dato'),
     ],
     'boleta': [
-        campo('grado_cursado', 'Grado que cursó', 'texto', 'escolar'),
-        campo('ciclo_boleta', 'Ciclo escolar de la boleta', 'texto', 'escolar'),
-        campo('promedio', 'Promedio final', 'numero', 'escolar'),
+        # Hay una boleta por cada año cursado (un alumno de 6.° trae las de 1.° a 5.°): cada hoja se lee aparte y sus
+        # datos se guardan con el grado al final (promedio_1, promedio_2...). Ver BOLETA y taller.por_grado.
+        campo('grado_cursado', 'Grado que cursó (1.° a 6.°)', 'texto', 'escolar'),
+        campo('ciclo_boleta', 'Ciclo escolar de la boleta (por ejemplo 2023-2024)', 'texto', 'escolar'),
+        campo('promedio', 'Promedio final del grado', 'numero', 'escolar'),
+        campo('lenguajes', 'Calificación final de Lenguajes (o Español)', 'numero', 'escolar'),
+        campo('saberes', 'Calificación final de Saberes y pensamiento científico (o Matemáticas)', 'numero', 'escolar'),
+        campo('etica', 'Calificación final de Ética, naturaleza y sociedades', 'numero', 'escolar'),
+        campo('humano', 'Calificación final de De lo humano y lo comunitario', 'numero', 'escolar'),
+        campo('materias', 'Otras materias con su calificación final (una por renglón: "Inglés: 9")', 'lista', 'escolar', 'materia'),
+        campo('inasistencias', 'Total de inasistencias o faltas', 'numero', 'escolar'),
+        campo('observaciones_boleta', 'Observaciones o recomendaciones del docente', 'texto', 'escolar'),
         campo('escuela_procedencia', 'Nombre de la escuela', 'texto', 'escolar'),
         campo('cct_procedencia', 'Clave de la escuela (CCT)', 'texto', 'escolar'),
     ],
@@ -80,6 +109,8 @@ FABRICA = {
         campo('nombre_tutor', 'Nombre completo', 'nombre', 'tutor', 'nombre'),
         campo('curp_tutor', 'CURP', 'curp', 'tutor', 'curp'),
         campo('domicilio_ine', 'Domicilio', 'domicilio', 'domicilio', 'domicilio'),
+        campo('colonia_ine', 'Colonia o localidad del domicilio', 'texto', 'domicilio', 'colonia'),
+        campo('municipio_ine', 'Municipio o alcaldía del domicilio', 'texto', 'domicilio', 'municipio'),
         campo('vigencia_ine', 'Vigencia', 'texto', 'tutor', 'vigencia_ine'),
     ],
     'acta_tutor': [
@@ -89,6 +120,8 @@ FABRICA = {
     ],
     'comprobante': [
         campo('domicilio', 'Domicilio del servicio', 'domicilio', 'domicilio'),
+        campo('colonia', 'Colonia o localidad', 'texto', 'domicilio'),
+        campo('municipio', 'Municipio o alcaldía', 'texto', 'domicilio'),
         campo('cp', 'Código postal', 'cp', 'domicilio'),
         campo('titular', 'Nombre del titular', 'nombre', 'domicilio'),
         campo('fecha_comprobante', 'Fecha del recibo o periodo', 'fecha', 'domicilio'),
@@ -100,11 +133,17 @@ PISTAS = [
     (r'CORREO|E-?MAIL', 'correo', 'contacto', 'correo'),
     (r'CELULAR|TEL[EÉ]FONO|TEL\b|WHATS', 'telefono', 'contacto', 'telefono'),
     (r'C\.?\s*P\b|C[OÓ]DIGO POSTAL', 'cp', 'domicilio', 'cp'),
-    (r'DOMICILIO|DIRECCI[OÓ]N|CALLE|COLONIA', 'domicilio', 'domicilio', 'domicilio'),
+    (r'COLONIA|LOCALIDAD|FRACCIONAMIENTO|BARRIO', 'texto', 'domicilio', 'colonia'),
+    (r'MUNICIPIO|ALCALD[IÍ]A|DELEGACI[OÓ]N', 'texto', 'domicilio', 'municipio'),
+    (r'DOMICILIO|DIRECCI[OÓ]N|CALLE', 'domicilio', 'domicilio', 'domicilio'),
     (r'SANGRE|\bRH\b', 'sangre', 'salud', 'tipo_sangre'),
     (r'ALERG', 'lista', 'salud', 'alergia'),
     (r'MEDICAMENT|TRATAMIENTO', 'lista', 'salud', 'medicamento'),
-    (r'ENFERMEDAD|PADECIM|CR[OÓ]NIC|DISCAPACIDAD|CONDICI[OÓ]N', 'lista', 'salud', 'padecimiento'),
+    (r'DISCAPACIDAD|BARRERAS|NECESIDADES EDUCATIVAS', 'lista', 'salud', 'discapacidad'),
+    (r'ENFERMEDAD|PADECIM|CR[OÓ]NIC|CONDICI[OÓ]N', 'lista', 'salud', 'padecimiento'),
+    (r'VACUNA|CARTILLA', 'texto', 'salud', 'vacunas'),
+    (r'LENTES|VISTA|VISUAL', 'texto', 'salud', 'agudeza_visual'),
+    (r'DENTAL|BUCAL|CARIES', 'texto', 'salud', 'salud_bucal'),
     (r'\bPESO\b', 'numero', 'salud', 'peso'),
     (r'TALLA|ESTATURA', 'numero', 'salud', 'talla'),
     (r'SEGURO|IMSS|ISSSTE|AFILIACI', 'texto', 'salud', 'servicio_medico'),
@@ -374,7 +413,30 @@ def esquema(campos):
     return {'type': 'object', 'properties': {c['clave']: {'type': 'string'} for c in campos}, 'required': [c['clave'] for c in campos]}
 
 
-PROPONER = ('Esta hoja es un formato o documento escolar. Lista los campos que se llenan o que trae con datos de una persona '
-            '(por ejemplo "Nombre del alumno", "Teléfono de la madre", "Alergias", "Tipo de sangre", "Domicilio"). Escribe '
-            'cada campo con la etiqueta como aparece impresa en la hoja. No copies los datos de nadie: solo las etiquetas.')
-ESQUEMA_PROPONER = {'type': 'object', 'properties': {'campos': {'type': 'array', 'items': {'type': 'string'}}}, 'required': ['campos']}
+PROPONER = ('Esta hoja es un formato o documento escolar. En "titulo" escribe el nombre del documento como aparece impreso. '
+            'En "senas" escribe de 3 a 6 textos impresos que siempre trae este formato y que lo distinguen de otros (el título, '
+            'el nombre de la institución, encabezados de sus secciones), nunca datos de una persona. En "campos" lista los '
+            'campos que se llenan o que trae con datos de una persona (por ejemplo "Nombre del alumno", "Teléfono de la madre", '
+            '"Alergias", "Tipo de sangre", "Domicilio"), con la etiqueta como aparece impresa. No copies los datos de nadie.')
+ESQUEMA_PROPONER = {'type': 'object', 'properties': {'titulo': {'type': 'string'}, 'senas': {'type': 'array', 'items': {'type': 'string'}},
+                                                     'campos': {'type': 'array', 'items': {'type': 'string'}}},
+                    'required': ['titulo', 'senas', 'campos']}
+
+
+def clasificar(tipos):
+    """Pregunta para una hoja que no se reconoció: qué documento parece, entre las plantillas de la escuela.
+
+    tipos: [{'clave', 'nombre', 'senas'}]. La persona que escanea confirma o cambia lo que diga la IA.
+    """
+    renglones = '\n'.join(f'- {t["clave"]}: {t["nombre"]}' + (f' (suele decir: {", ".join(t["senas"][:5])})' if t.get('senas') else '')
+                          for t in tipos)
+    return ('Esta hoja viene del expediente de un alumno de primaria en México. ¿Qué documento es? Elige en "tipo" una clave '
+            'de la lista; si no es ninguno, elige "otro". En "titulo" escribe el nombre del documento como aparece impreso '
+            '(por ejemplo "Certificado médico" o "Constancia de estudios"). En "motivo" di en pocas palabras qué lo delata '
+            f'(un título, un sello, un logotipo). No copies datos de nadie.\nTipos:\n{renglones}')
+
+
+def esquema_clasificar(tipos):
+    claves = [t['clave'] for t in tipos if t['clave'] != 'otro'] + ['otro']
+    return {'type': 'object', 'properties': {'tipo': {'type': 'string', 'enum': claves}, 'titulo': {'type': 'string'},
+                                             'motivo': {'type': 'string'}}, 'required': ['tipo', 'titulo', 'motivo']}

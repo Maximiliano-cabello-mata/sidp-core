@@ -18,6 +18,8 @@ from pathlib import Path, PurePosixPath
 
 MAXIMO_ARCHIVO = 60 * 1024 * 1024
 NO_SE_RESPALDA = {'configuracion.json'}  # Trae la clave del cerebro: la PC 4 ya la tiene.
+# La ventana de SIDP (el perfil de Edge: caché, cookies) se rehace sola y Edge tiene sus archivos bloqueados.
+CARPETAS_SIN_RESPALDO = {'ventana'}
 
 
 def carpeta_por_omision():
@@ -109,11 +111,16 @@ def archivos_de(carpeta):
     salida = []
     for ruta in sorted(carpeta.rglob('*')):
         relativa = ruta.relative_to(carpeta).as_posix()
+        if relativa.split('/')[0] in CARPETAS_SIN_RESPALDO:
+            continue
         if not ruta.is_file() or ruta.name in NO_SE_RESPALDA or ruta.suffix in ('.llegando', '.tmp') or ruta.name.endswith(('-journal', '-wal', '-shm')):
             continue
-        if ruta.stat().st_size > MAXIMO_ARCHIVO:
-            continue
-        salida.append((relativa, _copia_sqlite(ruta) if ruta.suffix == '.db' else ruta.read_bytes()))
+        try:
+            if ruta.stat().st_size > MAXIMO_ARCHIVO:
+                continue
+            salida.append((relativa, _copia_sqlite(ruta) if ruta.suffix == '.db' else ruta.read_bytes()))
+        except (PermissionError, sqlite3.OperationalError) as error:  # Un archivo abierto por otro programa: va en el siguiente.
+            print(f'respaldo: no se pudo leer {relativa} ({type(error).__name__})', flush=True)
     return salida
 
 

@@ -35,7 +35,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from validacion import actualizar, base_cerebro, campos, expediente, lector, modelo, respaldo, taller as taller_mod, vision
+from validacion import actualizar, base_cerebro, campos, expediente, extraer, lector, modelo, respaldo, taller as taller_mod, vision
 
 PUERTO = 8771
 MAXIMO = 4096  # Una pregunta son dos textos cortos; nada más grande pasa.
@@ -171,8 +171,20 @@ def alumnos_de_cerebro(url, clave, espera=60):
         return json.load(respuesta)
 
 
+def senas(vistas):
+    """Las señas que propuso la IA para una plantilla, solo las que pueden ser texto impreso fijo (sin números ni CURP)."""
+    salida, vistas_ya = [], set()
+    for sena in vistas or []:
+        sena = ' '.join(str(sena).split()).strip(' .:,;')
+        clave = extraer.mayusculas(sena)
+        if 4 <= len(sena) <= 60 and not any(c.isdigit() for c in sena) and clave not in vistas_ya:
+            salida.append(sena)
+            vistas_ya.add(clave)
+    return salida[:6]
+
+
 def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None, taller=None,
-                   almacen=None, carpeta_respaldos=None, actualizaciones=None):
+                   almacen=None, carpeta_respaldos=None, actualizaciones=None, estudio=None):
     almacen = almacen or respaldo.Almacen()
     actualizaciones = Path(actualizaciones or actualizar.carpeta_pc4())
     carpeta_respaldos = Path(carpeta_respaldos or base_cerebro.CARPETA_RESPALDOS)
@@ -244,8 +256,9 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                     resultado = analisis_datos.analizar(base)
                 except ImportError:
                     return self._responder(503, {'error': 'falta pandas en la PC 4 (python -m pip install pandas)'})
-                if 'ia=1' in consulta.split('&'):
-                    resultado['ia'] = analisis_datos.redactar(resultado, url)
+                if 'ia=1' in consulta.split('&'):  # Estudio nuevo ahora mismo (si contesta, queda guardado como el último).
+                    resultado['ia'] = estudio.hacer(resultado) if estudio else analisis_datos.redactar(resultado, url)
+                resultado['estudio'] = estudio.guardado() if estudio else None
                 return self._responder(200, resultado)
             except Exception as error:
                 return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}'})
@@ -303,11 +316,37 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 return self._responder(400, {'error': detalle[:300]})
             return self._responder(200, {'ok': True, 'hecho': hecho, **base.inventario()})
 
+        def _vision(self, ruta):
+            """El modelo que ve, sin base de datos: los campos y señas de una plantilla, o qué documento parece una hoja."""
+            pedido = self._leer_json(MAXIMO_EXPEDIENTE)
+            if pedido is None:
+                return
+            try:
+                if ruta == '/plantilla/campos':
+                    hojas = vision.paginas(base64.b64decode(pedido['contenido']), pedido.get('nombre', ''))[:2]
+                    vistos, segundos = vision.preguntar(hojas, campos.PROPONER, campos.ESQUEMA_PROPONER, url=url)
+                    etiquetas = [e for e in dict.fromkeys(str(x).strip() for x in vistos.get('campos', [])) if e][:40]
+                    return self._responder(200, {'campos': [campos.proponer(e) for e in etiquetas], 'senas': senas(vistos.get('senas')),
+                                                 'titulo': str(vistos.get('titulo') or '').strip()[:80], 'segundos': segundos})
+                tipos = [{'clave': str(t['clave'])[:40], 'nombre': str(t.get('nombre') or t['clave'])[:80],
+                          'senas': [str(s)[:60] for s in (t.get('senas') or [])][:5]} for t in pedido['tipos'][:40]]
+                if not tipos:
+                    raise ValueError('faltan los tipos')
+                hojas = vision.paginas(base64.b64decode(pedido['contenido']), pedido.get('nombre', ''))[:1]
+                visto, segundos = vision.preguntar(hojas, campos.clasificar(tipos), campos.esquema_clasificar(tipos), url=url, espera=300)
+                tipo = visto.get('tipo') if visto.get('tipo') in {t['clave'] for t in tipos} else 'otro'
+                return self._responder(200, {'tipo': tipo, 'titulo': str(visto.get('titulo') or '').strip()[:80],
+                                             'motivo': str(visto.get('motivo') or '').strip()[:160], 'segundos': segundos})
+            except vision.ErrorVision as error:
+                return self._responder(503, {'error': str(error)})
+            except (ValueError, KeyError, TypeError) as error:
+                return self._responder(400, {'error': f'pedido mal formado: {error}'})
+
         def _expediente(self, ruta):
             """Trabajos de extracción, datos del alumno y su baja: todo en la base de la PC 4."""
             if not base:
                 return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
-            pedido = self._leer_json(MAXIMO_EXPEDIENTE if ruta in ('/trabajo', '/plantilla/campos') else MAXIMO_INVENTARIO)
+            pedido = self._leer_json(MAXIMO_EXPEDIENTE if ruta == '/trabajo' else MAXIMO_INVENTARIO)
             if pedido is None:
                 return
             try:
@@ -315,11 +354,6 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                     if not taller:
                         return self._responder(503, {'error': 'el taller de la PC 4 no está trabajando'})
                     return self._responder(200, {'trabajo': taller.encargar(pedido)})
-                if ruta == '/plantilla/campos':
-                    hojas = vision.paginas(base64.b64decode(pedido['contenido']), pedido.get('nombre', ''))[:2]
-                    vistos, segundos = vision.preguntar(hojas, campos.PROPONER, campos.ESQUEMA_PROPONER, url=url)
-                    etiquetas = [e for e in dict.fromkeys(str(x).strip() for x in vistos.get('campos', [])) if e][:40]
-                    return self._responder(200, {'campos': [campos.proponer(e) for e in etiquetas], 'segundos': segundos})
                 persona = pedido.get('persona') or 'administrador'
                 if ruta == '/dato/confirmar':
                     hecho = base.confirmar_dato(pedido['id'], pedido.get('valor'), persona, pedido.get('descartar'))
@@ -345,11 +379,13 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
         def do_POST(self):
             if self.path not in ('/opinar', '/validar', '/leer', '/padron', '/inventario/alta', '/inventario/cambiar',
                                  '/respaldo/faltan', '/respaldo/archivo', '/respaldo/listo', '/trabajo', '/plantilla/campos',
-                                 '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
+                                 '/clasificar', '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
-            if self.path in ('/trabajo', '/plantilla/campos', '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
+            if self.path in ('/plantilla/campos', '/clasificar'):
+                return self._vision(self.path)
+            if self.path in ('/trabajo', '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
                 return self._expediente(self.path)
             if self.path.startswith('/respaldo/'):
                 return self._respaldo(self.path)
@@ -418,7 +454,14 @@ def main(argumentos=None):
         time.sleep(5)
         base, problema = base_cerebro.abrir(args.base)
     taller = taller_mod.arrancar(base, url=args.ollama) if base else None  # Saca los datos de lo escaneado, en fila.
-    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base, taller=taller, actualizaciones=args.actualizaciones)
+    estudio = None
+    if base:  # El estudio de la IA se rehace solo cuando hay datos nuevos y el taller no está leyendo.
+        from validacion import analisis_datos
+        estudio = analisis_datos.Estudio(base, args.ollama, ocupado=lambda: bool(taller and (taller.ahora or base._uno(
+            "SELECT count(*) FROM sidp.trabajo WHERE estado = 'pendiente'"))))
+        threading.Thread(target=estudio.vigilar, daemon=True).start()
+    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base, taller=taller, actualizaciones=args.actualizaciones,
+                              estudio=estudio)
     if os.environ.get('SIDP_ACTUALIZAR_GITHUB', '1') != '0':  # Cada hora baja de GitHub la versión nueva de SIDP.exe.
         threading.Thread(target=actualizar.vigilar_github, args=(args.actualizaciones,), daemon=True).start()
     print(f'Cerebro escuchando en http://{ip_local()}:{args.puerto}  (modelo {args.modelo})')

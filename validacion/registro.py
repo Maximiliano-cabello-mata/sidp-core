@@ -276,9 +276,15 @@ class Registro:
                       f'Revisa con el padre cómo está escrito el nombre ({alumno["nombre"]}).')
             self._constancia(alumno['alumno'], contenido, 'rechazado', motivo)
             return {'estado': 'no_coincide', 'alumno': alumno['nombre'], 'mensaje': motivo}
+        partes = self.db.execute('SELECT primer_apellido, segundo_apellido, nombres FROM alumno WHERE id = ?', (alumno['alumno'],)).fetchone()
+        corregido = renapo.nombre_de_renapo(lectura['texto'], alumno['curp'], *partes)
+        if corregido:  # En la lista venía pegado ("GARCIALOPEZ"): queda como lo escribe RENAPO.
+            self.completar_alumno(alumno['alumno'], corregido, origen='constancia RENAPO')
         self._constancia(alumno['alumno'], contenido, 'validado')
-        return {'estado': 'validada', 'alumno': alumno['nombre'],
-                'mensaje': f'Listo: la CURP de {alumno["nombre"]} quedó validada en RENAPO.'}
+        nombre = ' '.join(x for x in (corregido['nombres'], corregido['primer_apellido'], corregido['segundo_apellido']) if x) if corregido else None
+        return {'estado': 'validada', 'alumno': nombre or alumno['nombre'], 'corregido': corregido,
+                'mensaje': f'Listo: la CURP de {nombre or alumno["nombre"]} quedó validada en RENAPO.'
+                           + (f' En la lista el nombre venía pegado ({alumno["nombre"]}); quedó como lo escribe RENAPO.' if corregido else '')}
 
     def _guardar_archivo(self, ruta, contenido):
         with self.db:

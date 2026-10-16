@@ -201,8 +201,9 @@
       <div class="panel">
         <h2>Descargar para Excel</h2>
         <p class="chico">Los archivos se guardan en la carpeta de Descargas de esta PC. Tienen datos personales: no los mandes por correo ni los subas a internet.
-          El Excel por grado trae una hoja de resumen que compara los grados, una con todos los alumnos y una por grado con una gráfica por alumno;
-          si la PC 4 contesta, también trae peso, talla, tipo de sangre, alergias y promedio que salieron del escaneo (tarda unos segundos).</p>
+          El Excel por grado trae: Resumen (compara los grados, con gráficas), Salud (la salud de cada alumno, lo importante marcado en rojo),
+          Estado nutricional (con la OMS), Dónde viven, Boletas (promedio de cada año anterior), 911 (las tablas del cuestionario), Todos y una hoja
+          por grado con una gráfica por alumno. Los datos de salud, domicilio y boletas vienen de la PC 4 (tarda unos segundos).</p>
         <div class="barra">
           <button class="principal" data-descargar="por_grado" data-formato="xlsx"><span data-icono="descargar"></span> Excel por grado con gráficas</button>
           <button class="principal" data-descargar="alumnos" data-formato="xlsx"><span data-icono="descargar"></span> Lista de alumnos (Excel, una hoja por grupo)</button>
@@ -213,47 +214,95 @@
         <div id="an-mensaje"></div>
       </div>
       <div class="panel">
-        <h2>Para el 911 y el SAID completos</h2>
-        <p>La base todavía no guarda todo lo que piden: la clave del centro de trabajo (CCT), alumnos repetidores y promovidos,
-          lengua indígena, datos del personal (sexo y estudios) y el folio del SAID. La lista completa está en
-          <b>docs/investigacion/reportes_oficiales.md</b>. Esos datos se agregan en las siguientes fases.</p>
+        <h2>Lo que pide el gobierno cada año</h2>
+        <div class="tabla-envoltura"><table>
+          <tr><th>Cuándo</th><th>Qué</th><th>Qué piden de los alumnos</th><th>Dónde lo da SIDP</th></tr>
+          <tr><td>Septiembre y octubre</td><td>Estadística 911 (cuestionario 911.3, en f911.sep.gob.mx; inicio de este ciclo y fin del anterior)</td>
+            <td>Alumnos por grado, sexo y edad al 1 de septiembre; nuevo ingreso y repetidores; grupos; discapacidad y condiciones por tipo;
+              lengua indígena, nacidos en otro país y afromexicanos; existencia y promovidos del ciclo anterior; egresados de 6.°</td>
+            <td>Hoja "911" del Excel por grado y pestaña Análisis de datos</td></tr>
+          <tr><td>Durante el ciclo</td><td>Jornadas de salud "Vive saludable, vive feliz" (SEP, Salud, IMSS y DIF)</td>
+            <td>Peso, talla e IMC, vista y salud bucal de cada alumno</td><td>Hojas "Salud" y "Estado nutricional" del Excel por grado</td></tr>
+          <tr><td>Tres veces al año</td><td>Boleta de evaluación (Acuerdo 10/09/23)</td><td>Calificación por campo formativo, asistencias y observaciones</td>
+            <td>Hoja "Boletas" (las de años anteriores que se escanearon)</td></tr>
+          <tr><td>A principios de año</td><td>Preinscripción en el SAID (Estado de México)</td><td>CURP y acta del alumno; la escuela recibe la lista de asignados</td>
+            <td>Lista de alumnos y CURP validadas en RENAPO</td></tr>
+          <tr><td>Cuando hay convocatoria</td><td>Becas (Beca Rita Cetina)</td><td>CURP del alumno, clave de la escuela y datos del tutor</td>
+            <td>Lista de alumnos</td></tr>
+        </table></div>
+        <p class="chico">Las fechas cambian con cada convocatoria: revísenlas cada año. Todavía hay que capturar a mano lo que la base no guarda
+          (nuevo ingreso y repetidores, lengua indígena, afromexicanos, promovidos, personal y aulas). El detalle está en
+          docs/investigacion/estudios_sep_salud.md y docs/investigacion/reportes_oficiales.md.</p>
       </div>
     </section>
 
     <!-- ============ ANÁLISIS DE DATOS (PC 4) ============ -->
     <section class="pestana" data-pestana="datos">
       <h1>Análisis de datos</h1>
-      <p class="subtitulo">Lo calcula la PC 4 con pandas sobre su base de datos. Solo números: sin nombres ni CURP. La IA puede escribir un resumen, pero no cambia ningún dato.</p>
+      <p class="subtitulo">Lo que dicen los datos de los alumnos: salud, dónde viven, boletas y lo que pide el 911. Lo calcula la PC 4 con pandas
+        y se actualiza solo mientras escanean. Solo números: sin nombres ni CURP. La IA escribe el estudio, pero no cambia ningún dato.</p>
       <div class="barra">
-        <button class="principal" id="dt-actualizar">Actualizar análisis</button>
-        <button id="dt-ia">Pedir resumen a la IA</button>
+        <button class="principal" id="dt-actualizar">Actualizar ahora</button>
+        <button id="dt-ia">Pedir a la IA un estudio nuevo</button>
         <span class="espacio"></span><span class="chico" id="dt-motor"></span>
       </div>
       <div id="dt-mensaje"></div>
       <div id="dt-contenido" class="oculto">
         <div class="kpis" id="dt-kpis"></div>
-        <div class="panel">
-          <h2>Lo más importante</h2>
-          <ul class="hallazgos" id="dt-hallazgos"></ul>
-          <div id="dt-ia-texto"></div>
+        <div class="dos-columnas">
+          <div class="panel"><h2>Lo más importante</h2><ul class="hallazgos" id="dt-hallazgos"></ul></div>
+          <div class="panel"><h2>Estudio de la IA para el director y el subdirector</h2><div id="dt-ia-texto"></div></div>
         </div>
-        <div class="dos-columnas" style="margin-top:16px">
-          <div class="panel"><h2>Avance del expediente por grupo</h2><p class="chico">Documentos obligatorios validados por una persona.</p><div class="grafica" id="dt-avance"></div></div>
-          <div class="panel"><h2>Documentos que más faltan</h2><div class="grafica" id="dt-faltan"></div></div>
+        <div class="panel"><h2>Con cuántos alumnos se calcula</h2>
+          <p class="chico">Cuando un área pasa de la mitad de los alumnos, sus porcentajes ya hablan de toda la escuela y la IA escribe su estudio sola.</p>
+          <div class="grafica" id="dt-cobertura"></div></div>
+
+        <h2 class="seccion-datos">Salud</h2>
+        <div class="dos-columnas">
+          <div class="panel"><h2>Estado nutricional por grado</h2><p class="chico">IMC para la edad de la OMS, como la estrategia "Vive saludable, vive feliz" de la SEP.</p>
+            <div class="tabla-envoltura"><table id="dt-nutricion"></table></div></div>
+          <div class="panel"><h2>Estado nutricional de la escuela</h2><div class="grafica" id="dt-nutricion-escuela"></div></div>
         </div>
-        <div class="dos-columnas" style="margin-top:16px">
+        <div class="dos-columnas">
+          <div class="panel"><h2>Alergias más comunes</h2><div class="grafica" id="dt-alergias"></div></div>
+          <div class="panel"><h2>Enfermedades o padecimientos</h2><div class="grafica" id="dt-padecimientos"></div></div>
+        </div>
+        <div class="dos-columnas">
+          <div class="panel"><h2>Vista por grado</h2><div class="tabla-envoltura"><table id="dt-vista"></table></div></div>
+          <div class="panel"><h2>Salud bucal por grado</h2><div class="tabla-envoltura"><table id="dt-bucal"></table></div></div>
+        </div>
+        <div class="dos-columnas">
+          <div class="panel"><h2>Tipo de sangre</h2><div class="grafica" id="dt-sangre"></div></div>
+          <div class="panel"><h2>Medicamentos que toman</h2><div class="grafica" id="dt-medicamentos"></div></div>
+        </div>
+
+        <h2 class="seccion-datos">Dónde viven</h2>
+        <div class="dos-columnas">
+          <div class="panel"><h2>Por municipio</h2><div class="grafica" id="dt-municipios"></div></div>
+          <div class="panel"><h2>Colonias con más alumnos</h2><div class="grafica" id="dt-colonias"></div></div>
+        </div>
+
+        <h2 class="seccion-datos">Boletas de años anteriores</h2>
+        <div class="dos-columnas">
+          <div class="panel"><h2>Promedio por grado cursado</h2><div class="grafica" id="dt-boletas"></div></div>
+          <div class="panel"><h2>Por campo formativo (última boleta)</h2><div class="grafica" id="dt-formativos"></div></div>
+        </div>
+        <div class="panel"><h2>Por grupo: promedio de la última boleta y alumnos con menos de 7</h2><div class="grafica" id="dt-boletas-grupo"></div></div>
+
+        <h2 class="seccion-datos">Para el 911</h2>
+        <div class="panel"><h2>Alumnos por grado, sexo y edad al 1 de septiembre</h2>
+          <p class="chico">Como la tabla del cuestionario 911.3. Nuevo ingreso y repetidores se separan a mano al capturar.</p>
+          <div class="tabla-envoltura"><table id="dt-911"></table></div></div>
+        <div class="dos-columnas">
+          <div class="panel"><h2>Discapacidad y condiciones por grado</h2><p class="chico">Con los tipos fijos que pide el 911.</p>
+            <div class="tabla-envoltura"><table id="dt-discapacidad"></table></div></div>
+          <div class="panel"><h2>Lugar de nacimiento</h2><p class="chico">Sale de la CURP de cada alumno.</p>
+            <div class="tabla-envoltura"><table id="dt-nacidos"></table></div></div>
+        </div>
+        <div class="dos-columnas">
           <div class="panel"><h2>Matrícula por grupo y sexo</h2><div class="tabla-envoltura"><table id="dt-matricula"></table></div></div>
-          <div class="panel"><h2>Edad al 31 de diciembre</h2><div class="tabla-envoltura"><table id="dt-edades"></table></div></div>
-        </div>
-        <div class="dos-columnas" style="margin-top:16px">
           <div class="panel"><h2>Extraedad y menor edad</h2><div class="tabla-envoltura"><table id="dt-situacion"></table></div></div>
-          <div class="panel"><h2>Documentos recibidos, últimos 14 días</h2><div class="dias" id="dt-dias"></div><div class="dias-etiquetas" id="dt-dias-etiquetas"></div></div>
         </div>
-        <div class="dos-columnas" style="margin-top:16px">
-          <div class="panel"><h2>Documentos por estado</h2><div class="tabla-envoltura"><table id="dt-documentos"></table></div></div>
-          <div class="panel"><h2>Lectura del cerebro y alertas</h2><div id="dt-lecturas"></div></div>
-        </div>
-        <div class="panel"><h2>Inventario por categoría y estado</h2><div class="tabla-envoltura"><table id="dt-inventario"></table></div></div>
       </div>
     </section>
 
@@ -765,6 +814,16 @@ function cajaAlumno(r) {
     </div></div>`;
 }
 
+function queCreeLaIa(ia, tipos) {
+  // Una hoja que no se reconoció por sus textos fijos: lo que la IA de la PC 4 cree que es, para que la persona confirme.
+  if (!ia) return '(no reconocida: elige qué documento es)';
+  const titulo = esc(ia.titulo || tipos[ia.tipo] || 'otro documento'), motivo = ia.motivo ? ` (${esc(ia.motivo)})` : '';
+  return ia.tipo && ia.tipo !== 'otro'
+    ? `La IA cree que es: <b>${titulo}</b>${motivo}. Ya lo puse como ${esc(tipos[ia.tipo] || ia.tipo)}: confírmalo o cámbialo.`
+    : `La IA cree que es: <b>${titulo}</b>${motivo}. No hay plantilla para ese documento: queda como "Otro documento". ` +
+      'Si llega seguido, créale su plantilla en la pestaña Plantillas.';
+}
+
 function mostrarEscaneo(r) {
   escaneo = r;
   const a = r.propuesta.alumno || {}, t = r.propuesta.tutor || {};
@@ -791,7 +850,7 @@ function mostrarEscaneo(r) {
     <h3>Hojas escaneadas</h3>
     <div class="tabla-envoltura"><table><tr><th>Hoja</th><th>Qué documento es</th></tr>${r.paginas.map((p) => `<tr>
       <td>${motor.paginaUrl ? `<a href="${esc(motor.paginaUrl(r.lote, p.archivo))}" target="_blank" rel="noopener">${esc(p.origen)}</a>` : esc(p.origen)}
-        ${p.reconocido ? '' : '<span class="chico">(no reconocida)</span>'}</td>
+        ${p.reconocido ? '' : `<span class="chico">${queCreeLaIa(p.ia, r.tipos)}</span>`}</td>
       <td><select data-hoja="${esc(p.archivo)}" aria-label="Tipo de documento">${opciones(p.tipo)}</select></td></tr>`).join('')}</table></div>
     <p><button class="verde" id="es-guardar">Guardar expediente</button> <button id="es-descartar">Descartar</button></p>`;
   $('es-guardar').onclick = guardarEscaneo;
@@ -1064,8 +1123,7 @@ function mostrarAnalisis() {
   $('an-faltan').innerHTML = f.total ? fila(f.sin_curp, 'alumnos sin CURP', 'Se llena al escanear el acta o la CURP del alumno.', 'escanear')
     + fila(f.curp_sin_validar, 'CURP sin validar en RENAPO', 'Se valida en la pestaña CURP y RENAPO.', 'curp')
     + fila(f.sin_sexo, 'alumnos sin sexo registrado (el 911 lo pide)', 'Sale de la CURP o del acta al escanear.', 'escanear')
-    + fila(f.sin_fecha, 'alumnos sin fecha de nacimiento', 'Sale de la CURP o del acta al escanear.', 'escanear')
-    + fila(f.sin_documentos, 'alumnos sin documentos', 'Escanea su expediente o pide a los padres que lo suban.', 'escanear')
+    + fila(f.sin_fecha, 'alumnos sin fecha de nacimiento (el 911 cuenta la edad al 1 de septiembre)', 'Sale de la CURP o del acta al escanear.', 'escanear')
     : '<div class="alerta amarilla"><div>Todavía no hay alumnos. Sube las listas de grupo primero.</div><button data-ir="listas">Ir</button></div>';
 }
 for (const b of document.querySelectorAll('[data-descargar]')) b.onclick = async () => {
@@ -1214,9 +1272,15 @@ async function proponerCampos(p) {
   const nuevos = r.campos.filter((c) => !ya.has(c.etiqueta.toUpperCase()));
   camposPlantilla = [...actuales, ...nuevos];
   mostrarCampos();
-  avisoEn('pl-campos-mensaje', nuevos.length ? 'bien' : 'ojo', nuevos.length
-    ? `La IA propuso ${nuevos.length} dato(s) en ${Math.round(r.segundos)} s. Revísalos: quita los que no sirvan, corrige a dónde va cada uno y guarda.`
-    : 'La IA no encontró datos nuevos en la muestra.');
+  // Las señas (textos impresos que siempre trae el formato) se suman a los textos fijos con los que se reconoce al escanear.
+  const textos = $('pl-textos').value.split('\n').map((x) => x.trim()).filter(Boolean);
+  const senas = (r.senas || []).map((x) => x.toUpperCase()).filter((x) => !textos.map((y) => y.toUpperCase()).includes(x));
+  if (senas.length) $('pl-textos').value = [...textos, ...senas].join('\n');
+  if (r.titulo && !$('pl-nombre').value.trim() && !$('pl-nombre').disabled) $('pl-nombre').value = r.titulo;
+  avisoEn('pl-campos-mensaje', nuevos.length || senas.length ? 'bien' : 'ojo', nuevos.length || senas.length
+    ? `La IA propuso ${nuevos.length} dato(s) y ${senas.length} seña(s) para reconocerlo en ${Math.round(r.segundos)} s. ` +
+      'Revísalos: quita los que no sirvan, corrige a dónde va cada dato y guarda.'
+    : 'La IA no encontró datos ni señas nuevas en la muestra.');
 }
 
 async function leerMuestras(archivos) {
@@ -1300,37 +1364,62 @@ function grafica(id, filas, maximo, sufijo = '', color = '') {
 }
 async function cargarAnalisisPC4(conIA) {
   if (!motor.analisisPC4) { avisoEn('dt-mensaje', 'ojo', SIN_PC4); return; }
-  const r = await trabajar(conIA ? 'La IA está escribiendo el resumen (puede tardar un minuto)…' : 'Calculando en la PC 4…',
+  const r = await trabajar(conIA ? 'La IA está escribiendo el estudio (puede tardar unos minutos)…' : 'Calculando en la PC 4…',
     () => motor.analisisPC4(conIA), (c, t) => avisoEn('dt-mensaje', c, t));
   if (!r) return;
   avisoEn('dt-mensaje', '', '');
+  mostrarAnalisisPC4(r);
+}
+// Mientras la pestaña está abierta, el análisis se rehace solo: así crece conforme se escanea.
+setInterval(async () => {
+  if (pestana !== 'datos' || !motor.analisisPC4 || document.hidden) return;
+  try { mostrarAnalisisPC4(await motor.analisisPC4(false)); } catch (error) { /* La PC 4 no contestó: queda lo último. */ }
+}, 120000);
+const pares = (lista) => (lista || []).map((x) => [x[0], x[1]]);
+const maximo = (lista) => Math.max(1, ...(lista || []).map((x) => x[1]));
+function mostrarAnalisisPC4(r) {
   analisisPC4 = r;
   $('dt-contenido').classList.remove('oculto');
-  $('dt-motor').textContent = `Ciclo ${r.ciclo || '—'} · calculado con ${r.motor} · ${r.fecha}`;
+  $('dt-motor').textContent = `Ciclo ${r.ciclo || '—'} · calculado con ${r.motor} · ${r.fecha} · se actualiza solo cada 2 minutos`;
   const k = r.kpis;
   $('dt-kpis').innerHTML = kpi('azul', 'alumnos', k.alumnos, `Alumnos (${k.hombres} H, ${k.mujeres} M)`)
-    + kpi('verde', 'bien', `${k.avance_expedientes}%`, `Avance de expedientes · ${k.expedientes_completos} completos`)
-    + kpi('morado', 'curp', `${k.curp_validadas_renapo} de ${k.alumnos}`, 'CURP validadas en RENAPO')
-    + kpi(k.alertas_altas ? 'rojo' : 'verde', 'alerta', k.alertas_altas, 'Alertas graves')
-    + kpi('ambar', 'inventario', k.piezas_inventario, 'Piezas en el inventario');
+    + kpi('verde', 'bien', `${k.con_salud} de ${k.alumnos}`, 'Con datos de salud')
+    + kpi(k.sobrepeso_obesidad ? 'ambar' : 'verde', 'alerta', `${k.por_ciento_sobrepeso}%`, `Sobrepeso u obesidad (de ${k.medidos} medidos)`)
+    + kpi(k.con_alergias + k.con_padecimientos ? 'rojo' : 'verde', 'alerta', k.con_alergias + k.con_padecimientos, 'Con alergias o padecimientos')
+    + kpi('morado', 'datos', k.promedio_general ?? '—', 'Promedio de la última boleta')
+    + (k.municipio_principal ? kpi('azul', 'listas', `${k.por_ciento_municipio}%`, `Viven en ${k.municipio_principal}`) : '');
   $('dt-hallazgos').innerHTML = r.hallazgos.map((h) => `<li>${esc(h)}</li>`).join('');
-  $('dt-ia-texto').innerHTML = !r.ia ? '' : r.ia.texto
-    ? `<h3>Resumen de la IA <span class="chico">(${esc(r.ia.modelo)}, ${r.ia.segundos} s · revísalo antes de usarlo)</span></h3><div class="ia-texto">${esc(r.ia.texto)}</div>`
-    : `<div class="mensaje ojo">${esc(r.ia.problema)}</div>`;
-  grafica('dt-avance', r.avance_por_grupo.map((g) => [g.grupo, g.porcentaje]), 100, '%', 'verde');
-  grafica('dt-faltan', r.faltan_por_documento.map((d) => [d.documento, d.faltan]), Math.max(1, ...r.faltan_por_documento.map((d) => d.faltan)), '', 'ambar');
+  const estudio = r.ia && r.ia.texto ? { ...r.ia, fecha: 'ahora', al_dia: true } : r.estudio;
+  $('dt-ia-texto').innerHTML = (r.ia && !r.ia.texto ? `<div class="mensaje ojo">${esc(r.ia.problema)}</div>` : '') + (estudio && estudio.texto
+    ? `<p class="chico">Lo escribió la IA (${esc(estudio.modelo)}) ${esc(String(estudio.fecha).replace('T', ' '))}${estudio.al_dia ? ''
+      : ' · ya hay datos nuevos: lo rehace sola cuando la PC 4 termine de leer escaneos'}. Revísalo antes de usarlo.</p><div class="ia-texto">${esc(estudio.texto)}</div>`
+    : '<p class="chico">Todavía no hay estudio. La IA lo escribe sola cuando ya hay datos de más de la mitad de los alumnos en salud, '
+      + 'domicilio o boletas; también puedes pedirlo con el botón de arriba.</p>');
+  grafica('dt-cobertura', r.cobertura.map((c) => [`${c.area} (${c.con} de ${c.de})`, c.porcentaje]), 100, '%', 'verde');
+  const s = r.salud;
+  tablaCruce('dt-nutricion', s.nutricion, 'Grado');
+  grafica('dt-nutricion-escuela', pares(s.nutricion_escuela), maximo(s.nutricion_escuela), '', 'ambar');
+  grafica('dt-alergias', pares(s.alergias), maximo(s.alergias), '', 'ambar');
+  grafica('dt-padecimientos', pares(s.padecimientos), maximo(s.padecimientos), '', 'ambar');
+  tablaCruce('dt-vista', s.vista, 'Grado');
+  tablaCruce('dt-bucal', s.bucal, 'Grado');
+  grafica('dt-sangre', pares(s.sangre), maximo(s.sangre));
+  grafica('dt-medicamentos', pares(s.medicamentos), maximo(s.medicamentos));
+  const d = r.domicilio;
+  grafica('dt-municipios', pares(d.municipios), maximo(d.municipios));
+  grafica('dt-colonias', pares(d.colonias), maximo(d.colonias));
+  const e = r.escolar;
+  grafica('dt-boletas', e.por_grado_cursado.map(([g, p, n]) => [`${g} (${n} boletas)`, p]), 10, '', 'verde');
+  grafica('dt-formativos', pares(e.formativos), 10, '', 'verde');
+  grafica('dt-boletas-grupo', e.por_grupo.map(([g, p, b]) => [`${g} · ${b} con menos de 7`, p]), 10, '', 'verde');
+  const f = r.f911;
+  $('dt-911').innerHTML = `<tr><th>Grado</th><th></th>${f.columnas.map((c) => `<th class="cifra">${esc(c)}</th>`).join('')}</tr>` + f.filas.map((x) =>
+    `<tr class="${x[1] === 'Subtotal' || x[0] === 'Total' ? 'total' : ''}"><td>${esc(x[1] === 'Hombres' ? x[0] : x[0] === 'Total' ? 'Total' : '')}</td>
+      <td>${esc(x[1])}</td>${x.slice(2).map((n) => `<td class="cifra">${n}</td>`).join('')}</tr>`).join('');
+  tablaCruce('dt-discapacidad', r.discapacidad_911, 'Tipo');
+  tablaCruce('dt-nacidos', r.nacidos, 'Grado');
   tablaCruce('dt-matricula', r.matricula, 'Grupo');
-  tablaCruce('dt-edades', { columnas: r.edades.columnas.map((c) => c === 'Total' ? c : `${c} años`), filas: r.edades.filas }, 'Grupo');
   tablaCruce('dt-situacion', r.situacion_edad, 'Grupo');
-  tablaCruce('dt-documentos', r.documentos_por_estado, 'Documento');
-  tablaCruce('dt-inventario', r.inventario, 'Categoría');
-  const maxDia = Math.max(1, ...r.recibidos_14_dias.map((d) => d.documentos));
-  $('dt-dias').innerHTML = r.recibidos_14_dias.map((d) => `<div title="${esc(d.dia)}: ${d.documentos}" style="height:${100 * d.documentos / maxDia}%"></div>`).join('');
-  $('dt-dias-etiquetas').innerHTML = r.recibidos_14_dias.map((d) => `<span>${esc(d.dia.slice(8))}</span>`).join('');
-  const l = r.lecturas;
-  $('dt-lecturas').innerHTML = `<p>Páginas leídas: <b>${l.paginas}</b> · sin texto: <b>${l.sin_texto}</b> · reconocidas con un alumno: <b>${l.reconocidas}</b> · CURP leídas con algún error: <b>${l.curp_con_errores}</b></p>
-    <p class="chico">Por método: ${Object.entries(l.por_metodo).map(([m, n]) => `${esc(m)} ${n}`).join(', ') || 'todavía nada'}</p>
-    <h3>Alertas</h3><p>${Object.entries(r.alertas).map(([t, n]) => `${esc(t.replace(/_/g, ' '))}: <b>${n}</b>`).join(' · ') || 'Sin alertas.'}</p>`;
 }
 $('dt-actualizar').onclick = () => cargarAnalisisPC4(false);
 $('dt-ia').onclick = () => cargarAnalisisPC4(true);
@@ -1458,8 +1547,19 @@ const CAMPOS = {
   titular: 'Titular del recibo', fecha_comprobante: 'Fecha del comprobante', vigencia_ine: 'Vigencia de la INE', ocupacion: 'Ocupación',
   escolaridad: 'Escolaridad', grado_cursado: 'Grado que cursó', ciclo_boleta: 'Ciclo de la boleta', promedio: 'Promedio',
   escuela_procedencia: 'Escuela de procedencia', cct_procedencia: 'CCT de procedencia',
+  estado_nutricional: 'Estado nutricional', presion: 'Presión arterial', frecuencia_cardiaca: 'Frecuencia cardiaca',
+  agudeza_visual: 'Vista (agudeza visual)', usa_lentes: 'Usa lentes', audicion: 'Audición', salud_bucal: 'Salud bucal',
+  vacunas: 'Vacunas', discapacidad: 'Discapacidad', cirugia: 'Cirugía u hospitalización', educacion_fisica: 'Educación física',
+  recomendaciones: 'Recomendaciones del médico', otro_dato: 'Otro dato del certificado', colonia: 'Colonia o localidad',
+  municipio: 'Municipio', lenguajes: 'Lenguajes', saberes: 'Saberes y pensamiento científico', etica: 'Ética, naturaleza y sociedades',
+  humano: 'De lo humano y lo comunitario', materia: 'Materia', inasistencias: 'Inasistencias', observaciones_boleta: 'Observaciones de la boleta',
 };
-const nombreCampo = (c) => CAMPOS[c] || (c.charAt(0).toUpperCase() + c.slice(1)).replace(/_/g, ' ');
+// Los datos de cada boleta llevan su grado al final (promedio_2 es el promedio de 2.°).
+const nombreCampo = (c) => {
+  const grado = /^(.+)_([1-6])$/.exec(c);
+  if (grado && CAMPOS[grado[1]]) return `${CAMPOS[grado[1]]} (boleta de ${grado[2]}.°)`;
+  return CAMPOS[c] || (c.charAt(0).toUpperCase() + c.slice(1)).replace(/_/g, ' ');
+};
 const DE_QUIEN = { madre: 'de la madre', padre: 'del padre', tutor: 'del tutor', emergencia: 'contacto de emergencia', alumno: 'del alumno', otro: 'de otra persona' };
 const CONFIANZA = { confirmado: ['conf-confirmado', 'confirmado'], alta: ['conf-alta', 'seguro'], media: ['conf-media', 'leído'], baja: ['conf-baja', 'por confirmar'] };
 let alumnoAbierto = null, alumnoDatos = null;
@@ -1543,7 +1643,7 @@ function mostrarAlumno() {
   $('al-kpis').innerHTML = kpi('azul', 'datos', todos.length, 'Datos guardados')
     + kpi(dudosos ? 'ambar' : 'verde', dudosos ? 'alerta' : 'bien', dudosos, 'Por confirmar')
     + kpi('morado', 'plantillas', r.pdf.length, 'Documentos en PDF')
-    + (ultimo ? kpi('verde', 'escanear', `${ultimo.resumen.utiles}%`, 'Campos que se llenaron solos (última lectura)') : '');
+    + (ultimo ? kpi('verde', 'escanear', `${ultimo.resumen.utiles}%`, 'Datos que salieron seguros (última lectura)') : '');
   const fila = (que, valor) => `<tr><td>${esc(que)}</td><td colspan="2"><b>${esc(valor || '—')}</b></td></tr>`;
   const tarjeta = (titulo, filas) => `<div class="panel tarjeta-datos"><h2>${esc(titulo)}</h2><table>${filas}</table></div>`;
   let html = tarjeta('Datos del alumno', fila('CURP', a.curp) + fila('Nombre', `${a.nombres} ${a.primer_apellido} ${a.segundo_apellido || ''}`)
@@ -1555,6 +1655,7 @@ function mostrarAlumno() {
       <b>${esc(`${t.nombres} ${t.primer_apellido} ${t.segundo_apellido || ''}`)}</b>
       <div class="chico">${esc([t.telefono, t.correo, t.domicilio].filter(Boolean).join(' · ') || 'Sin teléfono ni correo')}</div></td></tr>`).join(''));
   }
+  html += saludEnBreve(r.datos.salud || []) + boletasPorAnio(r.datos.escolar || [], a.grado);
   for (const [categoria, titulo] of CATEGORIAS.slice(1)) if ((r.datos[categoria] || []).length) html += tarjeta(titulo, filasDatos(r.datos[categoria]));
   if (!todos.length) {
     html += `<div class="panel"><p>Todavía no hay datos sacados de sus documentos.</p><p class="chico">Se llenan solos: al guardar su expediente
@@ -1567,12 +1668,51 @@ function mostrarAlumno() {
   $('al-carpeta').textContent = r.carpeta ? `Carpeta: ${r.carpeta}` : 'Todavía no hay carpeta: se crea cuando se autoriza su expediente.';
   const estados = { pendiente: 'en fila', trabajando: 'leyendo', hecho: 'leído', error: 'no se pudo leer' };
   $('al-trabajos').innerHTML = r.trabajos.length ? `<div class="tabla-envoltura"><table><tr><th>Fecha</th><th>Estado</th><th class="cifra">Campos</th>
-      <th class="cifra">Se llenaron solos</th><th class="cifra">Por confirmar</th><th>Notas</th></tr>` +
+      <th class="cifra">Salieron seguros</th><th class="cifra">Por confirmar</th><th>Notas</th></tr>` +
     r.trabajos.map((t) => `<tr><td>${esc(t.creado.replace('T', ' ').slice(0, 16))}</td><td>${esc(estados[t.estado] || t.estado)}</td>
       <td class="cifra">${t.resumen ? t.resumen.esperados : '—'}</td><td class="cifra">${t.resumen ? t.resumen.utiles + '%' : '—'}</td>
       <td class="cifra">${t.resumen ? t.resumen.baja : '—'}</td>
       <td class="chico">${esc(t.problema || (t.resumen && t.resumen.modelo ? `con ${t.resumen.modelo}, ${Math.round(t.resumen.segundos_vision)} s` : t.resumen ? 'sin modelo que ve' : ''))}</td></tr>`).join('') + '</table></div>'
     : '<p class="chico">Sus documentos todavía no se han leído en la PC 4.</p>';
+}
+
+// Lo que una maestra necesita saber de un vistazo de su salud (lo de abajo trae cada dato con su origen y botones).
+function saludEnBreve(salud) {
+  if (!salud.length) return '';
+  const de = (campo) => salud.filter((d) => d.campo === campo && d.estado !== 'descartado').map((d) => d.valor);
+  const uno = (campo) => de(campo)[0] || '';
+  const peso = parseFloat(String(uno('peso')).replace(',', '.')), talla = parseFloat(String(uno('talla')).replace(',', '.'));
+  const metros = talla > 3 ? talla / 100 : talla;  // A veces escriben la talla en centímetros.
+  const imc = peso > 0 && metros > 0.5 ? (peso / (metros * metros)).toFixed(1) : '';
+  const renglones = [['Tipo de sangre', uno('tipo_sangre')], ['Alergias', de('alergia').join(', ')],
+    ['Enfermedades o padecimientos', de('padecimiento').join(', ')], ['Medicamentos', de('medicamento').join(', ')],
+    ['Discapacidad', de('discapacidad').join(', ')], ['Peso, talla e IMC', [uno('peso') && `${uno('peso')} kg`, uno('talla') && `${uno('talla')} m`,
+      imc && `IMC ${imc}`].filter(Boolean).join(' · ')], ['Estado nutricional', uno('estado_nutricional')],
+    ['Vista', [uno('agudeza_visual'), /^s[ií]/i.test(uno('usa_lentes')) ? 'usa lentes' : ''].filter(Boolean).join(' · ')],
+    ['Audición', uno('audicion')], ['Salud bucal', uno('salud_bucal')], ['Vacunas', uno('vacunas')],
+    ['Educación física', uno('educacion_fisica') || uno('apto')], ['Recomendaciones', uno('recomendaciones')]].filter(([, v]) => v);
+  const ojo = de('alergia').length || de('padecimiento').length || de('medicamento').length || de('discapacidad').length;
+  return `<div class="panel tarjeta-datos"><h2>Su salud en breve</h2>${ojo ? '<div class="mensaje ojo">Tiene alergias, padecimientos, medicamentos o '
+    + 'alguna discapacidad anotados: que lo sepa su maestra.</div>' : ''}<table>${renglones.map(([k, v]) =>
+    `<tr><td>${esc(k)}</td><td colspan="2"><b>${esc(v)}</b></td></tr>`).join('')}</table></div>`;
+}
+
+// Una fila por cada boleta de años anteriores (un alumno de 4.° trae las de 1.°, 2.° y 3.°).
+function boletasPorAnio(escolar, gradoActual) {
+  const porGrado = {};
+  for (const d of escolar) {
+    const m = /^(.+)_([1-6])$/.exec(d.campo);
+    if (m && d.estado !== 'descartado') (porGrado[m[2]] = porGrado[m[2]] || {})[m[1]] = d.valor;
+  }
+  const grados = Object.keys(porGrado).sort();
+  if (!grados.length) return '';
+  const columnas = [['ciclo_boleta', 'Ciclo'], ['promedio', 'Promedio'], ['lenguajes', 'Lenguajes'], ['saberes', 'Saberes'],
+    ['etica', 'Ética'], ['humano', 'Lo humano'], ['inasistencias', 'Faltas']];
+  const faltan = gradoActual > 1 ? [...Array(gradoActual - 1).keys()].map((i) => String(i + 1)).filter((g) => !porGrado[g]) : [];
+  return `<div class="panel tarjeta-datos"><h2>Boletas de años anteriores</h2><div class="tabla-envoltura"><table>
+    <tr><th>Grado</th>${columnas.map(([, n]) => `<th>${n}</th>`).join('')}</tr>
+    ${grados.map((g) => `<tr><td>${g}.°</td>${columnas.map(([k]) => `<td>${esc(porGrado[g][k] || '—')}</td>`).join('')}</tr>`).join('')}
+    </table></div>${faltan.length ? `<p class="chico">Todavía no se ha leído la boleta de: ${faltan.map((g) => g + '.°').join(', ')}.</p>` : ''}</div>`;
 }
 
 function verPdfAlumno(i) {
@@ -1678,7 +1818,7 @@ async function cargarPorConfirmar() {
     + kpi('azul', 'escanear', enFila, enFila ? 'Expedientes en fila (la PC 4 los lee sin prisa)' : 'Nada en fila')
     + kpi('verde', 'bien', t.hecho || 0, 'Expedientes ya leídos')
     + kpi('morado', 'datos', trabajos.porcentaje_util == null ? '—' : trabajos.porcentaje_util + '%',
-      trabajos.modelo_vision ? `Campos que se llenaron solos (lee con ${trabajos.modelo_vision})` : 'Campos que se llenaron solos (sin modelo que ve)');
+      trabajos.modelo_vision ? `Datos que salieron seguros (lee con ${trabajos.modelo_vision})` : 'Datos que salieron seguros (sin modelo que ve)');
   if (!lista.datos.length) {
     $('cf-lista').innerHTML = '<p>No hay nada por confirmar.</p><p class="chico">Cuando la PC 4 lea un expediente y algo no quede claro, aparece aquí.</p>';
     return;

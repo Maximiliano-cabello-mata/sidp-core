@@ -982,7 +982,8 @@ BEGIN
     END IF;
     nuevo := sidp.guardar_dato(d.alumno_id, d.categoria, d.campo, coalesce(nullif(btrim(valor_correcto), ''), d.valor), d.detalle,
                                'confirmado', 'persona', d.documento, d.trabajo_id, persona,
-                               d.campo IN ('telefono', 'correo', 'alergia', 'padecimiento', 'medicamento'));
+                               d.campo IN ('telefono', 'correo', 'alergia', 'padecimiento', 'medicamento', 'discapacidad', 'cirugia',
+                                           'otro_dato') OR d.campo ~ '^materia(_[1-6])?$');
     RETURN nuevo;
 END $$;
 

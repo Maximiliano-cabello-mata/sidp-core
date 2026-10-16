@@ -231,6 +231,9 @@ VISTO = {
 }
 
 
+CLASIFICADO = {'tipo': 'certificado_medico', 'titulo': 'Constancia de salud', 'motivo': 'trae el sello de un centro de salud'}
+
+
 @pytest.fixture
 def modelo_que_ve(monkeypatch):
     preguntas = []
@@ -238,7 +241,11 @@ def modelo_que_ve(monkeypatch):
     def preguntar(hojas, pregunta, esquema=None, nombre_modelo=None, url=None, espera=900):
         preguntas.append(pregunta)
         if pregunta == campos.PROPONER:
-            return {'campos': ['Nombre del alumno', 'Teléfono de la madre', 'Alergias', 'Teléfono de la madre']}, 2.0
+            return {'titulo': 'Ficha de inscripción', 'senas': ['FICHA DE INSCRIPCION', 'Ciclo escolar 2026-2027', 'Datos del alumno', 'ficha de inscripción'],
+                    'campos': ['Nombre del alumno', 'Teléfono de la madre', 'Alergias', 'Teléfono de la madre']}, 2.0
+        if pregunta.startswith('Esta hoja viene del expediente'):  # Una hoja que no se reconoció: qué documento parece.
+            assert {'certificado_medico', 'boleta', 'otro'} <= set(esquema['properties']['tipo']['enum'])
+            return dict(CLASIFICADO), 30.0
         documento = next(v for k, v in VISTO.items() if k in pregunta)
         return {c: {'valor': documento.get(c, ('', True))[0], 'seguro': documento.get(c, ('', True))[1]} for c in esquema['properties']}, 1.5
 
@@ -273,7 +280,7 @@ def test_el_taller_saca_los_datos_y_los_guarda_por_categoria(base, modelo_que_ve
     assert sorted(p.name for p in (tmp_path / 'trabajos' / str(trabajo)).iterdir()) == ['acta_alumno_1.pdf', 'certificado_medico_1.pdf']
     cuenta = trabajos.una_vez()
     assert {k: cuenta[k] for k in ('esperados', 'alta', 'media', 'baja', 'vacios', 'utiles')} == \
-        {'esperados': 21, 'alta': 7, 'media': 5, 'baja': 2, 'vacios': 7, 'utiles': 57}
+        {'esperados': 35, 'alta': 7, 'media': 5, 'baja': 2, 'vacios': 21, 'utiles': 86}  # 12 de 14 datos salieron seguros.
     assert not (tmp_path / 'trabajos' / str(trabajo)).exists()  # Los archivos del trabajo ya no hacen falta.
     assert trabajos.una_vez() is None
     assert datos_de(base) == {
@@ -290,7 +297,7 @@ def test_el_taller_saca_los_datos_y_los_guarda_por_categoria(base, modelo_que_ve
     # El nombre, la CURP y la fecha ya estaban en la lista oficial: el acta los confirma y no se repiten.
     assert not any(c == 'alumno' and k in ('curp', 'nombres', 'fecha_nacimiento') for c, k, _ in datos_de(base))
     estado = trabajos.estado()
-    assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 57 and estado['por_confirmar'] == 2
+    assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 86 and estado['por_confirmar'] == 2
     # Solo números en el resumen (nada de nombres).
     assert set(base._uno('SELECT resumen FROM sidp.trabajo WHERE id = %s', (trabajo,))) == \
         {'esperados', 'alta', 'media', 'baja', 'vacios', 'segundos_vision', 'modelo', 'utiles'}
@@ -381,9 +388,9 @@ def test_del_escaneo_al_expediente_del_alumno_en_el_panel(base, modelo_que_ve, t
         # El servidor ya le encargó el expediente a la PC 4: no quedó nada pendiente de mandar.
         estado = pedir(url, '/api/trabajos', cabeceras=token)[1]
         assert estado['trabajos'] == {'pendiente': 1} and estado['pendientes_de_enviar'] == 0, estado
-        assert trabajos.una_vez()['esperados'] == 21
+        assert trabajos.una_vez()['esperados'] == 35  # 10 del acta y 25 del certificado médico.
         estado = pedir(url, '/api/trabajos', cabeceras=token)[1]
-        assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 57
+        assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 86
         codigo, expediente = pedir(url, f'/api/alumno?curp={CURP_JUAN}', cabeceras=token)
         assert codigo == 200, expediente
         assert expediente['alumno']['nombres'] == 'JUAN' and expediente['alumno']['grado'] == 1
@@ -468,8 +475,54 @@ def test_la_ia_propone_los_campos_de_una_plantilla_nueva(base, modelo_que_ve, tm
         assert codigo == 200, respuesta
         assert [(c['etiqueta'], c['categoria'], c['campo']) for c in respuesta['campos']] == [
             ('Nombre del alumno', 'alumno', 'nombre'), ('Teléfono de la madre', 'contacto', 'telefono'), ('Alergias', 'salud', 'alergia')]
+        # Las señas para reconocerlo al escanear: solo texto impreso fijo (sin números) y sin repetir.
+        assert respuesta['titulo'] == 'Ficha de inscripción' and respuesta['senas'] == ['FICHA DE INSCRIPCION', 'Datos del alumno']
         # Sin taller (la PC 4 no tiene base o no arrancó) no se aceptan trabajos.
         assert pedir(url_cerebro, '/trabajo', pedido_de_juan(), {'X-SIDP-Clave': 'clave-de-prueba'})[0] == 503
     finally:
         servidor.shutdown()
         cerebro.shutdown()
+
+
+@con_base
+def test_la_ia_dice_que_documento_parece_una_hoja_que_no_se_reconocio(base, modelo_que_ve, tmp_path):
+    cerebro = cerebro_red.crear_servidor('clave-de-prueba', 0, url='http://127.0.0.1:9/api/chat', anfitrion='127.0.0.1', base=base)
+    url_cerebro = iniciar(cerebro)
+    app = aplicacion.Aplicacion(tmp_path / 'sistema', HOY, puerto=0)
+    servidor = aplicacion.crear_servidor(app, '127.0.0.1')
+    url = iniciar(servidor)
+    hoja_rara = ['HOJA DE REFERENCIA DEL CENTRO DE SALUD', 'Se atendió al menor en la unidad', 'Peso 24 kg Talla 1.20 m']
+    try:
+        assert app.configurar(url_cerebro, 'clave-de-prueba') is None
+        leido = escanear(url, app, pdf_de_hojas([ACTA.splitlines(), hoja_rara, ['REVERSO SIN TEXTO FIJO PERO CON BASTANTES LETRAS ESCRITAS']]))[1]
+        acta, rara, reverso = leido['paginas']
+        assert acta['reconocido'] and 'ia' not in acta
+        assert (rara['tipo'], rara['reconocido'], rara['ia']['titulo']) == ('certificado_medico', False, 'Constancia de salud')
+        assert reverso['tipo'] == 'certificado_medico'  # Una hoja sin señas sigue a la anterior (su reverso), ya con lo que dijo la IA.
+        assert sum(p.startswith('Esta hoja viene del expediente') for p in modelo_que_ve) == 2  # Solo las que no se reconocieron.
+        # Si la IA no ve ninguna plantilla, lo dice con el nombre del documento y queda como "otro".
+        CLASIFICADO.update(tipo='otro', titulo='Constancia de estudios', motivo='el título impreso')
+        leido = escanear(url, app, pdf_de_hojas([hoja_rara]))[1]
+        assert (leido['paginas'][0]['tipo'], leido['paginas'][0]['ia']['titulo']) == ('otro', 'Constancia de estudios')
+    finally:
+        CLASIFICADO.update(tipo='certificado_medico', titulo='Constancia de salud', motivo='trae el sello de un centro de salud')
+        servidor.shutdown()
+        cerebro.shutdown()
+
+
+def test_las_boletas_se_separan_por_hoja_y_cada_una_lleva_su_grado(tmp_path):
+    (tmp_path / 'boleta_1.pdf').write_bytes(pdf_de_hojas([['BOLETA PRIMER GRADO'], ['BOLETA SEGUNDO GRADO'], ['BOLETA TERCER GRADO']]))
+    documentos = taller.separar_hojas(tmp_path, [{'archivo': 'boleta_1.pdf', 'tipo': 'boleta', 'nombre': 'Boleta', 'campos': []},
+                                                 {'archivo': 'acta.pdf', 'tipo': 'acta_alumno', 'nombre': 'Acta', 'campos': []}])
+    assert [(d['archivo'], d.get('hoja')) for d in documentos] == [('boleta_1_hoja1.pdf', 1), ('boleta_1_hoja2.pdf', 2),
+                                                                    ('boleta_1_hoja3.pdf', 3), ('acta.pdf', None)]
+    # El grado: el que dice la boleta ("SEGUNDO", "3°") o, si no se leyó, el que sale de su ciclo contra el que cursa ahora.
+    assert taller.grado_de('SEGUNDO GRADO', '') == 2 and taller.grado_de('3°', None) == 3
+    assert taller.grado_de('', '2023-2024', (4, '2026-2027')) == 1 and taller.grado_de('', '', (4, '2026-2027')) is None
+    leido = [{'clave': 'grado_cursado', 'campo': 'grado_cursado', 'valor': 'Segundo'},
+             {'clave': 'promedio', 'campo': 'promedio', 'categoria': 'escolar', 'valor': '8.5', 'confianza': 'alta'},
+             {'clave': 'materias', 'campo': 'materia', 'categoria': 'escolar', 'valor': 'Español', 'confianza': 'alta'}]
+    salida, grado = taller.por_grado(leido, (4, '2026-2027'))
+    assert grado == 2 and [(r['campo'], r['varios'], r['detalle']['grado']) for r in salida] == [('promedio_2', False, 2), ('materia_2', True, 2)]
+    sin_grado, _ = taller.por_grado(leido[1:])
+    assert [(r['campo'], r['confianza']) for r in sin_grado] == [('promedio', 'baja'), ('materia', 'baja')]  # Por confirmar.

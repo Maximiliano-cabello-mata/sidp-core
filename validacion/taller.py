@@ -42,6 +42,73 @@ def _visto(v, tipo=None, lecturas=1):
     return {'valor': valor, 'seguro': (not dudoso) and (tipo is None or tipo in seguros)}
 
 
+# Documentos que traen uno por hoja: cada hoja de la boleta es de un año distinto y se lee aparte.
+POR_HOJA = ('boleta',)
+GRADOS = {'PRIMER': 1, 'PRIMERO': 1, 'SEGUNDO': 2, 'TERCER': 3, 'TERCERO': 3, 'CUARTO': 4, 'QUINTO': 5, 'SEXTO': 6}
+
+
+def separar_hojas(carpeta, documentos):
+    """Las boletas que llegan juntas en un PDF (una hoja por año) quedan como un documento por hoja."""
+    salida = []
+    for documento in documentos:
+        archivo = Path(carpeta) / documento['archivo']
+        if documento['tipo'] not in POR_HOJA or archivo.suffix.lower() != '.pdf' or not archivo.exists():
+            salida.append(documento)
+            continue
+        try:
+            import pypdf
+            lector_pdf = pypdf.PdfReader(str(archivo))
+            if len(lector_pdf.pages) < 2:
+                salida.append(documento)
+                continue
+            for numero, pagina in enumerate(lector_pdf.pages, 1):
+                escritor = pypdf.PdfWriter()
+                escritor.add_page(pagina)
+                nombre = f'{archivo.stem}_hoja{numero}.pdf'
+                with open(Path(carpeta) / nombre, 'wb') as salida_pdf:
+                    escritor.write(salida_pdf)
+                salida.append({**documento, 'archivo': nombre, 'hoja': numero})
+        except Exception as error:  # Un PDF que no se deja partir se lee entero, como antes.
+            print(f'no se pudo separar {archivo.name}: {type(error).__name__}: {error}', flush=True)
+            salida.append(documento)
+    return salida
+
+
+def grado_de(grado_escrito, ciclo_boleta, actual=None):
+    """El grado (1 a 6) de una boleta: el que dice ("SEGUNDO GRADO", "2°") o, si no se leyó, el que sale de su ciclo
+    contra el grado y ciclo que cursa ahora (una boleta de 2023-2024 de un alumno que en 2026-2027 va en 4.° es de 1.°)."""
+    texto = campos_mod._mayus(grado_escrito)
+    for palabra in re.findall(r'[A-Z]+|\d+', texto):
+        if palabra in GRADOS:
+            return GRADOS[palabra]
+        if palabra.isdigit() and 1 <= int(palabra) <= 6:
+            return int(palabra)
+    hallado = re.search(r'(20\d\d)\s*[-–/]\s*(?:20)?\d\d', str(ciclo_boleta or ''))
+    if hallado and actual and actual[0] and actual[1]:
+        grado = int(actual[0]) - (int(str(actual[1])[:4]) - int(hallado[1]))
+        return grado if 1 <= grado <= 6 else None
+    return None
+
+
+def por_grado(resultado, actual=None):
+    """Los datos de una boleta con su grado al final del campo (promedio -> promedio_2), para que las boletas de cada
+    año no se reemplacen entre sí. Sin grado, se dejan como están y por confirmar."""
+    valores = {r['clave']: r.get('valor') for r in resultado}
+    grado = grado_de(valores.get('grado_cursado'), valores.get('ciclo_boleta'), actual)
+    salida = []
+    for r in resultado:
+        if r['clave'] == 'grado_cursado':
+            continue  # Va en el nombre de cada campo.
+        if r['campo'] in campos_mod.BOLETA:
+            r = {**r, 'detalle': {**(r.get('detalle') or {}), 'grado': grado}, 'varios': r['campo'] in campos_mod.VARIOS}
+            if grado:
+                r['campo'] = f'{r["campo"]}_{grado}'
+            else:
+                r['confianza'] = 'baja'
+        salida.append(r)
+    return salida, grado
+
+
 def carpeta_por_omision():
     return Path(os.environ.get('SIDP_TRABAJOS') or (Path('C:/SIDP-datos/trabajos') if os.name == 'nt' else Path.home() / 'SIDP-datos' / 'trabajos'))
 
@@ -238,6 +305,9 @@ class Taller:
         modelo_vision = vision.elegir(self.url) if self.con_vision else None
         cuenta = {'esperados': 0, 'alta': 0, 'media': 0, 'baja': 0, 'vacios': 0, 'segundos_vision': 0, 'modelo': modelo_vision}
         carpeta = self.carpeta / str(trabajo_id)
+        documentos = separar_hojas(carpeta, documentos)
+        actual = self.base._consulta('SELECT grado, ciclo FROM sidp.v_inscritos WHERE id = %s ORDER BY ciclo DESC LIMIT 1', (alumno_id,))
+        actual = actual[0] if actual else None
         for documento in documentos:
             archivo = carpeta / documento['archivo']
             if not archivo.exists():
@@ -256,6 +326,9 @@ class Taller:
                 except vision.ErrorVision as error:
                     print(f'trabajo {trabajo_id}: {error}', flush=True)
             resultado = combinar(documento['campos'], procesos, vistos, identidad, hoy)
+            if documento['tipo'] in POR_HOJA:
+                resultado, grado = por_grado(resultado, actual)
+                cuenta.setdefault('boletas', []).append(grado)
             llenos = {r['clave'] for r in resultado}
             cuenta['esperados'] += len(documento['campos'])
             cuenta['vacios'] += len([c for c in documento['campos'] if c['clave'] not in llenos])
@@ -266,8 +339,11 @@ class Taller:
                 for valor in r['valores']:
                     self.base._uno('SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)',
                                    (alumno_id, r['categoria'], r['campo'], str(valor), json.dumps(r.get('detalle') or {}, ensure_ascii=False),
-                                    r['confianza'], r['metodo'], documento['nombre'], trabajo_id, 'cerebro', r['campo'] in campos_mod.VARIOS))
-        cuenta['utiles'] = round(100 * (cuenta['alta'] + cuenta['media']) / cuenta['esperados']) if cuenta['esperados'] else 0
+                                    r['confianza'], r['metodo'], documento['nombre'], trabajo_id, 'cerebro',
+                                    r.get('varios', r['campo'] in campos_mod.VARIOS)))
+        # De lo que sí venía en los documentos, cuánto salió seguro (el certificado trae muchos campos posibles; cada uno, solo algunos).
+        encontrados = cuenta['alta'] + cuenta['media'] + cuenta['baja']
+        cuenta['utiles'] = round(100 * (cuenta['alta'] + cuenta['media']) / encontrados) if encontrados else 0
         self.base._consulta("UPDATE sidp.trabajo SET estado = 'hecho', terminado = now(), resumen = CAST(%s AS jsonb), problema = NULL WHERE id = %s",
                             (json.dumps(cuenta), trabajo_id))
         shutil.rmtree(carpeta, ignore_errors=True)
@@ -309,9 +385,10 @@ class Taller:
         filas = self.base._consulta('SELECT estado, count(*) FROM sidp.trabajo GROUP BY estado')
         resumen = self.base._consulta("SELECT resumen FROM sidp.trabajo WHERE estado = 'hecho' AND resumen IS NOT NULL")
         esperados = sum((r[0] or {}).get('esperados', 0) for r in resumen)
+        encontrados = sum(sum((r[0] or {}).get(k, 0) for k in ('alta', 'media', 'baja')) for r in resumen)
         utiles = sum((r[0] or {}).get('alta', 0) + (r[0] or {}).get('media', 0) for r in resumen)
         return {'trabajos': {e: n for e, n in filas}, 'trabajando': self.ahora, 'modelo_vision': vision.elegir(self.url) if self.con_vision else None,
-                'campos_esperados': esperados, 'campos_utiles': utiles, 'porcentaje_util': round(100 * utiles / esperados) if esperados else None,
+                'campos_esperados': esperados, 'campos_utiles': utiles, 'porcentaje_util': round(100 * utiles / encontrados) if encontrados else None,
                 'por_confirmar': self.base._uno("SELECT count(*) FROM sidp.dato WHERE estado = 'por_confirmar'")}
 
 

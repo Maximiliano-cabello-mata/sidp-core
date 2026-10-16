@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from pruebas.test_base_cerebro import CURP_JUAN, alumnos, id_de
+from pruebas.test_base_cerebro import CURP_JUAN, alumnos
 from pruebas.test_entorno_pruebas import HOY, iniciar, pedir
 from validacion import aplicacion, base_cerebro, cerebro_red, respaldo
 
@@ -70,20 +70,97 @@ def test_el_panel_da_de_alta_e_imprime_etiquetas(entorno):
     assert pagina.count('<svg') == 2 and 'COM-000002' in pagina and 'LAPTOP' in pagina
 
 
-def test_el_analisis_sale_de_la_pc4_con_pandas(entorno, base):
+def _datos_inventados(base):
+    """Salud, domicilio y boletas inventados para los alumnos de prueba (los de 1.° y 2.° de test_lista_oficial)."""
+    from pruebas.test_lista_oficial import SEGUNDO
+    from validacion.ejemplo import generar
+    base.cargar('2026-2027', alumnos() + alumnos(SEGUNDO, 2), 'lista_oficial', 'lista oficial')
+    juan, regina, diego = CURP_JUAN, generar.curp(SEGUNDO[0][3]), generar.curp(SEGUNDO[1][3])
+    for curp, campo, valor in [
+            (juan, 'peso', '30'), (juan, 'talla', '1.15'), (juan, 'tipo_sangre', 'O positivo'), (juan, 'alergia', 'Penicilina'),
+            (juan, 'padecimiento', 'Asma'), (juan, 'medicamento', 'Salbutamol'), (juan, 'agudeza_visual', '20/40'),
+            (juan, 'salud_bucal', 'Presenta caries'), (regina, 'peso', '24'), (regina, 'talla', '1.25'), (regina, 'tipo_sangre', 'O+'),
+            (regina, 'alergia', 'Negadas'), (regina, 'discapacidad', 'Hipoacusia leve'), (regina, 'vacunas', 'Esquema incompleto'),
+            (diego, 'peso', '26'), (diego, 'talla', '1.28'), (diego, 'tipo_sangre', 'A+')]:
+        base.agregar_dato(curp, 'salud', campo, valor, 'Secretaria')
+    for curp, municipio, colonia in [(juan, 'Chalco', 'San Martín'), (regina, 'CHALCO, EDO. MEX.', 'Col. San Martin'),
+                                     (diego, 'Valle de Chalco Solidaridad', 'Darío Martínez')]:
+        base.agregar_dato(curp, 'domicilio', 'municipio', municipio, 'Secretaria')
+        base.agregar_dato(curp, 'domicilio', 'colonia', colonia, 'Secretaria')
+    for curp, promedio in [(regina, '9.4'), (diego, '6.5')]:
+        base.agregar_dato(curp, 'escolar', 'promedio_1', promedio, 'Secretaria')
+        base.agregar_dato(curp, 'escolar', 'lenguajes_1', str(float(promedio) - 0.5), 'Secretaria')
+    return juan, regina, diego
+
+
+def test_el_analisis_es_de_los_alumnos_no_de_los_documentos(entorno, base):
     app, url, token, _ = entorno
-    base.cargar('2026-2027', alumnos(), 'lista_oficial', 'lista oficial')
-    documento = base._uno("SELECT sidp.registrar_documento(%s, 'acta_nacimiento', %s, 'escaneo')", (id_de(base, CURP_JUAN), 'a' * 64))
-    base._consulta("SELECT sidp.revisar_documento(%s, 'validado', 'Secretaria')", (documento,))
+    _datos_inventados(base)
     codigo, r = pedir(url, '/api/analisis_pc4', None, token)
     assert codigo == 200, r
-    assert r['kpis']['alumnos'] == 3 and r['kpis']['documentos_validados'] == 1
-    assert r['matricula']['filas'][-1] == ['Total', 2, 1, 3]
-    assert r['avance_por_grupo'][0]['validados'] == 1
-    assert any('3 alumnos' in h for h in r['hallazgos'])
-    assert 'ia' not in r
+    assert r['kpis']['alumnos'] == 7 and r['matricula']['filas'][-1] == ['Total', 4, 3, 7]
+    assert not {'avance_por_grupo', 'faltan_por_documento', 'documentos_por_estado', 'recibidos_14_dias', 'lecturas'} & set(r)
+    # Salud: la OMS clasifica con peso, talla, edad y sexo; "Negadas" no es una alergia.
+    assert r['kpis']['medidos'] == 3 and r['kpis']['sobrepeso_obesidad'] == 1  # Juan: 30 kg y 1.15 m a los 6 años.
+    assert r['salud']['alergias'] == [['PENICILINA', 1]] and r['kpis']['con_alergias'] == 1
+    assert r['salud']['sangre'][0] == ['O+', 2]
+    assert ['Hipoacusia', 1, 1] in [f[:1] + f[-2:] for f in r['discapacidad_911']['filas']]
+    assert any('necesitan valoración' in h for h in r['hallazgos']) and any('dentista' in h for h in r['hallazgos'])
+    # Dónde viven: "CHALCO, EDO. MEX." y "Chalco" son el mismo municipio.
+    assert r['domicilio']['municipios'][0] == ['Chalco', 2] and r['domicilio']['colonias'][0] == ['San Martin', 2]
+    assert any('La mayoría vive en Chalco' in h for h in r['hallazgos'])
+    # Boletas: la de 1.° de los de 2.°; un promedio bajo.
+    assert r['escolar']['por_grado_cursado'] == [['1°', 8.0, 2]] and r['escolar']['bajos'] == 1
+    # 911: edad al 1 de septiembre; los de la tabla suman la matrícula.
+    total = r['f911']['filas'][-1]
+    assert total[0] == 'Total' and total[-1] == 7 and sum(total[2:-1]) == 7
+    assert r['cobertura'][0]['con'] == 3 and r['suficiente'] is False
+    assert 'ia' not in r and r['estudio'] is None
     codigo, r = pedir(url, '/api/analisis_pc4?ia=1', None, token)  # Sin Ollama, el análisis sale igual y lo dice.
     assert codigo == 200 and r['ia']['texto'] is None and 'no respondió' in r['ia']['problema']
+
+
+def test_el_estudio_de_la_ia_se_rehace_solo_cuando_hay_datos_nuevos(base, tmp_path):
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from validacion import analisis_datos
+    pedidos = []
+
+    class Ollama(BaseHTTPRequestHandler):
+        def do_POST(self):
+            pedidos.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
+            cuerpo = json.dumps({'message': {'content': 'Salud: estudio inventado.'}}).encode()
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(cuerpo)))
+            self.end_headers()
+            self.wfile.write(cuerpo)
+
+        def log_message(self, *args):
+            pass
+
+    falsa = ThreadingHTTPServer(('127.0.0.1', 0), Ollama)
+    threading.Thread(target=falsa.serve_forever, daemon=True).start()
+    ocupado = [True]
+    estudio = analisis_datos.Estudio(base, f'http://127.0.0.1:{falsa.server_port}/api/chat', tmp_path / 'estudio.json',
+                                     ocupado=lambda: ocupado[0], minimo=5)
+    try:
+        juan, regina, diego = _datos_inventados(base)
+        assert estudio.una_vez() is None  # La PC 4 está leyendo escaneos: espera.
+        ocupado[0] = False
+        assert estudio.una_vez() is None and not pedidos  # Datos de menos de la mitad: todavía no.
+        from pruebas.test_lista_oficial import PRIMERO, SEGUNDO
+        from validacion.ejemplo import generar
+        for _, _, _, c in PRIMERO[1:] + SEGUNDO[2:]:  # Ya la mayoría tiene datos de salud.
+            base.agregar_dato(generar.curp(c), 'salud', 'peso', '25', 'Secretaria')
+        assert estudio.una_vez()['texto'] == 'Salud: estudio inventado.'
+        guardado = estudio.guardado()
+        assert guardado['al_dia'] and guardado['alumnos'] == 7 and guardado['texto'].startswith('Salud')
+        pedido = pedidos[0]['messages'][0]['content']
+        assert 'director y el subdirector' in pedido and 'GARCIA' not in pedido and juan not in pedido  # Sin nombres ni CURP.
+        assert estudio.una_vez() is None and len(pedidos) == 1  # Sin datos nuevos no se repite.
+    finally:
+        falsa.shutdown()
 
 
 def test_la_pc4_guarda_la_copia_del_servidor_sin_sobrescribir(entorno, tmp_path):

@@ -668,3 +668,40 @@ segunda parte, **ya no se hace**.
    ```
 3. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea014.md` con la salida del paso 2 (sin IP ni claves) y súbelo
    solo a él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).
+
+## Tarea 015: lo nuevo de la PC 4 y qué se estudia (2026-10-16)
+
+Cambió código que corre en la PC 4. Lee esto primero: así sabes qué va a mostrar el panel y qué no.
+
+**Los dos trabajos de IA de la PC 4**
+
+- **El que extrae** (taller, modelo que ve `qwen2.5vl:3b`): saca los datos de cada documento escaneado. Ahora el
+  certificado médico da 25 datos (todo lo de salud que esté escrito, más una lista de "otros datos"). Cada hoja de
+  una boleta es un año distinto y se guarda con su grado (`promedio_3` es el de 3.°). El domicilio guarda colonia y
+  municipio. Las hojas que el escaneo no reconoce las mira la IA y dice qué documento parecen (la persona confirma).
+- **El que analiza** (`llama3.1:latest`): escribe el estudio para **el director y el subdirector** con los números
+  que calcula pandas, sin nombres ni CURP. Lo hace solo, cada 10 minutos, cuando hay datos nuevos, cuando ya hay
+  datos de más de la mitad de los alumnos en salud, domicilio o boletas, y cuando el taller no está leyendo (los
+  dos modelos no caben juntos en el procesador). Lo guarda en `C:\SIDP-datos\estudio_ia.json`.
+
+**Qué sí se estudia:** salud (estado nutricional con la OMS, vista, dientes, sangre, alergias, padecimientos,
+medicamentos, vacunas, discapacidad), dónde viven (municipio, colonia, CP), boletas de años anteriores y lo que pide
+el 911. **Qué no:** cuántos documentos se subieron o faltan, el avance de expedientes y la calidad de lectura. El
+detalle está en `docs/investigacion/estudios_sep_salud.md`. No agregues estudios de documentos.
+
+Pasos (no se borra nada):
+
+1. Actualiza la rama y reinicia los servicios (el script ya cierra el cerebro viejo y arranca el nuevo):
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
+   ```
+2. Revisa que estén los dos modelos y que el análisis conteste:
+   ```
+   ollama list
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
+   python -c "from validacion import base_cerebro, analisis_datos; b, p = base_cerebro.abrir(); r = analisis_datos.analizar(b); print(r['kpis']['alumnos'], [(c['area'], c['con'], c['de']) for c in r['cobertura']])"
+   ```
+3. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea015.md` con: la lista de modelos de `ollama list` (solo
+   nombres), la salida del paso 2 (solo números; sin IP, claves, nombres ni CURP) y cualquier error completo. Súbelo
+   solo a él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).
