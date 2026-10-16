@@ -42,17 +42,20 @@ def carpeta_por_omision():
 
 
 class Aplicacion:
-    def __init__(self, carpeta, hoy=None, puerto=PUERTO, usar_modelo=True):
+    def __init__(self, carpeta, hoy=None, puerto=PUERTO, usar_modelo=True, expedientes=None, conectar_al_abrir=True):
         self.carpeta = Path(carpeta).resolve()
+        self.vigia = None  # En el .exe instalado (escritorio.Vigia) cuida la conexión con la PC 4.
         self.carpeta.mkdir(parents=True, exist_ok=True)
         self.token = secrets.token_urlsafe(16)  # Sin él, otra página del navegador no puede usar el panel.
         self.puerto = puerto
         self.candado = threading.Lock()
-        self.bandeja = Bandeja(self.carpeta, hoy, usar_modelo=usar_modelo, registro=Registro(self.carpeta / 'plataforma_prueba.db'))
+        self.bandeja = Bandeja(self.carpeta, hoy, usar_modelo=usar_modelo, registro=Registro(self.carpeta / 'plataforma_prueba.db'),
+                               expedientes=expedientes)
         self.archivo_configuracion = self.carpeta / 'configuracion.json'
         self.configuracion = {}
         if self.archivo_configuracion.exists():
             self.configuracion = json.loads(self.archivo_configuracion.read_text(encoding='utf-8'))
+        if self.configuracion and conectar_al_abrir:
             self.bandeja.conectar_cerebro(self.configuracion.get('cerebro_url'), self.configuracion.get('cerebro_clave', ''))
 
     def configurar(self, url, clave):
@@ -60,6 +63,16 @@ class Aplicacion:
         self.configuracion = {'cerebro_url': (url or '').strip(), 'cerebro_clave': (clave or '').strip()}
         self.archivo_configuracion.write_text(json.dumps(self.configuracion), encoding='utf-8')
         return problema
+
+    def estado_configuracion(self, problema=None):
+        estado = {**self.configuracion, 'cerebro_conectado': bool(self.bandeja.cerebro), 'padron': self.bandeja.padron_aviso,
+                  'traidos': self.bandeja.traidos_aviso, 'respaldo': self.bandeja.respaldo_aviso, 'direccion_padres': self.direccion_padres(),
+                  'expedientes': str(self.bandeja.expedientes_alumno) if self.bandeja.expedientes_alumno else None}
+        if self.vigia:
+            estado['vigia'] = self.vigia.estado
+        if problema is not None:
+            estado['problema'] = problema
+        return estado
 
     def datos_para_cerebro(self):
         """Lo extraído y decidido, sin archivos: lo que el cerebro necesita para el análisis."""
@@ -91,7 +104,7 @@ def respaldar_seguido(app, cada=3600, primera=120):
         time.sleep(cada)
 
 
-def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
+def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
     app = aplicacion
 
     class Manejador(BaseHTTPRequestHandler):
@@ -152,6 +165,9 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     return self._enviar(200, app.pagina('panel.html'), 'text/html; charset=utf-8')
                 if url.path in ('/padres', '/padres.html'):
                     return self._enviar(200, app.pagina('padres.html'), 'text/html; charset=utf-8')
+                if url.path == '/api/hola':  # Para saber si SIDP ya está abierto en esta PC; no dice nada más.
+                    from validacion import escritorio
+                    return self._enviar(200, {'sidp': 'servidor', 'version': escritorio.version()})
                 if url.path in ESTATICOS:
                     nombre = ESTATICOS[url.path]
                     return self._enviar(200, (INTERFAZ / nombre).read_bytes(), mimetypes.guess_type(nombre)[0] + '; charset=utf-8')
@@ -187,8 +203,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     if url.path == '/api/curps':
                         return self._enviar(200, app.bandeja.curps())
                     if url.path == '/api/configuracion':
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso, 'respaldo': app.bandeja.respaldo_aviso,
-                                                  'direccion_padres': app.direccion_padres()})
+                        return self._enviar(200, app.estado_configuracion())
                     if url.path == '/api/plantillas':
                         return self._enviar(200, app.bandeja.lista_plantillas())
                     if url.path == '/api/grupos':
@@ -233,8 +248,20 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         archivo.write_bytes(self._cuerpo()[:1024 * 1024])
                         self._enviar(200, {'guardado': archivo.name})
                     return
+                if url.path == '/api/apagar':  # SIDP.exe --apagar, desde esta misma PC.
+                    if clave_apagar and self._local() and secrets.compare_digest(self.headers.get('X-SIDP-Apagar', ''), clave_apagar):
+                        self._enviar(200, {'apagado': True})
+                        threading.Thread(target=servidor.shutdown, daemon=True).start()
+                    else:
+                        self._enviar(403, {'error': 'no permitido'})
+                    return
                 if not self._admin():
                     return
+                if url.path == '/api/cerebro/buscar':  # Plan de emergencia: encontrar a la PC 4 aunque haya cambiado de IP.
+                    from validacion import escritorio
+                    guardada = app.configuracion.get('cerebro_url')
+                    encontrados = escritorio.buscar_cerebro(guardada)
+                    return self._enviar(200, {'encontrados': encontrados, 'diagnostico': escritorio.diagnostico(guardada)})
                 if url.path == '/api/escaneo/leer':  # Escaneos de un alumno ya revisado en papel.
                     archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
                     with app.candado:
@@ -286,8 +313,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso, 'respaldo': app.bandeja.respaldo_aviso, 'problema': problema,
-                                                  'direccion_padres': app.direccion_padres()})
+                        return self._enviar(200, app.estado_configuracion(problema))
                 self._enviar(404, {'error': 'no existe'})
             except (ErrorBandeja, ValueError) as error:
                 self._enviar(400, {'error': str(error)})
@@ -295,7 +321,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
         def log_message(self, formato, *args):  # Sin datos de los padres en la ventana.
             print(f'{self.client_address[0]} {formato % args}', flush=True)
 
-    return ThreadingHTTPServer((anfitrion, app.puerto), Manejador)
+    servidor = ThreadingHTTPServer((anfitrion, app.puerto), Manejador)
+    return servidor
 
 
 def leer_formulario(tipo, cuerpo):

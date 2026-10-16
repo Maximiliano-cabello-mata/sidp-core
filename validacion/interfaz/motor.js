@@ -32,6 +32,7 @@ function motorLocal() {
     archivoUrl: (id, nombre) => `/api/archivo?id=${encodeURIComponent(id)}&nombre=${encodeURIComponent(nombre)}&t=${encodeURIComponent(SIDP.token || '')}`,
     configuracion: () => api('/api/configuracion'),
     guardarConfiguracion: (datos) => api('/api/configuracion', datos),
+    buscarCerebro: () => api('/api/cerebro/buscar', {}),
     base: () => api('/api/base'),
     enviar: (formulario) => api('/api/padres/enviar', formulario),
     curps: () => api('/api/curps'),
@@ -211,6 +212,7 @@ def recibir(captura, archivos):
     analisisPC4: null,
     respaldar: null,
     guardarConfiguracion: null,
+    buscarCerebro: null,
     base: () => llamar('base'),
     curps: () => llamar('curps'),
     constancia: async (archivo) => {

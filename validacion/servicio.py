@@ -14,7 +14,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from validacion import cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo, respaldo
+from validacion import archivero, cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo, respaldo
 from validacion.grupos import ErrorGrupo, Grupos, ciclo_de
 from validacion import plantillas as plantillas_mod
 
@@ -150,8 +150,12 @@ def reporte_para_padre(resultado, motivo):
 
 class Bandeja:
     def __init__(self, carpeta, hoy=None, usar_modelo=True, nombre_modelo=None, url=None, base=None, editable=False,
-                 registro=None):
+                 registro=None, expedientes=None):
         self.carpeta = Path(carpeta)
+        # En el servidor instalado: los PDF de cada alumno en carpetas por grupo (validacion/archivero.py).
+        self.expedientes_alumno = Path(expedientes) if expedientes else None
+        self.archivero = archivero.Archivero(expedientes) if expedientes else None
+        self.archivo_aviso = None
         self.hoy = hoy or datetime.date.today()
         self.opciones = {'usar_modelo': usar_modelo}
         if nombre_modelo:
@@ -731,9 +735,50 @@ class Bandeja:
         if self.registro and ids:
             self.registro.decidir(ids, decision, motivo or None)
         respuesta = {'expediente': identificador, 'decision': decision}
+        if decision == 'autorizado':
+            self.archivar(identificador)
         if decision == 'rechazado':
             respuesta['reporte_para_padre'] = reporte_para_padre(resultado, motivo)
         return respuesta
+
+    def archivar(self, identificador):
+        """Copia los documentos autorizados a la carpeta del alumno, en PDF. Si falla, avisa y no detiene nada."""
+        if not self.archivero:
+            return None
+        carpeta = self.carpeta / 'expedientes' / identificador
+        quien = self._quien(identificador)
+        try:
+            captura = json.loads((carpeta / 'captura.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            captura = {}
+        datos = captura.get('alumno') or {}
+        nombre, curp = None, (datos.get('curp') or '').upper()
+        if quien['alumno_id'] and self.registro:
+            fila = self.registro.db.execute('SELECT primer_apellido, segundo_apellido, nombres, curp FROM alumno WHERE id = ?',
+                                            (quien['alumno_id'],)).fetchone()
+            if fila:
+                nombre, curp = ' '.join(x for x in fila[:3] if x), fila[3] or curp
+        nombre = nombre or ' '.join(filter(None, (datos.get('primer_apellido'), datos.get('segundo_apellido'), datos.get('nombres')))) or quien['alumno']
+        if not nombre:
+            return None
+        nombres = {**{k: v for k, (v, *_resto) in expediente.TIPOS.items()}, **self._tipos_escaneo()}
+        documentos = {}
+        for archivo in sorted(carpeta.iterdir()):
+            if not archivo.is_file() or archivo.suffix.lower() not in ('.pdf', *archivero.IMAGENES):
+                continue
+            tipo = archivo.stem.rsplit('_', 1)[0] if archivo.stem.rsplit('_', 1)[-1].isdigit() else archivo.stem
+            documentos.setdefault(nombres.get(tipo, tipo.replace('_', ' ').capitalize()), []).append((archivo.suffix, archivo.read_bytes()))
+        try:
+            destino, hecho = self.archivero.archivar(curp or f'expediente-{identificador}', nombre.upper(), quien['grupo'], documentos)
+        except Exception as error:
+            self.archivo_aviso = f'No se pudo copiar el expediente {identificador} a la carpeta de alumnos: {error}'
+            return None
+        self.archivo_aviso = None
+        return {'carpeta': str(destino), 'documentos': hecho}
+
+    def archivar_todo(self):
+        """Pone en carpetas todo lo ya autorizado (al instalar en una PC que ya tenía expedientes)."""
+        return [self.archivar(i) for i, d in self.decisiones().items() if (d or {}).get('decision') == 'autorizado']
 
     def detalle(self, identificador):
         carpeta = self._carpeta(identificador)

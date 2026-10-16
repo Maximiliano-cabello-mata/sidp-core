@@ -38,6 +38,7 @@ TIPOS = {  # tipo: (nombre del ejecutable, punto de entrada)
     'equipo': ('SIDP-Equipo', 'entrada_equipo.py'),
     'generico': ('sidp', '__main__.py'),
     'validador': ('SIDP-Validador', 'entrada_validador.py'),
+    'escritorio': ('SIDP', 'entrada_escritorio.py'),  # El que se instala en el servidor (despliegue/instalador.iss).
 }
 # Archivos que el validador lee en tiempo de ejecución: pantallas y el diseño de la base.
 DATOS_VALIDADOR = [('validacion/interfaz', 'validacion/interfaz'), ('database/diseno_integral.sql', 'database')]
@@ -72,15 +73,18 @@ def main():
     trabajo = Path(tempfile.mkdtemp(prefix='sidp-build-'))
     compilacion = trabajo / 'compilacion.txt'
     compilacion.write_text(f'compilado {datetime.date.today().isoformat()} ({version_git()})', encoding='utf-8')
-    comando = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--console',
+    version = trabajo / 'version.txt'
+    version.write_text(os.environ.get('SIDP_VERSION', '0.0.0'), encoding='utf-8')
+    ventana = '--windowed' if args.tipo == 'escritorio' else '--console'  # El instalado no abre consola.
+    comando = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', ventana,
                '--name', args.nombre, '--paths', str(RAIZ), '--distpath', args.destino,
                '--workpath', str(trabajo / 'build'), '--specpath', str(trabajo)]
-    if args.tipo == 'validador':  # Sin servidor web externo; numpy (de opencv) necesita unittest.
+    if args.tipo in ('validador', 'escritorio'):  # Sin servidor web externo; numpy (de opencv) necesita unittest.
         comando += [f'--exclude-module={m}' for m in EXCLUIDOS if m != 'unittest']
         comando += [arg for origen, destino in DATOS_VALIDADOR for arg in ('--add-data', f'{RAIZ / origen}{os.pathsep}{destino}')]
     else:
         comando += [f'--hidden-import={m}' for m in OCULTOS] + [f'--exclude-module={m}' for m in EXCLUIDOS]
-    comando += ['--add-data', f'{compilacion}{os.pathsep}.']
+    comando += ['--add-data', f'{compilacion}{os.pathsep}.', '--add-data', f'{version}{os.pathsep}.']
     if args.paquete:
         datos = validar_paquete(args.paquete)
         comando += ['--add-data', f'{Path(args.paquete).resolve()}{os.pathsep}.']

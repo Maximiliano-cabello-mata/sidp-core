@@ -187,3 +187,7 @@ tr.apagada td { color: var(--suave); }
 #iv-escanear { font-family: ui-monospace, Consolas, monospace; font-size: 18px; letter-spacing: 1px; }
 .carac { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-bottom: 6px; }
 .dos-columnas .tabla-envoltura > table { min-width: 0; }
+
+.emergencia { margin-top: 8px; }
+.emergencia summary { cursor: pointer; font-weight: 600; }
+.emergencia ol { margin: 8px 0 0 20px; }

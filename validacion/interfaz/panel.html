@@ -277,7 +277,24 @@
           <div><label for="cerebro-url">Dirección (por ejemplo http://192.168.1.40:8771)</label><input id="cerebro-url"></div>
           <div><label for="cerebro-clave">Clave que muestra el cerebro al arrancar</label><input id="cerebro-clave"></div>
         </div>
-        <p><button class="principal" id="cerebro-guardar">Conectar</button> <span class="chico" id="cerebro-estado"></span></p>
+        <p><button class="principal" id="cerebro-guardar">Conectar</button> <button id="cerebro-buscar">Buscar la PC 4 en la red</button>
+          <span class="chico" id="cerebro-estado"></span></p>
+        <p class="chico" id="cerebro-vigia"></p>
+        <details class="emergencia"><summary>Si no conecta (plan de emergencia)</summary>
+          <ol>
+            <li>Revisa que la PC 4 tenga luz encendida y que las dos PC estén en la misma red (mismo Wi-Fi o cable al mismo módem).</li>
+            <li>Da clic en <b>Buscar la PC 4 en la red</b>: si la red le cambió la IP, aquí aparece la nueva y se conecta sola.</li>
+            <li>Si no aparece, reinicia la PC 4 (botón de encendido). Sus servicios arrancan solos en unos 2 minutos.</li>
+            <li>Mientras tanto, SIDP sigue funcionando en esta PC: escaneas y guardas igual; lo que necesita a la PC 4 (respaldo,
+              lista de alumnos, análisis) se hace solo cuando vuelva.</li>
+            <li>Último recurso: conecta las dos PC con un cable de red directo o al mismo módem y escribe la dirección a mano.</li>
+          </ol>
+        </details>
+      </div>
+      <div class="panel oculto" id="panel-carpetas">
+        <h2>Dónde están los expedientes</h2>
+        <p>Cada expediente autorizado se guarda en PDF, en una carpeta por grupo y por alumno: <b id="ruta-expedientes"></b></p>
+        <p class="chico">Ahí solo están los documentos. Los datos que se sacan de ellos van a la base de la PC 4.</p>
       </div>
       <div class="panel oculto" id="panel-respaldo">
         <h2>Respaldo en la PC 4</h2>
@@ -1085,6 +1102,9 @@ if (motor.configuracion) {
     $('cerebro-url').value = c.cerebro_url || '';
     $('cerebro-clave').value = c.cerebro_clave || '';
     $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.traidos || ''} ${c.padron || ''}` : 'Sin cerebro: los procesos corren en esta PC.';
+    if (c.vigia) $('cerebro-vigia').textContent = c.vigia.conectado ? `SIDP revisa la conexión cada minuto (última: ${c.vigia.revisado || ''}).`
+      : `SIDP la busca solo cada minuto. ${c.vigia.problema || ''}`;
+    if (c.expedientes) { $('panel-carpetas').classList.remove('oculto'); $('ruta-expedientes').textContent = c.expedientes; }
     $('respaldo-estado').textContent = c.respaldo || (c.cerebro_conectado ? 'El primer respaldo se hace 2 minutos después de abrir.' : 'Conecta el cerebro para respaldar.');
     const publica = `${PAGINA_PUBLICA}padres.html?escuela=${new URL(c.direccion_padres).host}`;
     $('padres-ip').innerHTML = `Los padres, conectados al Wi-Fi de la escuela, abren <b>${esc(c.direccion_padres)}</b>
@@ -1093,6 +1113,14 @@ if (motor.configuracion) {
   $('cerebro-guardar').onclick = async () => {
     const c = await trabajar('Probando el cerebro…', () => motor.guardarConfiguracion({ cerebro_url: $('cerebro-url').value, cerebro_clave: $('cerebro-clave').value }));
     if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.traidos || ''} ${c.padron || ''}` : 'No respondió: ' + (c.problema || '');
+  };
+  $('cerebro-buscar').onclick = async () => {
+    const r = await trabajar('Buscando la PC 4 en la red (unos segundos)…', () => motor.buscarCerebro());
+    if (!r) return;
+    if (!r.encontrados.length) { $('cerebro-estado').textContent = 'No apareció en la red. ' + r.diagnostico; return; }
+    $('cerebro-url').value = r.encontrados[0];
+    $('cerebro-estado').textContent = `Apareció en ${r.encontrados[0]}. Revisa la clave y da clic en Conectar.`;
+    if ($('cerebro-clave').value) $('cerebro-guardar').click();
   };
 }
 
