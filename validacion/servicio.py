@@ -15,7 +15,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from validacion import archivero, campos as campos_mod, cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo, respaldo
+from validacion import archivero, campos as campos_mod, cerebro_red, comparador, expediente, extraer, hoja, lector, libro_grados, modelo, prueba, renapo, respaldo
 from validacion.grupos import ErrorGrupo, Grupos, ciclo_de
 from validacion import plantillas as plantillas_mod
 
@@ -562,6 +562,8 @@ class Bandeja:
         """(nombre de archivo, contenido, tipo) para descargar desde el panel."""
         if formato not in ('xlsx', 'csv'):
             raise ErrorBandeja('Formato no válido')
+        if que == 'por_grado':
+            return self.libro_por_grado()
         if que == 'alumnos':
             filas = self._con_grupos(self.grupos.exportar_alumnos)
             hojas = [('Todos', filas)]
@@ -579,6 +581,28 @@ class Bandeja:
         if formato == 'csv':
             return nombre, hoja.csv_excel(hojas[0][1]), 'text/csv; charset=utf-8'
         return nombre, hoja.xlsx(hojas), hoja.MIME_XLSX
+
+    def libro_por_grado(self):
+        """El Excel por grado con gráficas: las listas de aquí y, si la PC 4 contesta, lo que el escaneo sacó de cada alumno."""
+        from urllib.parse import quote
+        filas = self._con_grupos(self.grupos.exportar_alumnos)[1:]
+        _, ciclo = self._con_grupos(self.grupos.ciclo)
+        expedientes = {}
+        for fila in filas if self.cerebro else ():
+            if not fila[5]:
+                continue
+            try:
+                expedientes[fila[5]] = cerebro_red.pedir_a_cerebro(*self.cerebro, '/alumno?curp=' + quote(fila[5]), None, 20)
+            except cerebro_red.ErrorCerebro:
+                continue  # Ese alumno todavía no está en la base de la PC 4.
+            except OSError:
+                break  # La PC 4 dejó de contestar: el Excel sale con lo de aquí.
+        alumnos = [libro_grados.alumno(f, int(ciclo[:4]), expedientes.get(f[5])) for f in filas]
+        try:
+            contenido = libro_grados.libro(alumnos, ciclo, self.hoy)
+        except libro_grados.ErrorLibro as error:
+            raise ErrorBandeja(str(error))
+        return f'sidp_por_grado_{self.hoy.isoformat()}.xlsx', contenido, hoja.MIME_XLSX
 
     def _tipos_escaneo(self):
         propias = {p['clave']: p['nombre'] for p in self.plantillas.activas() if not p.get('fabrica')}

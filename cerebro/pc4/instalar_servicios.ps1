@@ -107,8 +107,8 @@ if (Test-Path $archivoAjustes) {
     $yaPuestos = @($previos | ForEach-Object { ($_ -split '=')[0].Trim() })
     $porOmision = @(@(
         "`$env:SIDP_MODELO_VISION = 'qwen2.5vl:3b'",
-        "`$env:SIDP_LADO_VISION = '1280'",
-        "`$env:SIDP_LECTURAS_VISION = '2'",
+        "`$env:SIDP_LADO_VISION = '960'",
+        "`$env:SIDP_LECTURAS_VISION = '1'",
         "`$env:OLLAMA_FLASH_ATTENTION = '1'",
         "`$env:OLLAMA_KEEP_ALIVE = '24h'"
     ) | Where-Object { $yaPuestos -notcontains ($_ -split '=')[0].Trim() })
@@ -117,7 +117,7 @@ if (Test-Path $archivoAjustes) {
         '# Después de cambiar algo, reinicia la PC 4 (o vuelve a correr instalar_servicios.ps1).',
         '#   SIDP_MODELO_VISION: el modelo que ve (python -m validacion.vision modelos dice cuáles hay).',
         '#   SIDP_LADO_VISION: píxeles de la hoja para el modelo (menos = más rápido, pero la letra chica se pierde).',
-        '#   SIDP_LECTURAS_VISION: 2 = lee cada hoja dos veces y lo que no coincide queda por confirmar.',
+        '#   SIDP_LECTURAS_VISION: 1 (aceptado); 2 = lee cada hoja dos veces y lo que no coincide queda por confirmar (más lento).',
         '#   OLLAMA_HOST y OLLAMA_MODELS no van aquí: los pone el lanzador (Ollama solo en 127.0.0.1).'
     )
     Set-Content -Encoding UTF8 $archivoAjustes ($encabezado + $previos + $porOmision)

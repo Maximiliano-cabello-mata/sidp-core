@@ -652,3 +652,19 @@ que es lo que más importa. Es para la corrida nocturna, en este orden. No se bo
    git pull --rebase origin claude/project-thread-vp6ab8
    git push origin claude/project-thread-vp6ab8
    ```
+
+## Tarea 014: corta (2026-10-16)
+
+Maximiliano probó el modelo optimizado y lo aceptó: se queda como lo dejaste (960 px, una lectura). La Tarea 013,
+segunda parte, **ya no se hace**.
+
+1. Regla: no cambies archivos fuera de `cerebro/laboratorio/resultados/`. Si quieres proponer un cambio de código,
+   déjalo como `.patch` en `resultados/` y dilo en el informe; Claude lo revisa y lo sube.
+2. Actualiza la rama y revisa los servicios. No hace falta reiniciar nada: lo nuevo (el Excel por grado) va dentro
+   del SIDP.exe del servidor, no en la PC 4. No se borra nada.
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
+   ```
+3. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea014.md` con la salida del paso 2 (sin IP ni claves) y súbelo
+   solo a él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).

@@ -11,7 +11,7 @@ nivel de confianza, y lo dudoso lo confirma una persona.
 
 Ajustes (en la PC 4 van en C:\\SIDP-datos\\servicios\\ajustes.ps1):
     SIDP_MODELO_VISION   el modelo a usar (por omisión, el primero instalado de PREFERIDOS)
-    SIDP_LADO_VISION     píxeles del lado mayor de la hoja (por omisión 1280)
+    SIDP_LADO_VISION     píxeles del lado mayor de la hoja (por omisión 960)
 
     python -m validacion.vision modelos                    # cuáles modelos de visión hay instalados
     python -m validacion.vision prueba HOJA.jpg            # cuánto tarda en leer una hoja (solo números)

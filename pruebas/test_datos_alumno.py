@@ -403,6 +403,17 @@ def test_del_escaneo_al_expediente_del_alumno_en_el_panel(base, modelo_que_ve, t
         assert pedir(url, '/api/dato/agregar', {'curp': CURP_JUAN, 'categoria': 'contacto', 'campo': 'telefono', 'valor': '7221234567',
                                                 'de': 'madre'}, token)[0] == 200
         assert len(pedir(url, '/api/por_confirmar', cabeceras=token)[1]['datos']) == 1
+        # El Excel por grado junta la lista de aquí con lo que la PC 4 sacó del escaneo.
+        import io
+        import openpyxl
+        solicitud = urllib.request.Request(f'{url}/api/exportar?que=por_grado&formato=xlsx', headers=token)
+        with urllib.request.urlopen(solicitud) as respuesta:
+            libro = openpyxl.load_workbook(io.BytesIO(respuesta.read()))
+        hoja = libro['1°']
+        encabezado = [c.value for c in hoja[3]]
+        juan = next(dict(zip(encabezado, [c.value for c in fila])) for fila in hoja.iter_rows(min_row=4) if fila[3].value == 'JUAN')
+        assert juan['Alergias'] == 'PENICILINA, POLVO' and juan['CURP'] == CURP_JUAN and juan['Sexo'] == 'Hombre'
+        assert libro['Resumen'].cell(5, 3).value == len(filas)  # Alumnos de 1°.
         # Baja: necesita motivo. Borrar: además hay que escribir BORRAR.
         assert pedir(url, '/api/alumno/baja', {'curp': CURP_JUAN}, token)[0] == 400
         assert pedir(url, '/api/alumno/borrar', {'curp': CURP_JUAN, 'motivo': 'error', 'confirmar': 'si'}, token)[0] == 400
