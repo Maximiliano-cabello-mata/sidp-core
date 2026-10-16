@@ -30,7 +30,6 @@ def nombre_valido(texto):
 
 def a_pdf(partes):
     """Un solo PDF con todas las partes, en orden: PDF tal cual y cada imagen como una hoja."""
-    from PIL import Image, ImageOps
     import pypdf
     escritor = pypdf.PdfWriter()
     for extension, contenido in partes:
@@ -40,6 +39,7 @@ def a_pdf(partes):
             continue
         if extension.lower() not in IMAGENES:
             continue
+        from PIL import Image, ImageOps  # Solo hace falta con fotos; un PDF se copia tal cual.
         imagen = ImageOps.exif_transpose(Image.open(io.BytesIO(contenido))).convert('RGB')
         hoja = io.BytesIO()
         imagen.save(hoja, 'PDF', resolution=150)
