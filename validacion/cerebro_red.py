@@ -5,6 +5,10 @@ procesa completo: el lector saca el texto (PDF, QR, OCR), los procesos revisan y
 en la zona gris. El resultado regresa al .exe, que es el que guarda. La PC 4 no guarda nada:
 los archivos viven en una carpeta temporal que se borra al terminar cada expediente.
 
+Además, la PC 4 es el respaldo del servidor: en /respaldo recibe una copia de la carpeta de datos del .exe
+(validacion/respaldo.py) y guarda una copia diaria de su base con pg_dump. En /inventario lleva el inventario
+de la escuela y en /analisis hace el análisis de datos con pandas (validacion/analisis_datos.py).
+
 Ollama sigue escuchando solo en 127.0.0.1; lo único abierto a la red es este servicio, y pide
 la clave que muestra al arrancar (sin ella responde 401).
 
@@ -23,16 +27,19 @@ import json
 import secrets
 import socket
 import tempfile
+import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from validacion import base_cerebro, expediente, lector, modelo
+from validacion import base_cerebro, expediente, lector, modelo, respaldo
 
 PUERTO = 8771
 MAXIMO = 4096  # Una pregunta son dos textos cortos; nada más grande pasa.
 MAXIMO_EXPEDIENTE = 80 * 1024 * 1024  # Fotos de un expediente completo, en base64.
 MAXIMO_PADRON = 4 * 1024 * 1024  # Toda la escuela: unos cientos de alumnos.
+MAXIMO_RESPALDO = 90 * 1024 * 1024  # Un archivo de respaldo (hasta 60 MB) en base64.
+MAXIMO_INVENTARIO = 256 * 1024
 TIPOS = ('nombre', 'domicilio')
 
 
@@ -126,6 +133,27 @@ def padron_a_cerebro(ciclo, alumnos, url, clave, espera=60):
         return json.load(respuesta)
 
 
+def pedir_a_cerebro(url, clave, ruta, datos=None, espera=120):
+    """Lado del .exe: GET (sin datos) o POST con JSON a una ruta del cerebro. Un error del cerebro sube con su mensaje."""
+    cuerpo = None if datos is None else json.dumps(datos, ensure_ascii=False).encode()
+    solicitud = urllib.request.Request(url.rstrip('/') + ruta, cuerpo, {'Content-Type': 'application/json', 'X-SIDP-Clave': clave})
+    try:
+        with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
+            return json.load(respuesta)
+    except urllib.error.HTTPError as error:
+        try:
+            mensaje = json.load(error).get('error')
+        except Exception:
+            mensaje = None
+        raise ErrorCerebro(mensaje or f'el cerebro respondió {error.code}', error.code) from None
+
+
+class ErrorCerebro(Exception):
+    def __init__(self, mensaje, codigo=None):
+        super().__init__(mensaje)
+        self.code = codigo
+
+
 def alumnos_de_cerebro(url, clave, espera=60):
     """Lado del .exe: los alumnos inscritos en la base de la PC 4, por grupo."""
     solicitud = urllib.request.Request(url.rstrip('/') + '/alumnos', headers={'X-SIDP-Clave': clave})
@@ -133,7 +161,11 @@ def alumnos_de_cerebro(url, clave, espera=60):
         return json.load(respuesta)
 
 
-def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None):
+def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo.URL, anfitrion='0.0.0.0', base=None,
+                   almacen=None, carpeta_respaldos=None):
+    almacen = almacen or respaldo.Almacen()
+    carpeta_respaldos = Path(carpeta_respaldos or base_cerebro.CARPETA_RESPALDOS)
+
     class Puente(BaseHTTPRequestHandler):
         def _responder(self, codigo, datos):
             cuerpo = json.dumps(datos, ensure_ascii=False).encode()
@@ -150,27 +182,100 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
             return False
 
         def do_GET(self):
-            if self.path not in ('/salud', '/alumnos'):
+            ruta, _, consulta = self.path.partition('?')
+            if ruta not in ('/salud', '/alumnos', '/inventario', '/analisis', '/respaldo'):
                 return self._responder(404, {'error': 'no existe'})
-            if self.path == '/alumnos' and self._autorizado():
-                if not base:
-                    return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
-                try:
-                    return self._responder(200, base.alumnos())
-                except Exception as error:
-                    return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}'})
-            if self.path == '/salud' and self._autorizado():
+            if not self._autorizado():
+                return
+            if ruta == '/salud':
                 try:
                     datos_base = base.resumen() if base else None
                 except Exception as error:
                     datos_base = {'error': f'{type(error).__name__}: {error}'}
-                self._responder(200, {'ok': True, 'modelo': nombre_modelo, 'herramientas': lector.herramientas(), 'base': datos_base})
+                return self._responder(200, {'ok': True, 'modelo': nombre_modelo, 'herramientas': lector.herramientas(), 'base': datos_base})
+            if ruta == '/respaldo':
+                return self._responder(200, almacen.estado())
+            if not base:
+                return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
+            try:
+                if ruta == '/alumnos':
+                    return self._responder(200, base.alumnos())
+                if ruta == '/inventario':
+                    return self._responder(200, base.inventario())
+                from validacion import analisis_datos
+                try:
+                    resultado = analisis_datos.analizar(base)
+                except ImportError:
+                    return self._responder(503, {'error': 'falta pandas en la PC 4 (python -m pip install pandas)'})
+                if 'ia=1' in consulta.split('&'):
+                    resultado['ia'] = analisis_datos.redactar(resultado, url)
+                return self._responder(200, resultado)
+            except Exception as error:
+                return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}'})
+
+        def _leer_json(self, maximo):
+            largo = int(self.headers.get('Content-Length') or 0)
+            if not 0 < largo <= maximo:
+                self._responder(413, {'error': 'pedido demasiado grande o vacío'})
+                return None
+            try:
+                return json.loads(self.rfile.read(largo))
+            except ValueError:
+                self._responder(400, {'error': 'no es JSON'})
+                return None
+
+        def _respaldo(self, ruta):
+            pedido = self._leer_json(MAXIMO_RESPALDO)
+            if pedido is None:
+                return
+            try:
+                if ruta == '/respaldo/faltan':
+                    return self._responder(200, {'faltan': almacen.faltan(pedido['archivos'])})
+                if ruta == '/respaldo/archivo':
+                    contenido = base64.b64decode(pedido['contenido'], validate=True)
+                    return self._responder(200, {'estado': almacen.guardar(pedido['ruta'], contenido, pedido['sha256'])})
+            except (ValueError, KeyError, TypeError) as error:
+                return self._responder(400, {'error': f'respaldo mal formado: {error}'})
+            copia_base = None
+            if base and not list(carpeta_respaldos.glob(f'sidp_cerebro_{datetime.date.today():%Y%m%d}_*.dump')):
+                try:  # Una copia de la base de la PC 4 por día, junto con la del .exe.
+                    copia_base = base.respaldar(carpeta_respaldos)
+                except Exception as error:
+                    copia_base = {'error': str(error)[:200]}
+            almacen.anotar({'archivos': pedido.get('archivos'), 'enviados': pedido.get('enviados'), 'copia_base': copia_base})
+            return self._responder(200, {'ok': True, **almacen.estado(), 'copia_base': copia_base})
+
+        def _inventario(self, ruta):
+            if not base:
+                return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
+            pedido = self._leer_json(MAXIMO_INVENTARIO)
+            if pedido is None:
+                return
+            try:
+                if ruta == '/inventario/alta':
+                    hecho = base.inventario_alta(pedido.get('categoria'), pedido.get('nombre'), pedido.get('caracteristicas'),
+                                                 pedido.get('cantidad'), pedido.get('ubicacion'), pedido.get('series'), pedido.get('actor'))
+                else:
+                    hecho = base.inventario_cambiar(pedido.get('codigo'), pedido.get('estado'), pedido.get('ubicacion'),
+                                                    pedido.get('notas'), pedido.get('actor'))
+            except base_cerebro.ErrorBase as error:
+                return self._responder(400, {'error': str(error)})
+            except Exception as error:  # Las reglas de la base (pieza que no existe, baja sin motivo) llegan aquí.
+                mensaje = getattr(error, 'args', [None])[0]
+                detalle = mensaje.get('M') if isinstance(mensaje, dict) else str(error)
+                return self._responder(400, {'error': detalle[:300]})
+            return self._responder(200, {'ok': True, 'hecho': hecho, **base.inventario()})
 
         def do_POST(self):
-            if self.path not in ('/opinar', '/validar', '/leer', '/padron'):
+            if self.path not in ('/opinar', '/validar', '/leer', '/padron', '/inventario/alta', '/inventario/cambiar',
+                                 '/respaldo/faltan', '/respaldo/archivo', '/respaldo/listo'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
+            if self.path.startswith('/respaldo/'):
+                return self._respaldo(self.path)
+            if self.path.startswith('/inventario/'):
+                return self._inventario(self.path)
             largo = int(self.headers.get('Content-Length') or 0)
             if self.path == '/padron':
                 if not base:

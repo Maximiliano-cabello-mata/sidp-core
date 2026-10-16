@@ -14,7 +14,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from validacion import cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo
+from validacion import cerebro_red, comparador, expediente, extraer, hoja, lector, modelo, prueba, renapo, respaldo
 from validacion.grupos import ErrorGrupo, Grupos, ciclo_de
 from validacion import plantillas as plantillas_mod
 
@@ -163,6 +163,7 @@ class Bandeja:
         self.cerebro = None  # (url, clave) del cerebro de la PC 4; sin él, los procesos corren aquí.
         self.padron_aviso = None  # Cómo quedó el padrón en la base del cerebro (PostgreSQL de la PC 4).
         self.traidos_aviso = None  # Cuántos alumnos se trajeron de la PC 4.
+        self.respaldo_aviso = None  # Cuándo se copió por última vez a la PC 4.
         self.resultados = {}
         for identificador in self.expedientes():  # Lo ya revisado sobrevive a cerrar el programa.
             guardado = self.carpeta / 'expedientes' / identificador / 'resultado.json'
@@ -452,6 +453,43 @@ class Bandeja:
         return {'grupos': grupos, 'filas': primero['filas'], 'grado': primero['grado'],
                 'letra': None if primero['letra_supuesta'] else primero['letra'],
                 'procesado_en': procesado_en, 'sin_texto': sin_texto}
+
+    # ---------------------------------------------------------------- PC 4: inventario, análisis y respaldo
+
+    def _pc4(self, ruta, datos=None, espera=120):
+        if not self.cerebro:
+            raise ErrorBandeja('Primero conecta el cerebro de la PC 4 en Ajustes: esto vive en la PC 4.')
+        try:
+            return cerebro_red.pedir_a_cerebro(*self.cerebro, ruta, datos, espera)
+        except cerebro_red.ErrorCerebro as error:
+            raise ErrorBandeja(f'La PC 4 dice: {error}')
+        except OSError as error:
+            raise ErrorBandeja(f'La PC 4 no respondió ({error}). Revisa que el cerebro esté abierto.')
+
+    def inventario(self):
+        return self._pc4('/inventario')
+
+    def inventario_alta(self, datos):
+        return self._pc4('/inventario/alta', datos)
+
+    def inventario_cambiar(self, datos):
+        return self._pc4('/inventario/cambiar', datos)
+
+    def analisis_pc4(self, con_ia=False):
+        return self._pc4('/analisis?ia=1' if con_ia else '/analisis', espera=300 if con_ia else 120)
+
+    def respaldar(self):
+        """Copia a la PC 4 lo nuevo o cambiado de la carpeta de datos de este .exe (bases y expedientes)."""
+        if not self.cerebro:
+            raise ErrorBandeja('Primero conecta el cerebro de la PC 4 en Ajustes.')
+        try:
+            hecho = respaldo.respaldar_en_cerebro(self.carpeta, *self.cerebro)
+        except Exception as error:
+            self.respaldo_aviso = f'El respaldo en la PC 4 falló ({error}).'
+            raise ErrorBandeja(self.respaldo_aviso)
+        self.respaldo_aviso = (f'Respaldo en la PC 4 al día ({datetime.datetime.now():%d/%m %H:%M}): {hecho["archivos"]} archivos, '
+                               f'{hecho["enviados"]} nuevos o cambiados.')
+        return {'aviso': self.respaldo_aviso, **hecho}
 
     def lista_traer(self):
         """El botón "Traer la lista de la PC 4": los alumnos de la base del cerebro entran aquí."""

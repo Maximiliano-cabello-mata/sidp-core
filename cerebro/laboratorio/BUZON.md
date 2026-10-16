@@ -406,3 +406,76 @@ No hace falta PowerShell de administrador.
    git push origin claude/project-thread-vp6ab8
    ```
 10. Avísale a Maximiliano que la lista ya está en la PC 4 y que ya puede abrir el panel.
+
+## Tarea 011: PC 4 como respaldo, análisis de datos e inventario; base optimizada (2026-10-16)
+
+La PC 4 no es la base principal: la principal es la del .exe en la PC del administrador. La PC 4 guarda
+(1) la copia de respaldo de todo lo que guarda el .exe (llega sola cada hora a `C:\SIDP-datos\respaldo`),
+(2) la base PostgreSQL de alumnos y expedientes, que ahora también trae el inventario de la escuela, y
+(3) hace el análisis de datos con pandas (solo números; llama3.1 puede redactar un resumen, pero es opcional).
+
+**Nada de nombres, CURP, clave del cerebro, contraseñas ni IP en el informe.** Un borrado no se deshace:
+en esta tarea solo se borra lo que dice el paso 7, y antes se respalda la base (paso 3).
+
+1. Actualiza la rama (en la carpeta del repositorio):
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   ```
+2. Instala pandas (hay versión para Python 3.15):
+   ```
+   python -m pip install -r validacion/requisitos.txt
+   ```
+3. **Antes de todo**, respalda la base (usa pg_dump de PostgreSQL):
+   ```
+   python -m validacion.base_cerebro respaldar
+   ```
+   Debe decir `Respaldo listo: C:\SIDP-datos\respaldos\... (N MB)`. Si dice `No se respaldó`, detente aquí,
+   anota el error completo en el informe y no hagas los pasos 5 y 7.
+4. Aplica el esquema nuevo (tablas del inventario e índices). No borra nada:
+   ```
+   python -m validacion.base_cerebro
+   ```
+   Debe decir `... 191 alumnos inscritos ...`.
+5. Optimiza la base (limpia filas muertas, rehace índices y estadísticas):
+   ```
+   python -m validacion.base_cerebro optimizar
+   ```
+6. Prueba el análisis (imprime solo frases con números):
+   ```
+   python -m validacion.base_cerebro analisis
+   ```
+   Debe empezar con `Análisis con pandas ...` y decir que hay 191 alumnos.
+7. Limpieza. **Primero solo mide** y anota los tamaños en el informe:
+   ```
+   python -m pip cache info
+   Get-ChildItem $env:TEMP -Recurse -ErrorAction SilentlyContinue | Measure-Object Length -Sum
+   ```
+   Después borra **solo** estas dos cosas, que son temporales y se vuelven a crear solas:
+   ```
+   python -m pip cache purge
+   Get-ChildItem $env:TEMP -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+   ```
+   **No borres** `C:\SIDP-datos`, la carpeta del repositorio, la carpeta de datos de PostgreSQL, los modelos de
+   Ollama ni ningún programa. Si ves algo más grande que parezca sobrar, solo anótalo (ruta y tamaño) en el
+   informe; Maximiliano decide.
+8. Crea la carpeta donde llega la copia del .exe:
+   ```
+   New-Item -ItemType Directory -Force C:\SIDP-datos\respaldo
+   ```
+9. Reinicia el cerebro: cierra su ventana y abre otra vez `validacion\iniciar_cerebro.bat`.
+10. Comprueba el análisis y el inventario. Cambia `CLAVE` por la clave del cerebro (no la escribas en el
+    informe). Solo imprime números:
+    ```
+    python -c "import json,sys,urllib.request as u; p=lambda r: json.load(u.urlopen(u.Request('http://127.0.0.1:8771'+r, headers={'X-SIDP-Clave': sys.argv[1]}))); a=p('/analisis'); i=p('/inventario'); print('alumnos', a['kpis']['alumnos'], 'piezas', len(i['piezas']), 'respaldo', p('/respaldo'))" CLAVE
+    ```
+    Debe decir `alumnos 191 piezas 0 respaldo {...}`.
+11. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea011_pc4.md` con lo que imprimieron los pasos 3 a
+    10 (tamaños antes y después) y cualquier error completo. Revisa que no tenga nombres, CURP, clave ni IP.
+12. Sube solo ese archivo:
+    ```
+    git add cerebro/laboratorio/resultados/
+    git commit -m "laboratorio: resultado de la tarea 011"
+    git pull --rebase origin claude/project-thread-vp6ab8
+    git push origin claude/project-thread-vp6ab8
+    ```
+13. Avísale a Maximiliano que la PC 4 ya está lista para el inventario, el análisis y los respaldos.

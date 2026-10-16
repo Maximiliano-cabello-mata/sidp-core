@@ -734,4 +734,130 @@ DROP FUNCTION IF EXISTS public.sidp_cargar_padron(jsonb, text);
 DROP FUNCTION IF EXISTS public.sidp_curp_cercana(text, integer);
 DROP FUNCTION IF EXISTS public.sidp_nombre_cercano(text, real);
 
+-- ============================================================ Inventario de la escuela
+
+-- Cada pieza (una mesa, una computadora) tiene su propio código de barras. Las piezas iguales que se dan de
+-- alta juntas forman un lote con sus características (por ejemplo, 4 computadoras con el mismo procesador).
+CREATE TABLE IF NOT EXISTS sidp.inventario_categoria (
+    clave    text PRIMARY KEY,
+    nombre   text NOT NULL,
+    prefijo  text NOT NULL UNIQUE CHECK (prefijo ~ '^[A-Z]{3}$'),
+    orden    integer NOT NULL DEFAULT 0
+);
+INSERT INTO sidp.inventario_categoria (clave, nombre, prefijo, orden) VALUES
+    ('mobiliario', 'Mobiliario (mesas, sillas, pizarrones, estantes)', 'MOB', 1),
+    ('computo',    'Cómputo (computadoras, impresoras, proyectores)',  'COM', 2),
+    ('material',   'Material didáctico y deportivo',                   'MAT', 3),
+    ('otro',       'Otro',                                             'OTR', 4)
+ON CONFLICT (clave) DO NOTHING;
+
+CREATE SEQUENCE IF NOT EXISTS sidp.inventario_folio;
+
+CREATE TABLE IF NOT EXISTS sidp.inventario_lote (
+    id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    categoria        text NOT NULL REFERENCES sidp.inventario_categoria (clave),
+    nombre           text NOT NULL CHECK (btrim(nombre) <> ''),
+    caracteristicas  jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(caracteristicas) = 'object'),
+    cantidad         integer NOT NULL CHECK (cantidad BETWEEN 1 AND 500),
+    ubicacion        text,
+    creado           timestamptz NOT NULL DEFAULT now(),
+    actor            text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sidp.inventario_pieza (
+    id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    codigo        text NOT NULL UNIQUE CHECK (codigo ~ '^[A-Z]{3}-[0-9]{6}$'),
+    lote_id       bigint NOT NULL REFERENCES sidp.inventario_lote (id),
+    numero_serie  text,
+    ubicacion     text,
+    estado        text NOT NULL DEFAULT 'bueno' CHECK (estado IN ('bueno', 'regular', 'malo', 'baja')),
+    notas         text,
+    version       integer NOT NULL DEFAULT 1,
+    creado        timestamptz NOT NULL DEFAULT now(),
+    actualizado   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS inventario_pieza_lote ON sidp.inventario_pieza (lote_id);
+CREATE INDEX IF NOT EXISTS inventario_lote_nombre ON sidp.inventario_lote USING gin (sidp.normalizar(nombre) gin_trgm_ops);
+
+DO $$
+DECLARE
+    tabla text;
+BEGIN
+    FOREACH tabla IN ARRAY ARRAY['inventario_categoria', 'inventario_lote', 'inventario_pieza'] LOOP
+        EXECUTE format('CREATE OR REPLACE TRIGGER no_borrar BEFORE DELETE ON sidp.%I FOR EACH ROW EXECUTE FUNCTION sidp.no_borrar()', tabla);
+        EXECUTE format('CREATE OR REPLACE TRIGGER no_vaciar BEFORE TRUNCATE ON sidp.%I FOR EACH STATEMENT EXECUTE FUNCTION sidp.no_borrar()', tabla);
+    END LOOP;
+    FOREACH tabla IN ARRAY ARRAY['inventario_lote', 'inventario_pieza'] LOOP
+        EXECUTE format('CREATE OR REPLACE TRIGGER anotar_cambio AFTER INSERT OR UPDATE ON sidp.%I FOR EACH ROW EXECUTE FUNCTION sidp.anotar_cambio()', tabla);
+    END LOOP;
+END $$;
+CREATE OR REPLACE TRIGGER subir_version BEFORE UPDATE ON sidp.inventario_pieza FOR EACH ROW EXECUTE FUNCTION sidp.subir_version();
+
+-- Da de alta N piezas iguales: un lote y un código por pieza (MOB-000001, MOB-000002...).
+CREATE OR REPLACE FUNCTION sidp.inventario_alta(clave_categoria text, nombre_lote text, datos jsonb, cuantas integer,
+                                                donde text, series text[], quien text)
+RETURNS jsonb
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_prefijo text;
+    v_lote bigint;
+    codigos text[] := '{}';
+    v_codigo text;
+BEGIN
+    IF quien IS NULL OR btrim(quien) = '' THEN
+        RAISE EXCEPTION 'Falta quién da de alta';
+    END IF;
+    SELECT prefijo INTO v_prefijo FROM sidp.inventario_categoria WHERE clave = clave_categoria;
+    IF v_prefijo IS NULL THEN
+        RAISE EXCEPTION 'No existe la categoría %', clave_categoria;
+    END IF;
+    PERFORM set_config('sidp.actor', quien, true);
+    INSERT INTO sidp.inventario_lote (categoria, nombre, caracteristicas, cantidad, ubicacion, actor)
+    VALUES (clave_categoria, upper(btrim(nombre_lote)), coalesce(datos, '{}'), cuantas, nullif(btrim(donde), ''), quien)
+    RETURNING id INTO v_lote;
+    FOR i IN 1..cuantas LOOP
+        v_codigo := v_prefijo || '-' || lpad(nextval('sidp.inventario_folio')::text, 6, '0');
+        INSERT INTO sidp.inventario_pieza (codigo, lote_id, numero_serie, ubicacion)
+        VALUES (v_codigo, v_lote, nullif(btrim(coalesce(series[i], '')), ''), nullif(btrim(donde), ''));
+        codigos := codigos || v_codigo;
+    END LOOP;
+    RETURN jsonb_build_object('lote', v_lote, 'codigos', to_jsonb(codigos));
+END $$;
+
+-- Cambia el estado, el lugar o las notas de una pieza; una baja pide motivo.
+CREATE OR REPLACE FUNCTION sidp.inventario_cambiar(codigo_pieza text, nuevo_estado text, nueva_ubicacion text, nuevas_notas text, quien text)
+RETURNS jsonb
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF quien IS NULL OR btrim(quien) = '' THEN
+        RAISE EXCEPTION 'Falta quién hace el cambio';
+    END IF;
+    IF nuevo_estado = 'baja' AND coalesce(btrim(nuevas_notas), '') = '' THEN
+        RAISE EXCEPTION 'Para dar de baja una pieza escribe el motivo en las notas';
+    END IF;
+    PERFORM set_config('sidp.actor', quien, true);
+    UPDATE sidp.inventario_pieza
+    SET estado = coalesce(nullif(nuevo_estado, ''), estado),
+        ubicacion = coalesce(nullif(btrim(nueva_ubicacion), ''), ubicacion),
+        notas = coalesce(nullif(btrim(nuevas_notas), ''), notas)
+    WHERE codigo = upper(btrim(codigo_pieza));
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No existe la pieza %', codigo_pieza;
+    END IF;
+    RETURN (SELECT to_jsonb(p) FROM sidp.inventario_pieza p WHERE codigo = upper(btrim(codigo_pieza)));
+END $$;
+
+CREATE OR REPLACE VIEW sidp.v_inventario AS
+SELECT p.codigo, p.estado, coalesce(p.ubicacion, l.ubicacion) AS ubicacion, p.numero_serie, p.notas, p.version,
+       p.actualizado, l.id AS lote, l.categoria, c.nombre AS categoria_nombre, l.nombre, l.caracteristicas, l.creado
+FROM sidp.inventario_pieza p
+JOIN sidp.inventario_lote l ON l.id = p.lote_id
+JOIN sidp.inventario_categoria c ON c.clave = l.categoria;
+
+-- ============================================================ Velocidad
+
+CREATE INDEX IF NOT EXISTS inscripcion_ciclo_estado ON sidp.inscripcion (ciclo, estado);
+CREATE INDEX IF NOT EXISTS documento_alumno_tipo ON sidp.documento (alumno_id, tipo, estado);
+CREATE INDEX IF NOT EXISTS lectura_recibida ON sidp.lectura (recibida);
+
 INSERT INTO sidp.meta (clave, valor) VALUES ('version', '2') ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor;

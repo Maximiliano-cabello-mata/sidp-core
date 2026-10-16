@@ -18,6 +18,9 @@ En la PC 4, desde la raíz del repositorio:
     python -m validacion.base_cerebro cargar LISTA.pdf    # carga la lista oficial de la SEP (o la lista revisada .csv)
     python -m validacion.base_cerebro informe             # números del 911, grupos y alertas (sin nombres)
     python -m validacion.base_cerebro borrar --si-borrar-todo   # deja la base vacía, para empezar de nuevo
+    python -m validacion.base_cerebro respaldar           # copia completa con pg_dump en C:\\SIDP-datos\\respaldos
+    python -m validacion.base_cerebro optimizar           # limpia, actualiza estadísticas y rehace índices (no borra datos)
+    python -m validacion.base_cerebro analisis            # el análisis con pandas, solo números
 """
 import argparse
 import datetime
@@ -34,6 +37,7 @@ from validacion.expediente import mayusculas
 
 ESQUEMA = Path(__file__).with_name('base_cerebro.sql')
 ARCHIVO = Path.home() / '.sidp' / 'base_cerebro.txt'
+CARPETA_RESPALDOS = Path('C:/SIDP-datos/respaldos') if os.name == 'nt' else Path.home() / 'SIDP-datos' / 'respaldos'
 CURP_MAXIMO = 2       # Letras distintas que se aceptan para proponer una CURP de la base.
 NOMBRE_MINIMO = 0.6   # Parecido mínimo para proponer a un alumno por su nombre.
 
@@ -74,6 +78,7 @@ class BaseCerebro:
         except Exception as error:
             raise ErrorBase(f'no se pudo conectar a PostgreSQL ({type(error).__name__})')
         self.conexion.autocommit = True
+        self.url = url
         self._candado = threading.Lock()  # Una conexión para todo el cerebro: una consulta a la vez.
 
     def _consulta(self, sql, parametros=()):
@@ -101,6 +106,74 @@ class BaseCerebro:
         self._consulta('DROP SCHEMA IF EXISTS sidp CASCADE; DROP TABLE IF EXISTS public.padron_alumno_v1, public.lectura_v1, '
                        'public.padron_alumno, public.lectura')
         return self.preparar()
+
+    # ---------------------------------------------------------------- Inventario
+
+    def inventario(self):
+        """Categorías y todas las piezas (las de baja también, marcadas): lo que muestra la pestaña Inventario."""
+        categorias = [{'clave': c, 'nombre': n, 'prefijo': p} for c, n, p in
+                      self._consulta('SELECT clave, nombre, prefijo FROM sidp.inventario_categoria ORDER BY orden')]
+        piezas = [{'codigo': c, 'estado': e, 'ubicacion': u, 'numero_serie': s, 'notas': n, 'lote': l, 'categoria': cat,
+                   'nombre': nom, 'caracteristicas': car, 'creado': cr.isoformat() if cr else None}
+                  for c, e, u, s, n, l, cat, nom, car, cr in self._consulta(
+                      'SELECT codigo, estado, ubicacion, numero_serie, notas, lote, categoria, nombre, caracteristicas, creado '
+                      'FROM sidp.v_inventario ORDER BY categoria, nombre, codigo')]
+        return {'categorias': categorias, 'piezas': piezas}
+
+    def inventario_alta(self, categoria, nombre, caracteristicas, cantidad, ubicacion, series, actor):
+        try:
+            cantidad = int(cantidad)
+        except (TypeError, ValueError):
+            raise ErrorBase('la cantidad debe ser un número')
+        if not 1 <= cantidad <= 500:
+            raise ErrorBase('la cantidad va de 1 a 500 piezas por alta')
+        if not str(nombre or '').strip():
+            raise ErrorBase('falta el nombre (por ejemplo: mesa binaria)')
+        if not str(actor or '').strip():
+            raise ErrorBase('falta quién da de alta')
+        datos = {str(k).strip(): str(v).strip() for k, v in (caracteristicas or {}).items() if str(k).strip() and str(v).strip()}
+        series = [str(x or '').strip() for x in (series or [])][:cantidad]
+        return self._uno('SELECT sidp.inventario_alta(%s, %s, CAST(%s AS jsonb), %s, %s, CAST(%s AS text[]), %s)',
+                         (categoria, nombre, json.dumps(datos, ensure_ascii=False), cantidad, ubicacion or '', series, actor))
+
+    def inventario_cambiar(self, codigo, estado, ubicacion, notas, actor):
+        if estado and estado not in ('bueno', 'regular', 'malo', 'baja'):
+            raise ErrorBase('el estado es bueno, regular, malo o baja')
+        return self._uno('SELECT sidp.inventario_cambiar(%s, %s, %s, %s, %s)', (codigo, estado or '', ubicacion or '', notas or '', actor))
+
+    # ---------------------------------------------------------------- Mantenimiento
+
+    def tamano(self):
+        return self._uno('SELECT pg_database_size(current_database())')
+
+    def optimizar(self):
+        """Limpia lo que PostgreSQL ya no usa, actualiza sus estadísticas y rehace los índices. No borra datos."""
+        antes = self.tamano()
+        self._consulta('VACUUM (ANALYZE)')
+        self._consulta('REINDEX SCHEMA sidp')
+        return {'antes_mb': round(antes / 1024 / 1024, 1), 'despues_mb': round(self.tamano() / 1024 / 1024, 1)}
+
+    def respaldar(self, carpeta):
+        """Una copia completa de la base con pg_dump (formato que restaura pg_restore). Devuelve la ruta y el tamaño."""
+        import shutil
+        import subprocess
+        programa = shutil.which('pg_dump')
+        if not programa and os.name == 'nt':
+            candidatos = sorted(Path('C:/Program Files/PostgreSQL').glob('*/bin/pg_dump.exe'), key=lambda p: int(p.parts[-3]) if p.parts[-3].isdigit() else 0)
+            programa = str(candidatos[-1]) if candidatos else None
+        if not programa:
+            raise ErrorBase('no se encontró pg_dump (viene con PostgreSQL, en su carpeta bin)')
+        partes = urllib.parse.urlsplit(self.url)
+        carpeta = Path(carpeta)
+        carpeta.mkdir(parents=True, exist_ok=True)
+        destino = carpeta / f'sidp_cerebro_{datetime.datetime.now():%Y%m%d_%H%M%S}.dump'
+        entorno = {**os.environ, 'PGPASSWORD': urllib.parse.unquote(partes.password or '')}
+        resultado = subprocess.run([programa, '-h', partes.hostname or '127.0.0.1', '-p', str(partes.port or 5432),
+                                    '-U', urllib.parse.unquote(partes.username or 'sidp'), '-Fc', '-f', str(destino),
+                                    partes.path.lstrip('/') or 'sidp_cerebro'], env=entorno, capture_output=True, text=True)
+        if resultado.returncode != 0 or not destino.is_file():
+            raise ErrorBase(f'pg_dump falló: {resultado.stderr.strip()[:300]}')
+        return {'archivo': str(destino), 'mb': round(destino.stat().st_size / 1024 / 1024, 2)}
 
     def alumnos(self, ciclo=None):
         """Los alumnos inscritos por grupo (el último ciclo si no se dice): lo que el panel del .exe trae de aquí."""
@@ -202,11 +275,12 @@ def _imprimir_resumen(resumen):
 
 def main(argumentos=None):
     parser = argparse.ArgumentParser(prog='python -m validacion.base_cerebro')
-    parser.add_argument('accion', nargs='?', default='estado', choices=('estado', 'cargar', 'informe', 'borrar'))
+    parser.add_argument('accion', nargs='?', default='estado', choices=('estado', 'cargar', 'informe', 'borrar', 'respaldar', 'optimizar', 'analisis'))
     parser.add_argument('archivo', nargs='?', type=Path, help='con "cargar": la lista oficial en PDF o la lista revisada en CSV (fuera del repositorio)')
     parser.add_argument('--ciclo', default=ciclo_de(datetime.date.today()), help='por ejemplo 2026-2027')
     parser.add_argument('--base', type=Path, default=ARCHIVO, help='archivo con la dirección de PostgreSQL')
     parser.add_argument('--si-borrar-todo', action='store_true', help='con "borrar": confirma que se borra todo')
+    parser.add_argument('--carpeta', type=Path, default=CARPETA_RESPALDOS, help='con "respaldar": dónde dejar la copia')
     args = parser.parse_args(argumentos)
     base, problema = abrir(args.base)
     if problema:
@@ -219,6 +293,24 @@ def main(argumentos=None):
             return 1
         base.borrar_todo()
         print('Base borrada: quedó vacía, con el esquema nuevo.')
+    if args.accion == 'respaldar':
+        try:
+            copia = base.respaldar(args.carpeta)
+        except ErrorBase as error:
+            print(f'No se respaldó: {error}')
+            return 1
+        print(f'Respaldo listo: {copia["archivo"]} ({copia["mb"]} MB). Se restaura con pg_restore.')
+        return 0
+    if args.accion == 'optimizar':
+        hecho = base.optimizar()
+        print(f'Base optimizada: de {hecho["antes_mb"]} MB a {hecho["despues_mb"]} MB, estadísticas e índices al día.')
+    if args.accion == 'analisis':
+        from validacion import analisis_datos
+        resultado = analisis_datos.analizar(base)
+        print(f'Análisis con {resultado["motor"]}, ciclo {resultado["ciclo"]}:')
+        for frase in resultado['hallazgos']:
+            print('  - ' + frase)
+        return 0
     if args.accion == 'cargar':
         if not args.archivo or not args.archivo.is_file():
             print('Falta la lista: python -m validacion.base_cerebro cargar RUTA\\DE\\LA\\LISTA.pdf (o .csv)')

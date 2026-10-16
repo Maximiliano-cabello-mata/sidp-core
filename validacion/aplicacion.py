@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from validacion import cerebro_red, prueba
+from validacion import cerebro_red, codigo_barras, prueba
 from validacion.registro import Registro
 from validacion.servicio import Bandeja, ErrorBandeja
 
@@ -76,6 +76,19 @@ class Aplicacion:
 
     def direccion_padres(self):
         return f'http://{cerebro_red.ip_local()}:{self.puerto}/padres'
+
+
+def respaldar_seguido(app, cada=3600, primera=120):
+    """Cada hora (la primera vez, 2 minutos después de abrir) copia a la PC 4 lo nuevo; si no está, lo intenta después."""
+    import time
+    time.sleep(primera)
+    while True:
+        if app.bandeja.cerebro:
+            try:
+                app.bandeja.respaldar()
+            except ErrorBandeja as error:
+                print(error, flush=True)
+        time.sleep(cada)
 
 
 def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
@@ -152,6 +165,18 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     return
                 if not url.path.startswith('/api/') or not self._admin(consulta):
                     return self._enviar(404, {'error': 'no existe'}) if not url.path.startswith('/api/') else None
+                # Lo que vive en la PC 4 no detiene el panel mientras responde (el análisis con IA tarda).
+                if url.path == '/api/inventario':
+                    return self._enviar(200, app.bandeja.inventario())
+                if url.path == '/api/analisis_pc4':
+                    return self._enviar(200, app.bandeja.analisis_pc4(consulta.get('ia', [''])[0] == '1'))
+                if url.path == '/api/respaldo':
+                    return self._enviar(200, {'aviso': app.bandeja.respaldo_aviso, 'conectado': bool(app.bandeja.cerebro)})
+                if url.path == '/api/etiquetas':  # Página para imprimir las etiquetas con código de barras.
+                    pedidos = [c for c in consulta.get('codigos', [''])[0].upper().split(',') if c]
+                    piezas = {p['codigo']: p for p in app.bandeja.inventario()['piezas']}
+                    return self._enviar(200, codigo_barras.hoja_etiquetas([piezas[c] for c in pedidos if c in piezas]).encode(),
+                                        'text/html; charset=utf-8')
                 with app.candado:
                     if url.path == '/api/estado':
                         return self._enviar(200, app.bandeja.estado())
@@ -162,7 +187,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     if url.path == '/api/curps':
                         return self._enviar(200, app.bandeja.curps())
                     if url.path == '/api/configuracion':
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso,
+                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso, 'respaldo': app.bandeja.respaldo_aviso,
                                                   'direccion_padres': app.direccion_padres()})
                     if url.path == '/api/plantillas':
                         return self._enviar(200, app.bandeja.lista_plantillas())
@@ -232,6 +257,12 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     with app.candado:
                         return self._enviar(200, app.bandeja.constancia_renapo(self.headers.get('X-SIDP-Nombre', ''), contenido))
                 datos = json.loads(self._cuerpo() or b'{}')
+                if url.path == '/api/inventario/alta':
+                    return self._enviar(200, app.bandeja.inventario_alta(datos))
+                if url.path == '/api/inventario/cambiar':
+                    return self._enviar(200, app.bandeja.inventario_cambiar(datos))
+                if url.path == '/api/respaldo':
+                    return self._enviar(200, app.bandeja.respaldar())
                 with app.candado:
                     if url.path == '/api/revisar_todo':
                         return self._enviar(200, app.bandeja.revisar_todo())
@@ -255,7 +286,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso, 'problema': problema,
+                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'padron': app.bandeja.padron_aviso, 'traidos': app.bandeja.traidos_aviso, 'respaldo': app.bandeja.respaldo_aviso, 'problema': problema,
                                                   'direccion_padres': app.direccion_padres()})
                 self._enviar(404, {'error': 'no existe'})
             except (ErrorBandeja, ValueError) as error:
@@ -325,6 +356,7 @@ def main(argumentos=None):
     print('Cierra esta ventana para apagarlo.', flush=True)
     if not args.no_abrir:
         threading.Timer(1.0, webbrowser.open, (panel,)).start()
+    threading.Thread(target=respaldar_seguido, args=(app,), daemon=True).start()
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

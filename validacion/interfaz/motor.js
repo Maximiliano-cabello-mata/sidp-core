@@ -86,6 +86,13 @@ function motorLocal() {
       document.body.appendChild(enlace); enlace.click(); enlace.remove();
     },
     muestraUrl: (clave, archivo) => `/api/plantillas/muestra?clave=${encodeURIComponent(clave)}&archivo=${encodeURIComponent(archivo)}&t=${encodeURIComponent(SIDP.token || '')}`,
+    // Lo que vive en la PC 4: inventario, análisis con pandas y respaldo.
+    inventario: () => api('/api/inventario'),
+    inventarioAlta: (datos) => api('/api/inventario/alta', datos),
+    inventarioCambiar: (datos) => api('/api/inventario/cambiar', datos),
+    etiquetasUrl: (codigos) => `/api/etiquetas?codigos=${encodeURIComponent(codigos.join(','))}&t=${encodeURIComponent(SIDP.token || '')}`,
+    analisisPC4: (conIA) => api('/api/analisis_pc4' + (conIA ? '?ia=1' : '')),
+    respaldar: () => api('/api/respaldo', {}),
   };
 }
 
@@ -200,6 +207,9 @@ def recibir(captura, archivos):
     reescribir: (id, captura, textos) => llamar('reescribir', id, captura, textos),
     archivoUrl: null,
     configuracion: null,
+    inventario: null,
+    analisisPC4: null,
+    respaldar: null,
     guardarConfiguracion: null,
     base: () => llamar('base'),
     curps: () => llamar('curps'),

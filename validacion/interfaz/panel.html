@@ -139,7 +139,7 @@
 
     <!-- ============ ANÁLISIS, 911 Y SAID ============ -->
     <section class="pestana" data-pestana="analisis">
-      <h1>Análisis, 911 y SAID</h1>
+      <h1>Reportes oficiales: 911 y SAID</h1>
       <p class="subtitulo">Los números que piden los reportes oficiales. El SIDP los prepara; los directivos los capturan en el sistema oficial.</p>
       <div class="kpis" id="an-kpis"></div>
       <div class="panel">
@@ -169,6 +169,90 @@
       </div>
     </section>
 
+    <!-- ============ ANÁLISIS DE DATOS (PC 4) ============ -->
+    <section class="pestana" data-pestana="datos">
+      <h1>Análisis de datos</h1>
+      <p class="subtitulo">Lo calcula la PC 4 con pandas sobre su base de datos. Solo números: sin nombres ni CURP. La IA puede escribir un resumen, pero no cambia ningún dato.</p>
+      <div class="barra">
+        <button class="principal" id="dt-actualizar">Actualizar análisis</button>
+        <button id="dt-ia">Pedir resumen a la IA</button>
+        <span class="espacio"></span><span class="chico" id="dt-motor"></span>
+      </div>
+      <div id="dt-mensaje"></div>
+      <div id="dt-contenido" class="oculto">
+        <div class="kpis" id="dt-kpis"></div>
+        <div class="panel">
+          <h2>Lo más importante</h2>
+          <ul class="hallazgos" id="dt-hallazgos"></ul>
+          <div id="dt-ia-texto"></div>
+        </div>
+        <div class="dos-columnas" style="margin-top:16px">
+          <div class="panel"><h2>Avance del expediente por grupo</h2><p class="chico">Documentos obligatorios validados por una persona.</p><div class="grafica" id="dt-avance"></div></div>
+          <div class="panel"><h2>Documentos que más faltan</h2><div class="grafica" id="dt-faltan"></div></div>
+        </div>
+        <div class="dos-columnas" style="margin-top:16px">
+          <div class="panel"><h2>Matrícula por grupo y sexo</h2><div class="tabla-envoltura"><table id="dt-matricula"></table></div></div>
+          <div class="panel"><h2>Edad al 31 de diciembre</h2><div class="tabla-envoltura"><table id="dt-edades"></table></div></div>
+        </div>
+        <div class="dos-columnas" style="margin-top:16px">
+          <div class="panel"><h2>Extraedad y menor edad</h2><div class="tabla-envoltura"><table id="dt-situacion"></table></div></div>
+          <div class="panel"><h2>Documentos recibidos, últimos 14 días</h2><div class="dias" id="dt-dias"></div><div class="dias-etiquetas" id="dt-dias-etiquetas"></div></div>
+        </div>
+        <div class="dos-columnas" style="margin-top:16px">
+          <div class="panel"><h2>Documentos por estado</h2><div class="tabla-envoltura"><table id="dt-documentos"></table></div></div>
+          <div class="panel"><h2>Lectura del cerebro y alertas</h2><div id="dt-lecturas"></div></div>
+        </div>
+        <div class="panel"><h2>Inventario por categoría y estado</h2><div class="tabla-envoltura"><table id="dt-inventario"></table></div></div>
+      </div>
+    </section>
+
+    <!-- ============ INVENTARIO ============ -->
+    <section class="pestana" data-pestana="inventario">
+      <h1>Inventario de la escuela</h1>
+      <p class="subtitulo">Mobiliario, cómputo y material. Cada pieza tiene su propio código de barras: 4 mesas son 4 códigos. Vive en la base de la PC 4.</p>
+      <div class="panel escaner">
+        <label for="iv-escanear">Escanea una etiqueta o escribe su código</label>
+        <div class="barra" style="margin:0">
+          <input id="iv-escanear" placeholder="MOB-000001" autocomplete="off" style="max-width:320px">
+          <button id="iv-buscar">Buscar</button>
+          <span class="espacio"></span>
+          <button class="principal" id="iv-nueva">Dar de alta piezas</button>
+        </div>
+        <div id="iv-pieza"></div>
+      </div>
+      <div class="panel oculto" id="iv-alta">
+        <h2>Dar de alta</h2>
+        <div class="rejilla">
+          <div><label for="iv-categoria">Categoría</label><select id="iv-categoria"></select></div>
+          <div><label for="iv-nombre">Qué es</label><input id="iv-nombre" placeholder="Mesa binaria, computadora de escritorio…"></div>
+          <div><label for="iv-cantidad">Cuántas iguales</label><input id="iv-cantidad" type="number" min="1" max="500" value="1"></div>
+          <div><label for="iv-ubicacion">Dónde está</label><input id="iv-ubicacion" placeholder="Salón de 3° A, dirección, bodega…"></div>
+        </div>
+        <label>Características (iguales para todas las piezas de esta alta)</label>
+        <div id="iv-caracteristicas"></div>
+        <button class="chico-boton" id="iv-mas">Agregar otra característica</button>
+        <label for="iv-series">Números de serie, uno por renglón y en orden (opcional; para computadoras e impresoras)</label>
+        <textarea id="iv-series" style="min-height:70px"></textarea>
+        <div class="rejilla">
+          <div><label for="iv-quien">Tu nombre (queda en la bitácora)</label><input id="iv-quien"></div>
+        </div>
+        <p><button class="verde" id="iv-guardar">Dar de alta y crear los códigos</button> <button id="iv-cancelar">Cancelar</button></p>
+        <div id="iv-alta-mensaje"></div>
+      </div>
+      <div class="panel">
+        <div class="barra">
+          <select id="iv-filtro"><option value="">Todas las categorías</option></select>
+          <select id="iv-filtro-estado"><option value="">Todos los estados</option><option value="activos">Sin las de baja</option>
+            <option>bueno</option><option>regular</option><option>malo</option><option>baja</option></select>
+          <input id="iv-texto" placeholder="Buscar por nombre, lugar o código" style="max-width:280px">
+          <span class="espacio"></span>
+          <button id="iv-imprimir">Imprimir etiquetas de lo marcado</button>
+        </div>
+        <div class="kpis" id="iv-kpis"></div>
+        <div class="tabla-envoltura"><table id="iv-tabla"></table></div>
+      </div>
+    </section>
+
     <!-- ============ PLANTILLAS ============ -->
     <section class="pestana" data-pestana="plantillas">
       <h1>Plantillas de documentos</h1>
@@ -194,6 +278,12 @@
           <div><label for="cerebro-clave">Clave que muestra el cerebro al arrancar</label><input id="cerebro-clave"></div>
         </div>
         <p><button class="principal" id="cerebro-guardar">Conectar</button> <span class="chico" id="cerebro-estado"></span></p>
+      </div>
+      <div class="panel oculto" id="panel-respaldo">
+        <h2>Respaldo en la PC 4</h2>
+        <p>La base principal está en esta PC. La PC 4 guarda una copia de todo (bases y expedientes) y una copia diaria de su propia base.
+          Se copia sola cada hora mientras el cerebro está conectado; solo viaja lo nuevo o lo que cambió.</p>
+        <p><button class="principal" id="respaldo-ahora">Respaldar ahora</button> <span class="chico" id="respaldo-estado"></span></p>
       </div>
       <div class="panel">
         <h2>Página de padres</h2>
@@ -228,6 +318,8 @@ const ICONOS = {
   bien: '<path d="M5 12l5 5 9-10"/>',
   alerta: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
   descargar: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+  datos: '<path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/>',
+  inventario: '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',
 };
 const icono = (nombre) => `<svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS[nombre] || ''}</svg>`;
 for (const e of document.querySelectorAll('[data-icono]')) e.outerHTML = icono(e.dataset.icono);
@@ -235,15 +327,19 @@ for (const e of document.querySelectorAll('[data-icono]')) e.outerHTML = icono(e
 // --- Pestañas ---
 const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio', icono: 'inicio' },
-  { separador: 'Validación' },
+  { separador: 'Alumnos y expedientes' },
   { id: 'listas', nombre: 'Listas de grupo', icono: 'listas', paso: 1 },
   { id: 'escanear', nombre: 'Escanear expediente', icono: 'escanear', paso: 2, titulo: 'Escanear expediente · validación manual' },
   { id: 'revision', nombre: 'Fila de revisión', icono: 'revision', paso: 3, titulo: 'Fila de revisión · validación automática' },
   { id: 'curp', nombre: 'CURP y RENAPO', icono: 'curp', paso: 4 },
-  { separador: 'Administración' },
-  { id: 'analisis', nombre: 'Análisis, 911 y SAID', icono: 'analisis' },
+  { separador: 'Análisis' },
+  { id: 'datos', nombre: 'Análisis de datos', icono: 'datos', titulo: 'Análisis de datos · PC 4' },
+  { id: 'analisis', nombre: '911 y SAID', icono: 'analisis', titulo: 'Reportes oficiales: 911 y SAID' },
+  { separador: 'Escuela' },
+  { id: 'inventario', nombre: 'Inventario', icono: 'inventario', titulo: 'Inventario · códigos de barras' },
+  { separador: 'Sistema' },
   { id: 'plantillas', nombre: 'Plantillas', icono: 'plantillas', titulo: 'Plantillas de documentos' },
-  { id: 'ajustes', nombre: 'Ajustes', icono: 'ajustes' },
+  { id: 'ajustes', nombre: 'Ajustes y respaldo', icono: 'ajustes' },
 ];
 let pestana = 'inicio';
 $('menu').innerHTML = PESTANAS.map((p) => p.separador ? `<div class="separador">${esc(p.separador)}</div>`
@@ -260,6 +356,7 @@ function irA(id) {
   $('titulo').textContent = p.titulo || p.nombre;
   if (location.hash.slice(1) !== p.id) history.replaceState(null, '', '#' + p.id);
   window.scrollTo(0, 0);
+  setTimeout(() => entrarPestana(p.id));  // Las pestañas de la PC 4 se cargan al abrirlas.
 }
 window.addEventListener('hashchange', () => irA(location.hash.slice(1)));
 irA(location.hash.slice(1) || 'inicio');
@@ -345,7 +442,8 @@ function mostrarInicio() {
     + paso(2, 'escanear', 'Escanear los expedientes', `${conDocumentos} de ${alumnos} alumnos con expediente`, alumnos > 0 && conDocumentos >= alumnos)
     + paso(3, 'revision', 'Revisar lo que suben los padres', pendientes.length ? `${pendientes.length} por decidir` : 'Nada pendiente', !pendientes.length)
     + paso(4, 'curp', 'Validar CURP en RENAPO', `${validadas} de ${curps.alumnos.length} validadas`, curps.alumnos.length > 0 && validadas >= curps.alumnos.length)
-    + paso(0, 'analisis', 'Análisis, 911 y SAID', 'Descargar a Excel', false);
+    + paso(0, 'datos', 'Análisis de datos', 'Lo calcula la PC 4', false)
+    + paso(0, 'inventario', 'Inventario', 'Códigos de barras por pieza', false);
   const alertas = [];
   const alerta = (clase, texto, boton, ir) => alertas.push(`<div class="alerta ${clase}"><div>${icono(clase === 'verde' ? 'bien' : 'alerta')} ${texto}</div>
       ${boton ? `<button data-ir="${ir}">${esc(boton)}</button>` : ''}</div>`);
@@ -987,6 +1085,7 @@ if (motor.configuracion) {
     $('cerebro-url').value = c.cerebro_url || '';
     $('cerebro-clave').value = c.cerebro_clave || '';
     $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.traidos || ''} ${c.padron || ''}` : 'Sin cerebro: los procesos corren en esta PC.';
+    $('respaldo-estado').textContent = c.respaldo || (c.cerebro_conectado ? 'El primer respaldo se hace 2 minutos después de abrir.' : 'Conecta el cerebro para respaldar.');
     const publica = `${PAGINA_PUBLICA}padres.html?escuela=${new URL(c.direccion_padres).host}`;
     $('padres-ip').innerHTML = `Los padres, conectados al Wi-Fi de la escuela, abren <b>${esc(c.direccion_padres)}</b>
       (o ${esc(publica)}, que los manda ahí). <a href="padres.html" target="_blank" rel="noopener">Abrir la página de padres</a>.`;
@@ -994,6 +1093,172 @@ if (motor.configuracion) {
   $('cerebro-guardar').onclick = async () => {
     const c = await trabajar('Probando el cerebro…', () => motor.guardarConfiguracion({ cerebro_url: $('cerebro-url').value, cerebro_clave: $('cerebro-clave').value }));
     if (c) $('cerebro-estado').textContent = c.cerebro_conectado ? `Conectado. ${c.traidos || ''} ${c.padron || ''}` : 'No respondió: ' + (c.problema || '');
+  };
+}
+
+
+// ================= PESTAÑAS DE LA PC 4 =================
+function entrarPestana(id) {
+  if (id === 'datos' && !analisisPC4) cargarAnalisisPC4(false);
+  if (id === 'inventario') cargarInventario();
+}
+const SIN_PC4 = 'Esto vive en la PC 4: abre el SIDP-Validador.exe de la escuela con el cerebro conectado (Ajustes).';
+var analisisPC4 = null;
+function tablaCruce(id, cruce, primera) {
+  if (!cruce.columnas.length) { $(id).innerHTML = '<tr><td class="chico">Todavía no hay datos.</td></tr>'; return; }
+  $(id).innerHTML = `<tr><th>${esc(primera)}</th>${cruce.columnas.map((c) => `<th class="cifra">${esc(c)}</th>`).join('')}</tr>` +
+    cruce.filas.map((f) => `<tr class="${f[0] === 'Total' ? 'total' : ''}"><td>${esc(f[0])}</td>${f.slice(1).map((n) => `<td class="cifra">${n}</td>`).join('')}</tr>`).join('');
+}
+function grafica(id, filas, maximo, sufijo = '', color = '') {
+  $(id).innerHTML = filas.length ? filas.map(([etiqueta, valor]) => `<div>${esc(etiqueta)}</div>
+    <div class="pista"><span class="${color}" style="width:${maximo ? Math.min(100, 100 * valor / maximo) : 0}%"></span></div>
+    <div class="valor">${valor}${sufijo}</div>`).join('') : '<div class="chico">Todavía no hay datos.</div>';
+}
+async function cargarAnalisisPC4(conIA) {
+  if (!motor.analisisPC4) { avisoEn('dt-mensaje', 'ojo', SIN_PC4); return; }
+  const r = await trabajar(conIA ? 'La IA está escribiendo el resumen (puede tardar un minuto)…' : 'Calculando en la PC 4…',
+    () => motor.analisisPC4(conIA), (c, t) => avisoEn('dt-mensaje', c, t));
+  if (!r) return;
+  avisoEn('dt-mensaje', '', '');
+  analisisPC4 = r;
+  $('dt-contenido').classList.remove('oculto');
+  $('dt-motor').textContent = `Ciclo ${r.ciclo || '—'} · calculado con ${r.motor} · ${r.fecha}`;
+  const k = r.kpis;
+  $('dt-kpis').innerHTML = kpi('azul', 'alumnos', k.alumnos, `Alumnos (${k.hombres} H, ${k.mujeres} M)`)
+    + kpi('verde', 'bien', `${k.avance_expedientes}%`, `Avance de expedientes · ${k.expedientes_completos} completos`)
+    + kpi('morado', 'curp', `${k.curp_validadas_renapo} de ${k.alumnos}`, 'CURP validadas en RENAPO')
+    + kpi(k.alertas_altas ? 'rojo' : 'verde', 'alerta', k.alertas_altas, 'Alertas graves')
+    + kpi('ambar', 'inventario', k.piezas_inventario, 'Piezas en el inventario');
+  $('dt-hallazgos').innerHTML = r.hallazgos.map((h) => `<li>${esc(h)}</li>`).join('');
+  $('dt-ia-texto').innerHTML = !r.ia ? '' : r.ia.texto
+    ? `<h3>Resumen de la IA <span class="chico">(${esc(r.ia.modelo)}, ${r.ia.segundos} s · revísalo antes de usarlo)</span></h3><div class="ia-texto">${esc(r.ia.texto)}</div>`
+    : `<div class="mensaje ojo">${esc(r.ia.problema)}</div>`;
+  grafica('dt-avance', r.avance_por_grupo.map((g) => [g.grupo, g.porcentaje]), 100, '%', 'verde');
+  grafica('dt-faltan', r.faltan_por_documento.map((d) => [d.documento, d.faltan]), Math.max(1, ...r.faltan_por_documento.map((d) => d.faltan)), '', 'ambar');
+  tablaCruce('dt-matricula', r.matricula, 'Grupo');
+  tablaCruce('dt-edades', { columnas: r.edades.columnas.map((c) => c === 'Total' ? c : `${c} años`), filas: r.edades.filas }, 'Grupo');
+  tablaCruce('dt-situacion', r.situacion_edad, 'Grupo');
+  tablaCruce('dt-documentos', r.documentos_por_estado, 'Documento');
+  tablaCruce('dt-inventario', r.inventario, 'Categoría');
+  const maxDia = Math.max(1, ...r.recibidos_14_dias.map((d) => d.documentos));
+  $('dt-dias').innerHTML = r.recibidos_14_dias.map((d) => `<div title="${esc(d.dia)}: ${d.documentos}" style="height:${100 * d.documentos / maxDia}%"></div>`).join('');
+  $('dt-dias-etiquetas').innerHTML = r.recibidos_14_dias.map((d) => `<span>${esc(d.dia.slice(8))}</span>`).join('');
+  const l = r.lecturas;
+  $('dt-lecturas').innerHTML = `<p>Páginas leídas: <b>${l.paginas}</b> · sin texto: <b>${l.sin_texto}</b> · reconocidas con un alumno: <b>${l.reconocidas}</b> · CURP leídas con algún error: <b>${l.curp_con_errores}</b></p>
+    <p class="chico">Por método: ${Object.entries(l.por_metodo).map(([m, n]) => `${esc(m)} ${n}`).join(', ') || 'todavía nada'}</p>
+    <h3>Alertas</h3><p>${Object.entries(r.alertas).map(([t, n]) => `${esc(t.replace(/_/g, ' '))}: <b>${n}</b>`).join(' · ') || 'Sin alertas.'}</p>`;
+}
+$('dt-actualizar').onclick = () => cargarAnalisisPC4(false);
+$('dt-ia').onclick = () => cargarAnalisisPC4(true);
+
+// --- Inventario ---
+var inventarioDatos = null;
+const CARACTERISTICAS = {
+  computo: ['Marca', 'Modelo', 'Procesador', 'Memoria RAM', 'Disco', 'Sistema operativo'],
+  mobiliario: ['Material', 'Color', 'Medidas'],
+  material: ['Marca', 'Descripción'],
+  otro: ['Descripción'],
+};
+function filaCaracteristica(nombre = '', valor = '') {
+  const fila = document.createElement('div');
+  fila.className = 'carac';
+  fila.innerHTML = `<input placeholder="Característica" value="${esc(nombre)}"><input placeholder="Valor" value="${esc(valor)}"><button class="chico-boton" title="Quitar">Quitar</button>`;
+  fila.querySelector('button').onclick = () => fila.remove();
+  $('iv-caracteristicas').appendChild(fila);
+}
+function caracteristicasPorCategoria() {
+  $('iv-caracteristicas').innerHTML = '';
+  for (const nombre of CARACTERISTICAS[$('iv-categoria').value] || []) filaCaracteristica(nombre);
+}
+async function cargarInventario() {
+  if (!motor.inventario) { $('iv-tabla').innerHTML = `<tr><td>${esc(SIN_PC4)}</td></tr>`; return; }
+  try { inventarioDatos = await motor.inventario(); } catch (error) { $('iv-tabla').innerHTML = `<tr><td class="alta">${esc(error.message)}</td></tr>`; return; }
+  const elegida = $('iv-categoria').value;
+  $('iv-categoria').innerHTML = inventarioDatos.categorias.map((c) => `<option value="${esc(c.clave)}">${esc(c.nombre)}</option>`).join('');
+  if (elegida) $('iv-categoria').value = elegida;
+  const filtro = $('iv-filtro').value;
+  $('iv-filtro').innerHTML = '<option value="">Todas las categorías</option>' + inventarioDatos.categorias.map((c) => `<option value="${esc(c.clave)}">${esc(c.nombre)}</option>`).join('');
+  $('iv-filtro').value = filtro;
+  mostrarInventario();
+}
+function mostrarInventario() {
+  if (!inventarioDatos) return;
+  const texto = $('iv-texto').value.trim().toUpperCase();
+  const estado = $('iv-filtro-estado').value;
+  const piezas = inventarioDatos.piezas.filter((p) => (!$('iv-filtro').value || p.categoria === $('iv-filtro').value)
+    && (!estado || (estado === 'activos' ? p.estado !== 'baja' : p.estado === estado))
+    && (!texto || `${p.codigo} ${p.nombre} ${p.ubicacion || ''} ${p.numero_serie || ''}`.toUpperCase().includes(texto)));
+  const activas = inventarioDatos.piezas.filter((p) => p.estado !== 'baja');
+  $('iv-kpis').innerHTML = inventarioDatos.categorias.map((c) => kpi('azul', 'inventario', activas.filter((p) => p.categoria === c.clave).length, c.nombre.split(' (')[0])).join('')
+    + kpi('rojo', 'alerta', activas.filter((p) => p.estado === 'malo').length, 'En mal estado');
+  if (!piezas.length) { $('iv-tabla').innerHTML = `<tr><td class="chico">${inventarioDatos.piezas.length ? 'Nada coincide con el filtro.' : 'Todavía no hay piezas. Da <b>Dar de alta piezas</b>.'}</td></tr>`; return; }
+  $('iv-tabla').innerHTML = `<tr><th><input type="checkbox" id="iv-todas" aria-label="Marcar todas" style="width:auto"></th><th>Código</th><th>Qué es</th><th>Características</th><th>Dónde</th><th>Serie</th><th>Estado</th></tr>` +
+    piezas.map((p) => `<tr class="${p.estado === 'baja' ? 'apagada' : ''}"><td><input type="checkbox" data-marca="${esc(p.codigo)}" style="width:auto"></td>
+      <td><button class="enlace codigo-pieza" data-pieza="${esc(p.codigo)}">${esc(p.codigo)}</button></td><td>${esc(p.nombre)}</td>
+      <td class="chico">${Object.entries(p.caracteristicas || {}).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}</td>
+      <td>${esc(p.ubicacion || '')}</td><td class="chico">${esc(p.numero_serie || '')}</td>
+      <td><span class="insignia estado-${esc(p.estado)}">${esc(p.estado)}</span></td></tr>`).join('');
+  $('iv-todas').onchange = () => { for (const c of $('iv-tabla').querySelectorAll('[data-marca]')) c.checked = $('iv-todas').checked; };
+  for (const b of $('iv-tabla').querySelectorAll('[data-pieza]')) b.onclick = () => verPieza(b.dataset.pieza);
+}
+function verPieza(codigo) {
+  codigo = codigo.trim().toUpperCase();
+  const p = inventarioDatos && inventarioDatos.piezas.find((x) => x.codigo === codigo);
+  if (!p) { $('iv-pieza').innerHTML = `<div class="mensaje mal">No existe la pieza ${esc(codigo)}.</div>`; return; }
+  $('iv-pieza').innerHTML = `<div class="caja-alumno"><div class="barra" style="margin:0 0 6px"><span class="codigo-pieza">${esc(p.codigo)}</span> <b>${esc(p.nombre)}</b>
+      <span class="insignia estado-${esc(p.estado)}">${esc(p.estado)}</span><span class="espacio"></span><button class="chico-boton" id="iv-una-etiqueta">Imprimir su etiqueta</button></div>
+    <div class="chico">${Object.entries(p.caracteristicas || {}).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(' · ')}${p.numero_serie ? ` · Serie: ${esc(p.numero_serie)}` : ''} · Alta: ${esc((p.creado || '').slice(0, 10))}</div>
+    <div class="rejilla"><div><label for="iv-p-estado">Estado</label><select id="iv-p-estado">${['bueno', 'regular', 'malo', 'baja'].map((e) => `<option ${e === p.estado ? 'selected' : ''}>${e}</option>`).join('')}</select></div>
+      <div><label for="iv-p-ubicacion">Dónde está</label><input id="iv-p-ubicacion" value="${esc(p.ubicacion || '')}"></div>
+      <div><label for="iv-p-notas">Notas (para una baja, el motivo)</label><input id="iv-p-notas" value="${esc(p.notas || '')}"></div>
+      <div><label for="iv-p-quien">Tu nombre</label><input id="iv-p-quien" value="${esc($('iv-quien').value)}"></div></div>
+    <p><button class="principal" id="iv-p-guardar">Guardar cambios</button></p><div id="iv-p-mensaje"></div></div>`;
+  $('iv-una-etiqueta').onclick = () => window.open(motor.etiquetasUrl([p.codigo]), '_blank');
+  $('iv-p-guardar').onclick = async () => {
+    const r = await trabajar('Guardando en la PC 4…', () => motor.inventarioCambiar({ codigo: p.codigo, estado: $('iv-p-estado').value,
+      ubicacion: $('iv-p-ubicacion').value, notas: $('iv-p-notas').value, actor: $('iv-p-quien').value }), (c, t) => avisoEn('iv-p-mensaje', c, t));
+    if (!r) return;
+    inventarioDatos = r; mostrarInventario(); verPieza(p.codigo);
+    avisoEn('iv-p-mensaje', 'bien', 'Guardado. El cambio quedó en la bitácora.');
+  };
+}
+$('iv-buscar').onclick = () => verPieza($('iv-escanear').value);
+$('iv-escanear').onkeydown = (e) => { if (e.key === 'Enter') { verPieza($('iv-escanear').value); $('iv-escanear').select(); } };  // El lector escribe el código y da Enter.
+$('iv-nueva').onclick = () => { $('iv-alta').classList.remove('oculto'); caracteristicasPorCategoria(); $('iv-nombre').focus(); };
+$('iv-cancelar').onclick = () => $('iv-alta').classList.add('oculto');
+$('iv-categoria').onchange = caracteristicasPorCategoria;
+$('iv-mas').onclick = () => filaCaracteristica();
+for (const id of ['iv-filtro', 'iv-filtro-estado']) $(id).onchange = mostrarInventario;
+$('iv-texto').oninput = mostrarInventario;
+$('iv-guardar').onclick = async () => {
+  const caracteristicas = {};
+  for (const fila of $('iv-caracteristicas').querySelectorAll('.carac')) {
+    const [nombre, valor] = [...fila.querySelectorAll('input')].map((i) => i.value.trim());
+    if (nombre && valor) caracteristicas[nombre] = valor;
+  }
+  const r = await trabajar('Dando de alta en la PC 4…', () => motor.inventarioAlta({ categoria: $('iv-categoria').value, nombre: $('iv-nombre').value,
+    cantidad: Number($('iv-cantidad').value), ubicacion: $('iv-ubicacion').value, caracteristicas,
+    series: $('iv-series').value.split('\n').map((x) => x.trim()), actor: $('iv-quien').value }), (c, t) => avisoEn('iv-alta-mensaje', c, t));
+  if (!r) return;
+  inventarioDatos = r; mostrarInventario();
+  const codigos = r.hecho.codigos;
+  $('iv-alta-mensaje').innerHTML = `<div class="mensaje bien">Listo: ${codigos.length} pieza(s), de ${esc(codigos[0])} a ${esc(codigos[codigos.length - 1])}.
+    <button class="chico-boton" id="iv-etiquetas-nuevas">Imprimir sus etiquetas</button></div>`;
+  $('iv-etiquetas-nuevas').onclick = () => window.open(motor.etiquetasUrl(codigos), '_blank');
+  $('iv-nombre').value = ''; $('iv-series').value = ''; $('iv-cantidad').value = 1;
+};
+$('iv-imprimir').onclick = () => {
+  const codigos = [...$('iv-tabla').querySelectorAll('[data-marca]:checked')].map((c) => c.dataset.marca);
+  if (!codigos.length) { alert('Marca primero las piezas (la casilla de la izquierda).'); return; }
+  window.open(motor.etiquetasUrl(codigos), '_blank');
+};
+
+// --- Respaldo (Ajustes) ---
+if (motor.respaldar) {
+  $('panel-respaldo').classList.remove('oculto');
+  $('respaldo-ahora').onclick = async () => {
+    const r = await trabajar('Copiando a la PC 4…', () => motor.respaldar(), (c, t) => { $('respaldo-estado').textContent = t; });
+    if (r) $('respaldo-estado').textContent = r.aviso + (r.copia_base && r.copia_base.archivo ? ' También se copió la base de la PC 4.' : '');
   };
 }
 
