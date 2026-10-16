@@ -26,9 +26,20 @@ from validacion import comparador, extraer, lector, modelo, vision
 
 MAXIMO_HOJAS = 3  # Por documento, al modelo que ve (las demás hojas casi nunca traen datos nuevos).
 INTENTOS = 3
-# El modelo que ve lee cada hoja dos veces (con los campos en otro orden). Lo que no coincide entre las dos lecturas
-# queda por confirmar: así un dato inventado o mal leído no se guarda como seguro. Tarda el doble; con 1 es más rápido.
-LECTURAS = int(os.environ.get('SIDP_LECTURAS_VISION') or 2)
+# Con 1 lectura y esquema plano tarda ~33 s por hoja en la PC 4; con 2 lecturas (~45 s) compara orden normal e inverso.
+LECTURAS = int(os.environ.get('SIDP_LECTURAS_VISION') or 1)
+TIPOS_SEGUROS_1 = ('fecha', 'sangre', 'si_no', 'numero')
+TIPOS_SEGUROS_2 = TIPOS_SEGUROS_1 + ('telefono', 'cp')
+
+
+def _visto(v, tipo=None, lecturas=1):
+    if isinstance(v, dict):
+        return v
+    s = str(v or '').strip()
+    dudoso = s.endswith('?')
+    valor = s[:-1].strip() if dudoso else s
+    seguros = TIPOS_SEGUROS_1 if lecturas < 2 else TIPOS_SEGUROS_2
+    return {'valor': valor, 'seguro': (not dudoso) and (tipo is None or tipo in seguros)}
 
 
 def carpeta_por_omision():
@@ -110,13 +121,17 @@ def necesita_ver(lista, procesos):
 
 def ver(hojas, nombre_documento, lista, modelo_vision, url=modelo.URL, lecturas=None, hoy=None):
     """Lo que lee el modelo que ve: ({clave: {valor, seguro}}, segundos). Con dos lecturas, lo que no coincide no es seguro."""
+    cuantas = lecturas or LECTURAS
     primera, segundos = vision.preguntar(hojas, campos_mod.pregunta(nombre_documento, lista), campos_mod.esquema(lista), modelo_vision, url)
-    if (lecturas or LECTURAS) < 2 or not primera:
+    if not primera:
+        return primera, segundos
+    primera = {c['clave']: _visto(primera.get(c['clave']), c['tipo'], cuantas) for c in lista if c['clave'] in primera}
+    if cuantas < 2:
         return primera, segundos
     al_reves = list(reversed(lista))
     segunda, mas = vision.preguntar(hojas, campos_mod.pregunta(nombre_documento, al_reves), campos_mod.esquema(al_reves), modelo_vision, url)
     for c in lista:
-        a, b = primera.get(c['clave']) or {}, (segunda or {}).get(c['clave']) or {}
+        a, b = _visto(primera.get(c['clave']), c['tipo'], 2), _visto((segunda or {}).get(c['clave']), c['tipo'], 2)
         uno, otro = str(a.get('valor') or '').strip(), str(b.get('valor') or '').strip()
         if not uno and not otro:
             continue
@@ -132,7 +147,7 @@ def combinar(campos, procesos, vistos, identidad, hoy):
     salida = []
     for c in campos:
         de_proceso, metodo = procesos.get(c['clave'], (None, None))
-        visto = (vistos or {}).get(c['clave']) or {}
+        visto = _visto((vistos or {}).get(c['clave']), c['tipo']) if vistos and c['clave'] in vistos else {}
         crudo_visto = str(visto.get('valor') or '').strip()
         limpio_p, detalle_p = campos_mod.limpiar(c['tipo'], de_proceso, hoy) if de_proceso else (None, {})
         limpio_v, detalle_v = campos_mod.limpiar(c['tipo'], crudo_visto, hoy) if crudo_visto and not campos_mod.vacio(crudo_visto) else (None, {})

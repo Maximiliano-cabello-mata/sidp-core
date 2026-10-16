@@ -31,10 +31,10 @@ from validacion import modelo
 # En orden de preferencia: el primero instalado es el que se usa. qwen3-vl lee mejor la letra a mano, pero en una PC
 # sin tarjeta de video es lento: en la PC 4 el ajuste SIDP_MODELO_VISION fija qwen2.5vl:3b (Tarea 012).
 PREFERIDOS = ('qwen3-vl:8b', 'qwen2.5vl:7b', 'qwen3-vl:4b', 'qwen2.5vl:3b', 'minicpm-v:8b')
-# Píxeles del lado mayor. Los tokens de la imagen crecen con el área: 1600 daba unos 3,000 (103 s en la PC 4);
-# 1280, unos 1,900; 960, unos 1,100. Menos es más rápido, pero la letra chica se pierde: se mide con medir_lectura.
-LADO = int(os.environ.get('SIDP_LADO_VISION') or 1280)
-CONTEXTO = 16384
+# Píxeles del lado mayor. En qwen2.5vl el piso nativo del codificador visual (image_min_pixels=802816) equivale a ~960 px
+# (~1,054 tokens de imagen, ~22 s en la iGPU Radeon de la PC 4 vs ~46 s a 1280 px y ~103 s a 1600 px).
+LADO = int(os.environ.get('SIDP_LADO_VISION') or 960)
+CONTEXTO = 4096
 
 
 class ErrorVision(Exception):
@@ -73,7 +73,7 @@ def preparar(contenido, lado=None):
     imagen = ImageOps.exif_transpose(imagen).convert('RGB')
     imagen.thumbnail((lado, lado))
     salida = io.BytesIO()
-    imagen.save(salida, 'JPEG', quality=88)
+    imagen.save(salida, 'JPEG', quality=82)
     return salida.getvalue()
 
 

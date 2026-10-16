@@ -1,4 +1,4 @@
-# Resultado de la Tarea 013: código nuevo del escaneo, modelo que ve más rápido y medición de la letra a mano (PC 4)
+# Resultado de la Tarea 013 y Optimización de Velocidad del Motor de Visión (PC 4)
 
 - **Fecha:** 2026-10-16
 - **Equipo:** PC 4 (`DESKTOP-8RJIA6B`, AMD Ryzen 5 5600G with Radeon Graphics, 24 GB RAM)
@@ -27,7 +27,7 @@ PostgreSQL (puerto 5432): escuchando en ::1
 Cerebro (puerto 8771): escuchando en 0.0.0.0
 Ollama (puerto 11434): escuchando en 127.0.0.1
 Modelos de Ollama: qwen2.5vl:3b, qwen3-vl:8b, sidp-revisor-2:latest, sidp-revisor:latest, llama3.1:latest
-Ajustes (C:\SIDP-datos\servicios\ajustes.ps1): OLLAMA_IGPU_ENABLE = '1'; OLLAMA_FLASH_ATTENTION = '1'; OLLAMA_KEEP_ALIVE = '24h'; SIDP_MODELO_VISION = 'qwen2.5vl:3b'; SIDP_LADO_VISION = '1280'; SIDP_LECTURAS_VISION = '2'
+Ajustes (C:\SIDP-datos\servicios\ajustes.ps1): OLLAMA_IGPU_ENABLE = '1'; OLLAMA_FLASH_ATTENTION = '1'; OLLAMA_KEEP_ALIVE = '24h'; SIDP_MODELO_VISION = 'qwen2.5vl:3b'; SIDP_LADO_VISION = '960'; SIDP_LECTURAS_VISION = '1'
 Actualización que ofrece al servidor: ninguna todavía (se baja sola de GitHub al fusionar a main)
 Cerebro: responde. Base: PostgreSQL 17.11, 191 alumnos
 --- Últimas líneas de C:\SIDP-datos\registros\ollama.ciclo.log
@@ -50,23 +50,113 @@ Cerebro: responde. Base: PostgreSQL 17.11, 191 alumnos
 --- Últimas líneas de C:\SIDP-datos\registros\cerebro.error.log
 ```
 
-- Al arrancar `SIDP-Cerebro`, la base migró automáticamente a **`esquema: 3`**, conservando íntegros los 191 alumnos.
-- Al reiniciar `SIDP-Ollama` con `OLLAMA_IGPU_ENABLE = '1'` en `ajustes.ps1`, Ollama detectó y activó la **iGPU AMD Radeon(TM) Graphics por Vulkan (`11.9 GiB` VRAM total, `11.3 GiB` disponibles)**.
-
 ---
 
-## 2. Tabla Comparativa Rápida de Mediciones
+## 2. Tabla Comparativa de Mediciones y Optimización (Meta: ≥ 80 % bien y 0 peligrosos)
 
-| Etiqueta | Hojas | Campos | Configuración | Tiempo / hoja | Bien (solo o 1 clic) | Solos y bien | Peligrosos |
+| Etiqueta | Hojas | Campos | Configuración | Tiempo / hoja | Bien (meta 80 %) | Solos y bien | Peligrosos |
 | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |
 | **`sin_vision`** | 24 | 288 | Solo procesos fijos (OCR + reglas) | **1 s** | **18 %** | 0 % | **0** |
-| **`base6`** | 6 | 72 | `qwen2.5vl:3b`, 2 lecturas, `1280 px` | **98 s** | **99 %** | 40 % | **0** |
-| **`una_lectura`** | 6 | 72 | `qwen2.5vl:3b`, 1 lectura, `1280 px` | **75 s** | **97 %** | 58 % | **0** |
-| **`lado960`** | 6 | 72 | `qwen2.5vl:3b`, 2 lecturas, `960 px` | **73 s** | **94 %** | 40 % | **0** |
+| **`base6`** | 6 | 72 | `qwen2.5vl:3b`, 2 lecturas, `1280 px` (esquema anidado) | **98 s** | **99 %** | 40 % | **0** |
+| **`una_lectura`** | 6 | 72 | `qwen2.5vl:3b`, 1 lectura, `1280 px` (esquema anidado) | **75 s** | **97 %** | 58 % | **0** |
+| **`lado960`** | 6 | 72 | `qwen2.5vl:3b`, 2 lecturas, `960 px` (esquema anidado) | **73 s** | **94 %** | 40 % | **0** |
+| **`optimizado_1`** | 6 | 72 | `qwen2.5vl:3b`, 1 lectura, `960 px` (**esquema JSON plano**) | **37 s** *(15 s en caché)* | **93 %** | **44 %** | **0** |
+
+### Qué se optimizó en el motor (`validacion/vision.py`, `validacion/campos.py`, `validacion/taller.py`):
+1. **Esquema JSON plano (`{clave: string}` con `?` al final cuando duda):**
+   - El esquema anidado anterior (`{"campo": {"valor": "...", "seguro": false}}`) obligaba a Ollama a generar **443 tokens** de sintaxis JSON repetitiva por lectura (`30.2 s` de `eval time` a `14.6 tokens/s`, o `56 s` en dos lecturas).
+   - Con el esquema plano (`{"campo": "..."}`), los tokens generados bajan a la mitad (**186–225 tokens**, `11–15 s` de `eval time`), ahorrando **~15 a 18 segundos por lectura**.
+2. **Resolución por omisión en el piso nativo de `qwen2.5vl` (`LADO = 960 px`):**
+   - El codificador de visión de `qwen2.5vl:3b` en Ollama tiene `image_min_pixels = 802816` (`~896x896 px` = `1,054 tokens` visuales). Usar `960 px` evalúa el prompt visual en **~22 s** en la iGPU Radeon (Vulkan), frente a **~46 s** a `1280 px` y **~103 s** a `1600 px`.
+3. **Contexto ajustado (`CONTEXTO = 4096`) y prompt compacto:**
+   - Reduce el buffer KV en Vulkan de `2,304 MiB` a `576 MiB` y baja los tokens de texto de la instrucción de `353` a `~175`.
+4. **Regla anti-peligrosos en 1 lectura (`LECTURAS = 1`):**
+   - En modo de 1 lectura, los campos estructurados (`fecha`, `sangre`, `si_no`, `numero`), las listas vacías (`"Ninguna"`) y cualquier dato que coincida con el OCR o con la lista oficial quedan marcados con confianza segura (`44 %` solos y bien), mientras que nombres, correos, teléfonos, domicilios y alergias escritas a mano quedan por confirmar con 1 clic, manteniendo **0 peligrosos** y bajando el tiempo en frío por hoja de **98 s a 37 s (2.65x más rápido)**.
 
 ---
 
 ## 3. Resúmenes Completos por Etiqueta
+
+### Etiqueta: `optimizado_1` (`resumen_lectura_optimizado_1.md`)
+
+- **Tiempo en primera corrida sin caché de imagen:** `37 s` en promedio por hoja (`01_certificado_medico.jpg: 38 s`, `01_ficha_inscripcion.jpg: 40 s`, `02_certificado_medico.jpg: 32 s`, `02_ficha_inscripcion.jpg: 39 s`, `03_certificado_medico.jpg: 32 s`, `03_ficha_inscripcion.jpg: 42 s`).
+- **Tiempo en segunda corrida (reutilizando caché de imagen en iGPU):** `15 s` en promedio por hoja.
+
+# Medición de la lectura por campo (2026-10-15)
+
+- Hojas: 6 · campos medidos: 72 · modelo que ve: qwen2.5vl:3b, 1 lectura(s) por hoja, imagen de 960 px
+- Tiempo por hoja: 37 s en promedio sin caché / 15 s con caché
+- **Bien (solo o con un clic): 93 %** · se llenaron solos y bien: 44 % · peligrosos: 0
+
+#### Por tipo de hoja
+
+| tipo | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
+|---|---|---|---|---|---|---|---|
+| certificado_medico | 27 | 17 | 10 | 0 | 0 | 0 | 100 % |
+| ficha_inscripcion | 45 | 15 | 25 | 5 | 0 | 0 | 89 % |
+
+#### Por tipo de campo
+
+| tipo_campo | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
+|---|---|---|---|---|---|---|---|
+| correo | 3 | 0 | 1 | 2 | 0 | 0 | 33 % |
+| cp | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
+| curp | 3 | 0 | 2 | 1 | 0 | 0 | 67 % |
+| domicilio | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| fecha | 6 | 6 | 0 | 0 | 0 | 0 | 100 % |
+| lista | 9 | 7 | 1 | 1 | 0 | 0 | 89 % |
+| nombre | 15 | 0 | 15 | 0 | 0 | 0 | 100 % |
+| numero | 6 | 6 | 0 | 0 | 0 | 0 | 100 % |
+| sangre | 6 | 6 | 0 | 0 | 0 | 0 | 100 % |
+| si_no | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
+| telefono | 9 | 3 | 5 | 1 | 0 | 0 | 89 % |
+| texto | 6 | 0 | 6 | 0 | 0 | 0 | 100 % |
+
+#### Por letra
+
+| letra | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
+|---|---|---|---|---|---|---|---|
+| clara (Inkfree.ttf) | 24 | 10 | 14 | 0 | 0 | 0 | 100 % |
+| clara (comic.ttf) | 24 | 9 | 11 | 4 | 0 | 0 | 83 % |
+| clara (segoepr.ttf) | 24 | 13 | 10 | 1 | 0 | 0 | 96 % |
+
+#### Por cómo se tomó la foto
+
+| variante | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
+|---|---|---|---|---|---|---|---|
+| derecha | 15 | 4 | 11 | 0 | 0 | 0 | 100 % |
+| girada | 24 | 10 | 10 | 4 | 0 | 0 | 83 % |
+| perspectiva | 24 | 13 | 10 | 1 | 0 | 0 | 96 % |
+| sombra | 9 | 5 | 4 | 0 | 0 | 0 | 100 % |
+
+#### Por campo
+
+| clave | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
+|---|---|---|---|---|---|---|---|
+| alergias | 6 | 4 | 1 | 1 | 0 | 0 | 83 % |
+| apto | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
+| cedula | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| contacto_emergencia | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| correo | 3 | 0 | 1 | 2 | 0 | 0 | 33 % |
+| cp | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
+| curp | 3 | 0 | 2 | 1 | 0 | 0 | 67 % |
+| domicilio | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| enfermedades | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
+| fecha_certificado | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
+| fecha_nacimiento | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
+| medico | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| nombre_alumno | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| nombre_madre | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| nombre_padre | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| observaciones | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
+| peso | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
+| talla | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
+| telefono_emergencia | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
+| telefono_madre | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
+| telefono_padre | 3 | 1 | 1 | 1 | 0 | 0 | 67 % |
+| tipo_sangre | 6 | 6 | 0 | 0 | 0 | 0 | 100 % |
+
+---
 
 ### Etiqueta: `sin_vision` (`resumen_lectura_sin_vision.md`)
 
@@ -261,50 +351,6 @@ Cerebro: responde. Base: PostgreSQL 17.11, 191 alumnos
 | telefono | 9 | 4 | 5 | 0 | 0 | 0 | 100 % |
 | texto | 6 | 5 | 0 | 0 | 1 | 0 | 83 % |
 
-#### Por letra
-
-| letra | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
-|---|---|---|---|---|---|---|---|
-| clara (Inkfree.ttf) | 24 | 13 | 11 | 0 | 0 | 0 | 100 % |
-| clara (comic.ttf) | 24 | 14 | 10 | 0 | 0 | 0 | 100 % |
-| clara (segoepr.ttf) | 24 | 15 | 7 | 1 | 1 | 0 | 92 % |
-
-#### Por cómo se tomó la foto
-
-| variante | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
-|---|---|---|---|---|---|---|---|
-| derecha | 15 | 4 | 11 | 0 | 0 | 0 | 100 % |
-| girada | 24 | 13 | 10 | 0 | 1 | 0 | 96 % |
-| perspectiva | 24 | 16 | 7 | 1 | 0 | 0 | 96 % |
-| sombra | 9 | 9 | 0 | 0 | 0 | 0 | 100 % |
-
-#### Por campo
-
-| clave | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
-|---|---|---|---|---|---|---|---|
-| alergias | 6 | 5 | 1 | 0 | 0 | 0 | 100 % |
-| apto | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| cedula | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| contacto_emergencia | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| correo | 3 | 0 | 2 | 1 | 0 | 0 | 67 % |
-| cp | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| curp | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| domicilio | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| enfermedades | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| fecha_certificado | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| fecha_nacimiento | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| medico | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| nombre_alumno | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| nombre_madre | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| nombre_padre | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| observaciones | 3 | 2 | 0 | 0 | 1 | 0 | 67 % |
-| peso | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| talla | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| telefono_emergencia | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| telefono_madre | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| telefono_padre | 3 | 2 | 1 | 0 | 0 | 0 | 100 % |
-| tipo_sangre | 6 | 6 | 0 | 0 | 0 | 0 | 100 % |
-
 ---
 
 ### Etiqueta: `lado960` (`resumen_lectura_lado960.md`)
@@ -321,81 +367,3 @@ Cerebro: responde. Base: PostgreSQL 17.11, 191 alumnos
 |---|---|---|---|---|---|---|---|
 | certificado_medico | 27 | 13 | 13 | 1 | 0 | 0 | 96 % |
 | ficha_inscripcion | 45 | 16 | 26 | 3 | 0 | 0 | 93 % |
-
-#### Por tipo de campo
-
-| tipo_campo | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
-|---|---|---|---|---|---|---|---|
-| correo | 3 | 0 | 2 | 1 | 0 | 0 | 67 % |
-| cp | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| curp | 3 | 0 | 2 | 1 | 0 | 0 | 67 % |
-| domicilio | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| fecha | 6 | 5 | 1 | 0 | 0 | 0 | 100 % |
-| lista | 9 | 7 | 1 | 1 | 0 | 0 | 89 % |
-| nombre | 15 | 1 | 14 | 0 | 0 | 0 | 100 % |
-| numero | 6 | 2 | 4 | 0 | 0 | 0 | 100 % |
-| sangre | 6 | 4 | 2 | 0 | 0 | 0 | 100 % |
-| si_no | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| telefono | 9 | 4 | 5 | 0 | 0 | 0 | 100 % |
-| texto | 6 | 2 | 3 | 1 | 0 | 0 | 83 % |
-
-#### Por letra
-
-| letra | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
-|---|---|---|---|---|---|---|---|
-| clara (Inkfree.ttf) | 24 | 13 | 11 | 0 | 0 | 0 | 100 % |
-| clara (comic.ttf) | 24 | 6 | 16 | 2 | 0 | 0 | 92 % |
-| clara (segoepr.ttf) | 24 | 10 | 12 | 2 | 0 | 0 | 92 % |
-
-#### Por cómo se tomó la foto
-
-| variante | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
-|---|---|---|---|---|---|---|---|
-| derecha | 15 | 4 | 11 | 0 | 0 | 0 | 100 % |
-| girada | 24 | 8 | 13 | 3 | 0 | 0 | 88 % |
-| perspectiva | 24 | 16 | 7 | 1 | 0 | 0 | 96 % |
-| sombra | 9 | 1 | 8 | 0 | 0 | 0 | 100 % |
-
-#### Por campo
-
-| clave | Campos | Bien y solo | Bien, un clic | Leído mal (por confirmar) | No se leyó | PELIGROSO: mal y marcado seguro | Bien (meta 80 %) |
-|---|---|---|---|---|---|---|---|
-| alergias | 6 | 4 | 1 | 1 | 0 | 0 | 83 % |
-| apto | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| cedula | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| contacto_emergencia | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| correo | 3 | 0 | 2 | 1 | 0 | 0 | 67 % |
-| cp | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| curp | 3 | 0 | 2 | 1 | 0 | 0 | 67 % |
-| domicilio | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| enfermedades | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| fecha_certificado | 3 | 2 | 1 | 0 | 0 | 0 | 100 % |
-| fecha_nacimiento | 3 | 3 | 0 | 0 | 0 | 0 | 100 % |
-| medico | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| nombre_alumno | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| nombre_madre | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| nombre_padre | 3 | 0 | 3 | 0 | 0 | 0 | 100 % |
-| observaciones | 3 | 1 | 1 | 1 | 0 | 0 | 67 % |
-| peso | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| talla | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| telefono_emergencia | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| telefono_madre | 3 | 1 | 2 | 0 | 0 | 0 | 100 % |
-| telefono_padre | 3 | 2 | 1 | 0 | 0 | 0 | 100 % |
-| tipo_sangre | 6 | 4 | 2 | 0 | 0 | 0 | 100 % |
-
----
-
-## 4. Hallazgos Técnicos y Notas para Claude
-
-1. **Aceleración por iGPU Vulkan activa y reutilización de caché visual (LCP):**
-   - Al cargar `OLLAMA_IGPU_ENABLE = '1'` desde `C:\SIDP-datos\servicios\ajustes.ps1`, Ollama 0.40.4 habilitó `Vulkan0 (AMD Radeon(TM) Graphics, 11.9 GiB)`.
-   - La primera lectura de una hoja de `1280 px` (~1,940 tokens) tarda ~58 s (`prompt eval time = 39.2 s` + `eval time = 19.6 s` a `14.1 tokens/s`).
-   - En la **segunda lectura** de la misma hoja (con el orden de campos invertido), Ollama detecta similitud LCP de `0.893 (1732/1940 tokens)` y **reutiliza el caché de la imagen**, evaluando el prompt en solo **2.67 segundos** (`2674 ms / 231 tokens`) más ~26 s de generación JSON (~29.4 s en total para la segunda lectura).
-2. **Por qué `una_lectura` (`1280 px`, 1 lectura) y `base6` (`1280 px`, 2 lecturas) superan ampliamente la meta del 80 %:**
-   - `base6` logró **99 % bien (71 de 72 campos)** con **0 peligrosos** en `98 s/hoja`.
-   - `una_lectura` logró **97 % bien (70 de 72 campos)**, subiendo los campos "bien y solo" de `40 %` a **`58 %`** con **0 peligrosos** en `75 s/hoja`.
-   - `lado960` logró **94 % bien (68 de 72 campos)** con **0 peligrosos** en `73 s/hoja` (pierde ligeramente precisión en `curp` y `alergias` cuando la hoja viene girada).
-3. **Nota de implementación en `instalar_servicios.ps1`:**
-   - Cuando `SIDP-Ollama` y `SIDP-Cerebro` corren como tareas programadas `S4U` (en `SessionId 0`), sus procesos hijos (`ollama.exe` y `python.exe` lanzados con `Start-Process`) siguen vivos si solo se ejecuta `Stop-ScheduledTask`. Para que `instalar_servicios.ps1` pueda reiniciarlos limpiamente sin dejar un `ollama.exe` anterior ocupando el puerto `11434`, conviene usar `taskkill /F /IM ollama.exe /T` o detener el árbol de procesos antes de `Start-ScheduledTask`.
-4. **Comparaciones pendientes para corrida nocturna:**
-   - Por la hora local (`22:32`), se suben de inmediato `sin_vision` (24 hojas) y las tres comparaciones clave de 6 hojas (`base6`, `una_lectura` y `lado960`), quedando pendientes para corrida extendida `taller` (las 18 hojas restantes de las 24), `lado1600` y `qwen3_8b`.

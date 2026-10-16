@@ -364,17 +364,14 @@ def _palabras_originales(renglon):
 # ---------------------------------------------------------------- Lo que se le pide al modelo que ve
 
 def pregunta(nombre_documento, campos):
-    renglones = '\n'.join(f'- {c["clave"]}: {c["etiqueta"]} ({TIPOS.get(c["tipo"], "texto").lower()})' for c in campos)
-    return (f'Esta hoja es: {nombre_documento}. Ya la revisó la escuela en papel; solo hay que copiar sus datos.\n'
-            'Copia cada campo tal como está escrito en la hoja, incluida la letra a mano, aunque sea fea. Si el campo no '
-            'aparece en la hoja, deja el valor vacío. Si está escrito pero no se entiende bien, escribe lo que más se '
-            'parezca y pon seguro=false. No inventes datos.\n'
-            f'Campos:\n{renglones}')
+    renglones = '\n'.join(f'- {c["clave"]}: {c["etiqueta"]}' for c in campos)
+    return (f'Hoja: {nombre_documento}. Copia cada campo tal como está escrito en la hoja, incluida la letra a mano. '
+            'Si el campo no aparece, deja el valor vacío. Si no se entiende bien, escribe lo que más se parezca y pon ? '
+            f'al final. No inventes datos.\nCampos:\n{renglones}')
 
 
 def esquema(campos):
-    uno = {'type': 'object', 'properties': {'valor': {'type': 'string'}, 'seguro': {'type': 'boolean'}}, 'required': ['valor', 'seguro']}
-    return {'type': 'object', 'properties': {c['clave']: uno for c in campos}, 'required': [c['clave'] for c in campos]}
+    return {'type': 'object', 'properties': {c['clave']: {'type': 'string'} for c in campos}, 'required': [c['clave'] for c in campos]}
 
 
 PROPONER = ('Esta hoja es un formato o documento escolar. Lista los campos que se llenan o que trae con datos de una persona '
