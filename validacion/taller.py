@@ -26,6 +26,9 @@ from validacion import comparador, extraer, lector, modelo, vision
 
 MAXIMO_HOJAS = 3  # Por documento, al modelo que ve (las demás hojas casi nunca traen datos nuevos).
 INTENTOS = 3
+# El modelo que ve lee cada hoja dos veces (con los campos en otro orden). Lo que no coincide entre las dos lecturas
+# queda por confirmar: así un dato inventado o mal leído no se guarda como seguro. Tarda el doble; con 1 es más rápido.
+LECTURAS = int(os.environ.get('SIDP_LECTURAS_VISION') or 2)
 
 
 def carpeta_por_omision():
@@ -89,6 +92,34 @@ def de_procesos(tipo, texto, qr, hoy):
     return {k: v for k, v in salida.items() if v[0]}
 
 
+def coinciden(tipo, uno, otro, hoy=None):
+    if tipo == 'lista':
+        return set(campos_mod.lista(uno)) == set(campos_mod.lista(otro))
+    if campos_mod.vacio(uno) or campos_mod.vacio(otro):
+        return campos_mod.vacio(uno) == campos_mod.vacio(otro)
+    a, b = campos_mod.limpiar(tipo, uno, hoy)[0] or uno, campos_mod.limpiar(tipo, otro, hoy)[0] or otro
+    return comparador.normalizar(str(a)) == comparador.normalizar(str(b))
+
+
+def ver(hojas, nombre_documento, lista, modelo_vision, url=modelo.URL, lecturas=None, hoy=None):
+    """Lo que lee el modelo que ve: ({clave: {valor, seguro}}, segundos). Con dos lecturas, lo que no coincide no es seguro."""
+    primera, segundos = vision.preguntar(hojas, campos_mod.pregunta(nombre_documento, lista), campos_mod.esquema(lista), modelo_vision, url)
+    if (lecturas or LECTURAS) < 2 or not primera:
+        return primera, segundos
+    al_reves = list(reversed(lista))
+    segunda, mas = vision.preguntar(hojas, campos_mod.pregunta(nombre_documento, al_reves), campos_mod.esquema(al_reves), modelo_vision, url)
+    for c in lista:
+        a, b = primera.get(c['clave']) or {}, (segunda or {}).get(c['clave']) or {}
+        uno, otro = str(a.get('valor') or '').strip(), str(b.get('valor') or '').strip()
+        if not uno and not otro:
+            continue
+        if not coinciden(c['tipo'], uno, otro, hoy):
+            primera[c['clave']] = {'valor': uno or otro, 'seguro': False, 'otra': otro if uno else ''}
+        else:
+            primera[c['clave']] = {'valor': uno, 'seguro': bool(a.get('seguro')) and bool(b.get('seguro'))}
+    return primera, segundos + mas
+
+
 def combinar(campos, procesos, vistos, identidad, hoy):
     """Un valor por campo con su confianza. vistos: lo que leyó el modelo {clave: {valor, seguro}}."""
     salida = []
@@ -105,14 +136,19 @@ def combinar(campos, procesos, vistos, identidad, hoy):
             iguales = comparador.normalizar(str(limpio_p)) == comparador.normalizar(str(limpio_v))
             valor, detalle = (limpio_p, detalle_p)
             confianza, metodo = ('alta', f'{metodo}+vision') if iguales else ('baja', metodo)
-            if not iguales:
+            if not iguales and metodo == 'ocr':  # En una foto, el modelo que ve suele leer mejor que el OCR: se propone lo suyo.
+                valor, detalle, metodo = limpio_v, {**detalle_v, 'otra_lectura': limpio_p}, 'vision'
+            elif not iguales:
                 detalle = {**detalle, 'otra_lectura': limpio_v}
         elif limpio_p:
             valor, detalle = limpio_p, detalle_p
-            confianza = 'alta' if c['tipo'] == 'curp' or metodo == 'qr' else 'media'
+            # El OCR de una foto confunde 5 con 3 o 7 con 1: solo, queda por confirmar (la CURP se salva con su dígito).
+            confianza = 'alta' if c['tipo'] == 'curp' or metodo == 'qr' else 'baja' if metodo == 'ocr' else 'media'
         elif limpio_v:
             valor, detalle, metodo = limpio_v, detalle_v, 'vision'
             confianza = 'media' if visto.get('seguro') else 'baja'
+            if visto.get('otra'):
+                detalle = {**detalle, 'otra_lectura': visto['otra']}
         elif crudo_visto and not campos_mod.vacio(crudo_visto):
             valor, detalle, metodo, confianza = crudo_visto.upper(), {'no_paso_reglas': True}, 'vision', 'baja'
         else:
@@ -193,8 +229,7 @@ class Taller:
             if modelo_vision and documento['campos']:
                 hojas = vision.paginas(archivo.read_bytes(), archivo.name)[:MAXIMO_HOJAS]
                 try:
-                    vistos, segundos = vision.preguntar(hojas, campos_mod.pregunta(documento['nombre'], documento['campos']),
-                                                        campos_mod.esquema(documento['campos']), modelo_vision, self.url)
+                    vistos, segundos = ver(hojas, documento['nombre'], documento['campos'], modelo_vision, self.url, hoy=hoy)
                     cuenta['segundos_vision'] += segundos
                 except vision.ErrorVision as error:
                     print(f'trabajo {trabajo_id}: {error}', flush=True)

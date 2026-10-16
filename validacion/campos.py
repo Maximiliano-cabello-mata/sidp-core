@@ -304,6 +304,7 @@ def limpiar(tipo, valor, hoy=None):
     if tipo == 'nombre':
         nombre = re.sub(r'[^A-ZÑÁÉÍÓÚÜ ]', ' ', crudo.upper())
         nombre = re.sub(r'\s+', ' ', nombre).strip()
+        nombre = re.sub(r'^(?:(?:DR|DRA|LIC|PROF|PROFA|ING|SR|SRA|SRITA|C)\s+)+', '', nombre)  # "Dra. Rosa..." -> "ROSA...".
         return (nombre if len(nombre) >= 2 else None), {}
     texto = _mayus(crudo)
     return (texto or None), {}
@@ -329,12 +330,16 @@ def de_texto(texto, campos, hoy=None):
     renglones = [r for r in str(texto or '').splitlines() if r.strip()]
     salida = {}
     for c in campos:
-        clave_palabras = [p for p in _palabras(c['etiqueta']) if len(p) >= 4][:4]
+        clave_palabras = [p for p in _palabras(c['etiqueta']) if len(p) >= 4][:5]
         if not clave_palabras:
             continue
+        necesarias = len(clave_palabras) if len(clave_palabras) <= 3 else -(-len(clave_palabras) * 3 // 4)
+        de_quien = set(clave_palabras) & QUIENES
         for i, renglon in enumerate(renglones):
             palabras = _palabras(renglon)
-            if sum(1 for p in clave_palabras if p in palabras) < max(1, round(len(clave_palabras) * 0.6)):
+            if sum(1 for p in clave_palabras if p in palabras) < necesarias:
+                continue
+            if (set(palabras) & QUIENES) - de_quien:  # "Teléfono del padre" no es el renglón de la madre.
                 continue
             ultima = max(j for j, p in enumerate(palabras) if p in clave_palabras)
             resto = ' '.join(renglon.split(':', 1)[1:]).strip() if ':' in renglon else ''
@@ -347,6 +352,9 @@ def de_texto(texto, campos, hoy=None):
             if c['clave'] in salida:
                 break
     return salida
+
+
+QUIENES = {'MADRE', 'PADRE', 'MAMA', 'PAPA', 'TUTOR', 'TUTORA', 'EMERGENCIA', 'ALUMNO', 'ALUMNA', 'MEDICO'}
 
 
 def _palabras_originales(renglon):

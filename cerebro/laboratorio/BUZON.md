@@ -537,3 +537,78 @@ que ve (lee letra a mano) para el escaneo.
    git pull --rebase origin claude/project-thread-vp6ab8
    git push origin claude/project-thread-vp6ab8
    ```
+
+## Tarea 013: código nuevo del escaneo y medición de la letra a mano (2026-10-16)
+
+Hazla después de la Tarea 012. El escaneo ahora saca el dato de cada campo (nombre, teléfonos, tipo de sangre,
+alergias, domicilio...) y lo guarda en la base de la PC 4; lo dudoso queda "por confirmar". El modelo que ve lee
+cada hoja **dos veces**: si las dos lecturas no coinciden, el dato queda por confirmar. Aquí se mide cuánto acierta
+con letra a mano, con fichas **inventadas** (meta: 80 % bien, solo o con un clic, y casi cero "peligrosos").
+
+**No se borra nada en esta tarea.** Todo lo que se genera queda en `C:\SIDP-datos\manuscritos` (fuera del
+repositorio). Al repositorio solo sube el informe con números: nada de nombres, CURP, clave, contraseñas ni IP.
+`detalle_local.csv` trae lo que se leyó de cada hoja: **no se sube**.
+
+1. Actualiza la rama:
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   ```
+2. Reinicia los servicios con el código nuevo. En **PowerShell como administrador**, en la carpeta del repositorio:
+   ```
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
+   ```
+   Espera un minuto y revisa (PowerShell normal):
+   ```
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
+   ```
+   Debe decir que el cerebro responde. Al arrancar, el cerebro pone solo la base al día (tablas nuevas para los
+   datos de cada campo; no borra nada).
+3. Instala lo que falta para leer PDF hoja por hoja:
+   ```
+   python -m pip install -r validacion/requisitos.txt
+   ```
+4. Genera 24 hojas inventadas "a mano" (12 fichas de inscripción y 12 certificados médicos, con letra clara y fea,
+   como foto de celular o escaneo):
+   ```
+   python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos --cuantas 12
+   ```
+5. Mide primero sin el modelo que ve (rápido) y guarda ese resumen aparte:
+   ```
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --sin-vision
+   Copy-Item C:\SIDP-datos\manuscritos\resumen_lectura.md C:\SIDP-datos\manuscritos\resumen_sin_vision.md
+   ```
+6. Mide con el modelo que ve, dos lecturas por hoja (como trabaja el taller). **Tarda**: de 1 a 2 minutos por hoja,
+   unos 30 a 50 minutos en total. No cierres la ventana; cada renglón dice cuántos campos salieron bien en esa hoja.
+   ```
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos
+   Copy-Item C:\SIDP-datos\manuscritos\resumen_lectura.md C:\SIDP-datos\manuscritos\resumen_dos_lecturas.md
+   ```
+   Si da tiempo, compara con una sola lectura (la mitad de tiempo):
+   ```
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --lecturas 1
+   Copy-Item C:\SIDP-datos\manuscritos\resumen_lectura.md C:\SIDP-datos\manuscritos\resumen_una_lectura.md
+   ```
+7. Opcional, con Maximiliano (la prueba de verdad, con letra de personas):
+   ```
+   python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos_reales --en-blanco
+   ```
+   Imprime `ficha_en_blanco.pdf` unas 5 veces y que distintas personas la llenen con **datos inventados** (con
+   letra fea incluida). Tómales foto con el celular y pon las fotos en `C:\SIDP-datos\manuscritos_reales` como
+   `01_ficha_inscripcion.jpg`, `02_ficha_inscripcion.jpg`... Escribe ahí `respuestas.csv` con lo que dice cada
+   ficha, un renglón por campo, con el mismo formato que `C:\SIDP-datos\manuscritos\respuestas.csv` (columnas
+   archivo, tipo, clave, valor, letra, variante; tipo = `ficha_inscripcion`; letra = quién la llenó, por ejemplo
+   "persona 1"; variante = `foto`). Luego:
+   ```
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_reales
+   ```
+8. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea013_lectura.md` con: lo que imprimió el paso 2, el
+   contenido de `resumen_sin_vision.md`, `resumen_dos_lecturas.md` (y `resumen_una_lectura.md` y el del paso 7 si
+   los hiciste) y cualquier error completo. Esos resúmenes solo traen números y nombres de campos; revisa de
+   todos modos que no haya nombres de personas, CURP, teléfonos ni IP.
+9. Sube solo ese archivo:
+   ```
+   git add cerebro/laboratorio/resultados/2026-10-16_tarea013_lectura.md
+   git commit -m "laboratorio: resultado de la tarea 013"
+   git pull --rebase origin claude/project-thread-vp6ab8
+   git push origin claude/project-thread-vp6ab8
+   ```

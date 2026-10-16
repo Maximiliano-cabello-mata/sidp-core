@@ -12,7 +12,7 @@ import pytest
 
 from pruebas.test_entorno_pruebas import HOY, escanear, iniciar, pedir
 from pruebas.test_lista_oficial import pdf_de_hojas
-from validacion import aplicacion, campos, cerebro_red, taller, vision
+from validacion import aplicacion, campos, cerebro_red, comparador, taller, vision
 from validacion.ejemplo import generar
 
 pytest.importorskip('pypdf')
@@ -93,6 +93,63 @@ def test_los_procesos_fijos_leen_el_acta_la_ine_y_el_certificado():
                    'vigencia_ine': ('2024-2034', 'texto')}
     medico = taller.de_procesos('certificado_medico', generar.medico('JUAN GARCIA HERNANDEZ'), [], HOY)
     assert medico == {'apto': ('sí', 'texto'), 'fecha_certificado': ('2026-09-02', 'texto')}
+
+
+def test_el_telefono_del_padre_no_se_toma_del_renglon_de_la_madre():
+    lista = campos.revisar_campos([{'etiqueta': 'Teléfono de la madre'}, {'etiqueta': 'Teléfono del padre'},
+                                   {'etiqueta': 'Teléfono de emergencia'}])
+    hoja = 'Teléfono de la madre: 722 111 2233\nTeléfono de emergencia: 722 555 6677'
+    assert campos.de_texto(hoja, lista, HOY) == {'telefono_de_la_madre': '722 111 2233', 'telefono_de_emergencia': '722 555 6677'}
+
+
+def test_lo_que_lee_solo_el_ocr_o_dos_lecturas_distintas_queda_por_confirmar(monkeypatch):
+    lista = [campos.campo('cp', 'Código postal', 'cp', 'domicilio'), campos.campo('telefono', 'Teléfono', 'telefono', 'contacto', 'telefono'),
+             campos.campo('alergias', 'Alergias', 'lista', 'salud', 'alergia')]
+    salida = {r['clave']: r for r in taller.combinar(lista, {'cp': ('32079', 'ocr')}, None, {}, HOY)}
+    assert salida['cp']['confianza'] == 'baja'  # Del OCR de una foto: un 5 pudo leerse 3.
+    lecturas = iter([{'cp': {'valor': '52079', 'seguro': True}, 'telefono': {'valor': '722 123 4567', 'seguro': True},
+                      'alergias': {'valor': 'polvo y nuez', 'seguro': True}},
+                     {'cp': {'valor': '52079', 'seguro': True}, 'telefono': {'valor': '722 128 4567', 'seguro': True},
+                      'alergias': {'valor': 'Nuez, polvo', 'seguro': True}}])
+    monkeypatch.setattr(vision, 'preguntar', lambda *a, **k: (next(lecturas), 60.0))
+    vistos, segundos = taller.ver([b'hoja'], 'Ficha', lista, 'modelo', lecturas=2, hoy=HOY)
+    assert segundos == 120.0
+    assert vistos['cp'] == {'valor': '52079', 'seguro': True} and vistos['alergias']['seguro'] is True
+    assert vistos['telefono'] == {'valor': '722 123 4567', 'seguro': False, 'otra': '722 128 4567'}
+    salida = {r['clave']: r for r in taller.combinar(lista, {}, vistos, {}, HOY)}
+    assert (salida['cp']['confianza'], salida['telefono']['confianza']) == ('media', 'baja')
+    assert salida['telefono']['detalle']['otra_lectura'] == '722 128 4567'
+
+
+def test_la_medicion_de_letra_a_mano_cuenta_aciertos_sin_sacar_datos(tmp_path, monkeypatch):
+    pytest.importorskip('cv2')
+    import csv
+    from validacion import medir_lectura
+    from validacion.ejemplo import manuscritos
+    assert manuscritos.crear(tmp_path, cuantas=1) == 2
+    respuestas = list(csv.DictReader(open(tmp_path / 'respuestas.csv', encoding='utf-8')))
+    assert {r['tipo'] for r in respuestas} == {'ficha_inscripcion', 'certificado_medico'}
+    assert all(comparador.desglose_curp(r['valor']) for r in respuestas if r['clave'] == 'curp')
+    # Un modelo que ve que lee bien todo, salvo un teléfono que lee distinto cada vez.
+    verdad = {(r['archivo'], r['clave']): r['valor'] for r in respuestas}
+    veces = iter(range(100))
+    monkeypatch.setattr(vision, 'elegir', lambda url=None, pedido=None: 'modelo-de-prueba')
+    monkeypatch.setattr(vision, 'paginas', lambda contenido, nombre='': [nombre.encode()])
+
+    def preguntar(hojas, pregunta, esquema=None, nombre_modelo=None, url=None, espera=900):
+        archivo, vez = hojas[0].decode(), next(veces)
+        leido = {c: {'valor': verdad.get((archivo, c), ''), 'seguro': True} for c in esquema['properties']}
+        if 'telefono_padre' in leido:
+            leido['telefono_padre']['valor'] = f'72200000{vez:02d}'
+        return leido, 1.0
+
+    monkeypatch.setattr(vision, 'preguntar', preguntar)
+    detalle, tiempos, modelo_vision = medir_lectura.medir(tmp_path, HOY, lecturas=2)
+    cuenta = {c: sum(1 for d in detalle if d['resultado'] == c) for c in medir_lectura.CLASES}
+    assert len(detalle) == len(respuestas) and cuenta['peligroso'] == 0 and cuenta['corregir'] == 1
+    texto = medir_lectura.resumen(detalle, tiempos, modelo_vision, 2)
+    assert 'Bien (solo o con un clic)' in texto
+    assert not any(r['valor'] in texto for r in respuestas if len(r['valor']) > 4)  # Solo números en el resumen.
 
 
 # ---------------------------------------------------------------- En la base de la PC 4
