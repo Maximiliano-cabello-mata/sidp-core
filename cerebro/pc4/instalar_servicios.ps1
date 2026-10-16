@@ -62,7 +62,11 @@ New-Item -ItemType Directory -Force $servicios, $registros, (Join-Path $datos 'r
 # 2. Lanzadores: un ciclo por servicio que arranca el programa y lo vuelve a arrancar si se cae.
 #    Lo que imprime queda en C:\SIDP-datos\registros\<nombre>.log (y .error.log); lo de la corrida
 #    anterior se guarda como .anterior.log, así no crece sin límite.
+#    Primero se cargan los ajustes de C:\SIDP-datos\servicios\ajustes.ps1 (modelo que ve, etc.); OLLAMA_HOST va
+#    después para que Ollama siga solo en 127.0.0.1 aunque alguien lo cambie ahí.
 $plantilla = @'
+$ajustes = 'C:\SIDP-datos\servicios\ajustes.ps1'
+if (Test-Path $ajustes) { . $ajustes }
 $env:OLLAMA_HOST = '127.0.0.1:11434'
 $env:OLLAMA_MODELS = '__MODELOS__'
 $env:PYTHONUTF8 = '1'
@@ -84,6 +88,41 @@ while ($true) {
 # Ollama: solo en esta PC (127.0.0.1) y con los modelos de este usuario.
 [Environment]::SetEnvironmentVariable('OLLAMA_HOST', '127.0.0.1:11434', 'User')
 [Environment]::SetEnvironmentVariable('OLLAMA_MODELS', $modelos, 'User')
+
+# Ajustes que se conservan: este script nunca sobrescribe ajustes.ps1. La primera vez se llena con lo que se
+# haya agregado a mano a los lanzadores (para no perderlo) y con valores para una PC sin tarjeta de video.
+$archivoAjustes = Join-Path $servicios 'ajustes.ps1'
+if (Test-Path $archivoAjustes) {
+    Write-Host "Ajustes: se conservan los de $archivoAjustes"
+} else {
+    $previos = @()
+    foreach ($nombre in 'ollama.ps1', 'cerebro.ps1') {
+        $archivo = Join-Path $servicios $nombre
+        if (Test-Path $archivo) {
+            $previos += Get-Content $archivo | Where-Object { $_ -match '^\s*\$env:(SIDP|OLLAMA)_\w+\s*=' -and $_ -notmatch '\$env:OLLAMA_(HOST|MODELS)\b' } |
+                ForEach-Object { $_.Trim() }
+        }
+    }
+    $previos = @($previos | Select-Object -Unique)
+    $yaPuestos = @($previos | ForEach-Object { ($_ -split '=')[0].Trim() })
+    $porOmision = @(@(
+        "`$env:SIDP_MODELO_VISION = 'qwen2.5vl:3b'",
+        "`$env:SIDP_LADO_VISION = '1280'",
+        "`$env:SIDP_LECTURAS_VISION = '2'",
+        "`$env:OLLAMA_FLASH_ATTENTION = '1'",
+        "`$env:OLLAMA_KEEP_ALIVE = '24h'"
+    ) | Where-Object { $yaPuestos -notcontains ($_ -split '=')[0].Trim() })
+    $encabezado = @(
+        '# Ajustes de la PC 4. instalar_servicios.ps1 no toca este archivo: lo que cambies aquí se queda.',
+        '# Después de cambiar algo, reinicia la PC 4 (o vuelve a correr instalar_servicios.ps1).',
+        '#   SIDP_MODELO_VISION: el modelo que ve (python -m validacion.vision modelos dice cuáles hay).',
+        '#   SIDP_LADO_VISION: píxeles de la hoja para el modelo (menos = más rápido, pero la letra chica se pierde).',
+        '#   SIDP_LECTURAS_VISION: 2 = lee cada hoja dos veces y lo que no coincide queda por confirmar.',
+        '#   OLLAMA_HOST y OLLAMA_MODELS no van aquí: los pone el lanzador (Ollama solo en 127.0.0.1).'
+    )
+    Set-Content -Encoding UTF8 $archivoAjustes ($encabezado + $previos + $porOmision)
+    Write-Host "Ajustes guardados en $archivoAjustes ($($previos.Count) tomados de los lanzadores anteriores)"
+}
 
 $lanzadores = @{
     'SIDP-Ollama'  = @{ Nombre = 'ollama'; Programa = $ollama; Argumentos = 'serve'; Carpeta = $servicios; Retraso = 'PT0S' }

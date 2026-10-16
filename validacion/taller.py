@@ -43,12 +43,13 @@ def _identidad(fila):
             'fecha_nacimiento': nacimiento.isoformat() if nacimiento else '', 'sexo': sexo or ''}
 
 
-def de_procesos(tipo, texto, qr, hoy):
-    """Lo que dan los procesos fijos: {clave del campo: (valor, metodo)}."""
+def de_procesos(tipo, texto, qr, hoy, metodo_texto='texto'):
+    """Lo que dan los procesos fijos: {clave del campo: (valor, metodo)}. metodo_texto: 'ocr' si el texto salió de
+    una foto o un escaneo (puede traer letras confundidas), 'texto' si venía escrito en el PDF."""
     pagina = {'archivo': 'hoja', 'texto': texto, 'qr': qr, 'tipo': tipo}
     propuesta = extraer.proponer([pagina], hoy)
     salida = {}
-    metodo = 'qr' if qr else 'texto'
+    metodo = 'qr' if qr else metodo_texto
     alumno, tutor = propuesta.get('alumno') or {}, propuesta.get('tutor') or {}
     if tipo in ('acta_alumno', 'constancia_curp'):
         for clave in ('curp', 'nombres', 'primer_apellido', 'segundo_apellido', 'fecha_nacimiento'):
@@ -99,6 +100,12 @@ def coinciden(tipo, uno, otro, hoy=None):
         return campos_mod.vacio(uno) == campos_mod.vacio(otro)
     a, b = campos_mod.limpiar(tipo, uno, hoy)[0] or uno, campos_mod.limpiar(tipo, otro, hoy)[0] or otro
     return comparador.normalizar(str(a)) == comparador.normalizar(str(b))
+
+
+def necesita_ver(lista, procesos):
+    """False si los procesos fijos ya sacaron todos los campos de texto impreso o QR (sin OCR): ahí el modelo que ve
+    solo gastaría minutos. Las hojas a mano, escaneadas o con campos que faltan sí pasan por él."""
+    return any(procesos.get(c['clave'], (None, 'ocr'))[1] == 'ocr' for c in lista)
 
 
 def ver(hojas, nombre_documento, lista, modelo_vision, url=modelo.URL, lecturas=None, hoy=None):
@@ -221,12 +228,12 @@ class Taller:
             if not archivo.exists():
                 continue
             lectura = lector.leer(archivo)
-            procesos = de_procesos(documento['tipo'], lectura['texto'], lectura['qr'], hoy)
             metodo_texto = 'ocr' if any('ocr' in m for m in lectura['metodo']) else 'texto'
+            procesos = de_procesos(documento['tipo'], lectura['texto'], lectura['qr'], hoy, metodo_texto)
             for clave, valor in campos_mod.de_texto(lectura['texto'], documento['campos'], hoy).items():
                 procesos.setdefault(clave, (valor, metodo_texto))
             vistos = None
-            if modelo_vision and documento['campos']:
+            if modelo_vision and documento['campos'] and necesita_ver(documento['campos'], procesos):
                 hojas = vision.paginas(archivo.read_bytes(), archivo.name)[:MAXIMO_HOJAS]
                 try:
                     vistos, segundos = ver(hojas, documento['nombre'], documento['campos'], modelo_vision, self.url, hoy=hoy)

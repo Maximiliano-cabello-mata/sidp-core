@@ -538,16 +538,23 @@ que ve (lee letra a mano) para el escaneo.
    git push origin claude/project-thread-vp6ab8
    ```
 
-## Tarea 013: código nuevo del escaneo y medición de la letra a mano (2026-10-16)
+## Tarea 013: código nuevo del escaneo, modelo que ve más rápido y medición de la letra a mano (2026-10-16)
 
-Hazla después de la Tarea 012. El escaneo ahora saca el dato de cada campo (nombre, teléfonos, tipo de sangre,
-alergias, domicilio...) y lo guarda en la base de la PC 4; lo dudoso queda "por confirmar". El modelo que ve lee
-cada hoja **dos veces**: si las dos lecturas no coinciden, el dato queda por confirmar. Aquí se mide cuánto acierta
-con letra a mano, con fichas **inventadas** (meta: 80 % bien, solo o con un clic, y casi cero "peligrosos").
+Gracias por la Tarea 012: con tu desglose de tiempos se cambió el código. Ahora el modelo que ve **no "piensa"**
+antes de contestar (eso era lo que hacía tardar 9 minutos a qwen3-vl), la hoja se le manda de 1280 px en lugar
+de 1600 (menos tokens de imagen) y, si los procesos ya leyeron todo de un PDF con texto o QR, ni se le pregunta.
+El escaneo saca el dato de cada campo (nombre, teléfonos, tipo de sangre, alergias, domicilio...) y lo guarda en la
+base de la PC 4; el modelo lee cada hoja **dos veces** y lo que no coincide queda "por confirmar". Aquí se mide
+cuánto acierta con letra a mano, con fichas **inventadas** (meta: 80 % bien, solo o con un clic, y casi cero
+"peligrosos").
+
+Los ajustes que pusiste a mano en los lanzadores (`SIDP_MODELO_VISION` y los de Ollama) ya no se pierden: al
+volver a correr `instalar_servicios.ps1` se pasan solos a `C:\SIDP-datos\servicios\ajustes.ps1`, que el script ya
+nunca sobrescribe. Desde ahora los ajustes se cambian **en ese archivo**.
 
 **No se borra nada en esta tarea.** Todo lo que se genera queda en `C:\SIDP-datos\manuscritos` (fuera del
 repositorio). Al repositorio solo sube el informe con números: nada de nombres, CURP, clave, contraseñas ni IP.
-`detalle_local.csv` trae lo que se leyó de cada hoja: **no se sube**.
+Los `detalle_local*.csv` traen lo que se leyó de cada hoja: **no se suben**.
 
 1. Actualiza la rama:
    ```
@@ -557,12 +564,15 @@ repositorio). Al repositorio solo sube el informe con números: nada de nombres,
    ```
    powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
    ```
+   Debe decir `Ajustes guardados en C:\SIDP-datos\servicios\ajustes.ps1 (N tomados de los lanzadores anteriores)`.
    Espera un minuto y revisa (PowerShell normal):
    ```
    powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
    ```
-   Debe decir que el cerebro responde. Al arrancar, el cerebro pone solo la base al día (tablas nuevas para los
-   datos de cada campo; no borra nada).
+   Debe decir que el cerebro responde y mostrar la línea `Ajustes (...)` con `SIDP_MODELO_VISION = 'qwen2.5vl:3b'`.
+   Si no aparece, abre `C:\SIDP-datos\servicios\ajustes.ps1` con el Bloc de notas, agrega esa línea
+   (`$env:SIDP_MODELO_VISION = 'qwen2.5vl:3b'`) y vuelve a correr `instalar_servicios.ps1`. Al arrancar, el cerebro
+   pone solo la base al día (tablas nuevas para los datos de cada campo; no borra nada).
 3. Instala lo que falta para leer PDF hoja por hoja:
    ```
    python -m pip install -r validacion/requisitos.txt
@@ -572,23 +582,27 @@ repositorio). Al repositorio solo sube el informe con números: nada de nombres,
    ```
    python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos --cuantas 12
    ```
-5. Mide primero sin el modelo que ve (rápido) y guarda ese resumen aparte:
+5. Mide sin el modelo que ve (rápido, para comparar):
    ```
-   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --sin-vision
-   Copy-Item C:\SIDP-datos\manuscritos\resumen_lectura.md C:\SIDP-datos\manuscritos\resumen_sin_vision.md
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --sin-vision --etiqueta sin_vision
    ```
-6. Mide con el modelo que ve, dos lecturas por hoja (como trabaja el taller). **Tarda**: de 1 a 2 minutos por hoja,
-   unos 30 a 50 minutos en total. No cierres la ventana; cada renglón dice cuántos campos salieron bien en esa hoja.
+6. Mide como trabajará el taller (qwen2.5vl:3b, dos lecturas, 1280 px) con las 24 hojas. **Tarda** (calculo de 1 a
+   3 minutos por hoja); no cierres la ventana. Cada renglón dice cuántos campos salieron bien en esa hoja y en
+   cuántos segundos.
    ```
-   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos
-   Copy-Item C:\SIDP-datos\manuscritos\resumen_lectura.md C:\SIDP-datos\manuscritos\resumen_dos_lecturas.md
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen2.5vl:3b --etiqueta taller
    ```
-   Si da tiempo, compara con una sola lectura (la mitad de tiempo):
+7. Comparaciones con las primeras 6 hojas, para escoger el mejor ajuste. Hazlas en este orden; si se hace tarde,
+   lo que falte queda para después (dilo en el informe):
    ```
-   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --lecturas 1
-   Copy-Item C:\SIDP-datos\manuscritos\resumen_lectura.md C:\SIDP-datos\manuscritos\resumen_una_lectura.md
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen2.5vl:3b --hojas 6 --etiqueta base6
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen2.5vl:3b --hojas 6 --lecturas 1 --etiqueta una_lectura
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen2.5vl:3b --hojas 6 --lado 960 --etiqueta lado960
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen2.5vl:3b --hojas 6 --lado 1600 --etiqueta lado1600
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen3-vl:8b --hojas 6 --lecturas 1 --etiqueta qwen3_8b
    ```
-7. Opcional, con Maximiliano (la prueba de verdad, con letra de personas):
+   El último prueba si qwen3-vl, ya sin "pensar", lee la letra fea bastante mejor como para valer lo que tarda.
+8. Opcional, con Maximiliano (la prueba de verdad, con letra de personas):
    ```
    python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos_reales --en-blanco
    ```
@@ -599,16 +613,16 @@ repositorio). Al repositorio solo sube el informe con números: nada de nombres,
    archivo, tipo, clave, valor, letra, variante; tipo = `ficha_inscripcion`; letra = quién la llenó, por ejemplo
    "persona 1"; variante = `foto`). Luego:
    ```
-   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_reales
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_reales --modelo qwen2.5vl:3b --etiqueta reales
    ```
-8. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea013_lectura.md` con: lo que imprimió el paso 2, el
-   contenido de `resumen_sin_vision.md`, `resumen_dos_lecturas.md` (y `resumen_una_lectura.md` y el del paso 7 si
-   los hiciste) y cualquier error completo. Esos resúmenes solo traen números y nombres de campos; revisa de
-   todos modos que no haya nombres de personas, CURP, teléfonos ni IP.
-9. Sube solo ese archivo:
-   ```
-   git add cerebro/laboratorio/resultados/2026-10-16_tarea013_lectura.md
-   git commit -m "laboratorio: resultado de la tarea 013"
-   git pull --rebase origin claude/project-thread-vp6ab8
-   git push origin claude/project-thread-vp6ab8
-   ```
+9. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea013_lectura.md` con: lo que imprimió el paso 2 (sin
+   la clave ni la IP), el contenido completo de cada `resumen_lectura_*.md` que salió (cada uno con su etiqueta
+   como título) y cualquier error completo. Esos resúmenes solo traen números y nombres de campos; revisa de todos
+   modos que no haya nombres de personas, CURP, teléfonos ni IP.
+10. Sube solo ese archivo:
+    ```
+    git add cerebro/laboratorio/resultados/2026-10-16_tarea013_lectura.md
+    git commit -m "laboratorio: resultado de la tarea 013"
+    git pull --rebase origin claude/project-thread-vp6ab8
+    git push origin claude/project-thread-vp6ab8
+    ```

@@ -144,12 +144,68 @@ def test_la_medicion_de_letra_a_mano_cuenta_aciertos_sin_sacar_datos(tmp_path, m
         return leido, 1.0
 
     monkeypatch.setattr(vision, 'preguntar', preguntar)
+    monkeypatch.setattr(vision, 'cargar', lambda nombre_modelo, url=None: 0.0)
     detalle, tiempos, modelo_vision = medir_lectura.medir(tmp_path, HOY, lecturas=2)
     cuenta = {c: sum(1 for d in detalle if d['resultado'] == c) for c in medir_lectura.CLASES}
     assert len(detalle) == len(respuestas) and cuenta['peligroso'] == 0 and cuenta['corregir'] == 1
     texto = medir_lectura.resumen(detalle, tiempos, modelo_vision, 2)
     assert 'Bien (solo o con un clic)' in texto
     assert not any(r['valor'] in texto for r in respuestas if len(r['valor']) > 4)  # Solo números en el resumen.
+
+
+def test_el_modelo_que_ve_no_piensa_en_voz_alta_y_recibe_la_hoja_achicada(monkeypatch):
+    """qwen3-vl "pensaba" 4 minutos antes de contestar y la hoja de 1600 px le costaba 3,000 tokens (PC 4, Tarea 012)."""
+    pytest.importorskip('PIL')
+    import io
+    import json
+    import urllib.error
+    from PIL import Image
+    hoja = io.BytesIO()
+    Image.new('RGB', (2550, 3300), 'white').save(hoja, 'PNG')
+    pedidos = []
+
+    class Respuesta(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            self.close()
+
+    def urlopen(solicitud, timeout=None):
+        cuerpo = json.loads(solicitud.data)
+        pedidos.append(cuerpo)
+        if cuerpo.get('think') is not None and len(pedidos) == 1 and viejo:
+            raise urllib.error.HTTPError(solicitud.full_url, 400, 'Bad Request', {}, io.BytesIO(b'{"error":"unknown field think"}'))
+        return Respuesta(json.dumps({'message': {'content': '{"tipo_sangre": {"valor": "O+", "seguro": true}}'}}).encode())
+
+    monkeypatch.setattr(vision.urllib.request, 'urlopen', urlopen)
+    monkeypatch.setattr(vision, 'LADO', 1280)
+    viejo = False
+    leido, _ = vision.preguntar([hoja.getvalue()], 'Lee', {'type': 'object'}, 'modelo-de-prueba', 'http://127.0.0.1:1/api/chat')
+    assert leido['tipo_sangre']['valor'] == 'O+' and pedidos[0]['think'] is False
+    assert max(Image.open(io.BytesIO(base64.b64decode(pedidos[0]['messages'][0]['images'][0]))).size) == 1280
+    viejo, pedidos[:] = True, []  # Un Ollama que no conoce "think": se vuelve a pedir sin él.
+    leido, _ = vision.preguntar([hoja.getvalue()], 'Lee', {'type': 'object'}, 'modelo-de-prueba', 'http://127.0.0.1:1/api/chat')
+    assert len(pedidos) == 2 and 'think' not in pedidos[1] and leido['tipo_sangre']['valor'] == 'O+'
+
+
+def test_el_modelo_del_ajuste_que_no_esta_instalado_no_apaga_la_lectura(monkeypatch):
+    monkeypatch.setattr(vision, 'instalados', lambda url=None: ['llama3.1:latest', 'qwen2.5vl:3b'])
+    monkeypatch.setenv('SIDP_MODELO_VISION', 'qwen3-vl:8b')
+    assert vision.elegir() == 'qwen2.5vl:3b'
+    assert vision.elegir(pedido='qwen3-vl:8b') is None  # Pedido a mano: ese o ninguno.
+    monkeypatch.setenv('SIDP_MODELO_VISION', 'qwen2.5vl:3b')
+    assert vision.elegir() == 'qwen2.5vl:3b'
+
+
+def test_si_los_procesos_ya_leyeron_todo_sin_ocr_no_se_gasta_el_modelo_que_ve():
+    lista = [campos.campo('curp', 'CURP', 'curp', 'alumno'), campos.campo('fecha_nacimiento', 'Fecha', 'fecha', 'alumno')]
+    assert not taller.necesita_ver(lista, {'curp': ('X', 'qr'), 'fecha_nacimiento': ('2020-05-12', 'texto')})
+    assert taller.necesita_ver(lista, {'curp': ('X', 'qr'), 'fecha_nacimiento': ('2020-05-12', 'ocr')})
+    assert taller.necesita_ver(lista, {'curp': ('X', 'qr')})
+    # Lo que los procesos sacan del texto de una foto queda marcado como OCR (por confirmar si va solo).
+    medico = taller.de_procesos('certificado_medico', generar.medico('JUAN GARCIA HERNANDEZ'), [], HOY, 'ocr')
+    assert {metodo for _, metodo in medico.values()} == {'ocr'}
 
 
 # ---------------------------------------------------------------- En la base de la PC 4

@@ -25,6 +25,14 @@ try {
     Write-Host "Modelos de Ollama: $($modelos -join ', ')"
 } catch { Write-Host "Ollama no respondió: $($_.Exception.Message)" }
 
+$archivoAjustes = 'C:\SIDP-datos\servicios\ajustes.ps1'
+if (Test-Path $archivoAjustes) {
+    $lineas = Get-Content $archivoAjustes | Where-Object { $_ -match '^\s*\$env:' } | ForEach-Object { $_.Trim() -replace '^\$env:', '' }
+    Write-Host "Ajustes ($archivoAjustes): $($lineas -join '; ')"
+} else {
+    Write-Host 'Ajustes: no hay ajustes.ps1 (se crea al correr instalar_servicios.ps1)'
+}
+
 $archivoClave = Join-Path $env:USERPROFILE '.sidp\clave_cerebro.txt'
 try {
     $clave = (Get-Content $archivoClave -Raw).Trim()
