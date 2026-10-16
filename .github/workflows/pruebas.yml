@@ -50,6 +50,16 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements-build.txt
+      # Los scripts de la PC 4 se corren a mano allá: aquí solo se revisa que PowerShell los entienda.
+      - shell: pwsh
+        run: |
+          $mal = 0
+          foreach ($archivo in Get-ChildItem cerebro/pc4 -Filter *.ps1) {
+            $errores = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($archivo.FullName, [ref]$null, [ref]$errores) | Out-Null
+            foreach ($e in $errores) { Write-Host "$($archivo.Name): $($e.Message) (línea $($e.Extent.StartLineNumber))"; $mal++ }
+          }
+          if ($mal) { exit 1 }
       # Dos ejecutables (ADR-029): uno para el servidor y otro para las demás computadoras.
       - run: python despliegue/compilar.py --tipo servidor
       - run: python despliegue/compilar.py --tipo equipo

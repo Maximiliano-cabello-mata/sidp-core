@@ -27,6 +27,7 @@ import json
 import secrets
 import socket
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -325,9 +326,17 @@ def main(argumentos=None):
     # Fuera del repositorio, que es público: la clave nunca debe subirse.
     parser.add_argument('--clave', type=Path, default=Path.home() / '.sidp' / 'clave_cerebro.txt')
     parser.add_argument('--base', type=Path, default=base_cerebro.ARCHIVO, help='archivo con la dirección de PostgreSQL')
+    # Arranque sin monitor (cerebro/pc4/instalar_servicios.ps1): PostgreSQL puede tardar en levantarse y la
+    # clave no se escribe en el registro, que se queda en el disco.
+    parser.add_argument('--esperar-base', type=int, default=0, help='segundos que espera a PostgreSQL al arrancar')
+    parser.add_argument('--sin-mostrar-clave', action='store_true')
     args = parser.parse_args(argumentos)
     clave = clave_guardada(args.clave)
     base, problema = base_cerebro.abrir(args.base)
+    limite = time.monotonic() + args.esperar_base
+    while base is None and time.monotonic() < limite:
+        time.sleep(5)
+        base, problema = base_cerebro.abrir(args.base)
     servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base)
     print(f'Cerebro escuchando en http://{ip_local()}:{args.puerto}  (modelo {args.modelo})')
     if base:
@@ -335,8 +344,11 @@ def main(argumentos=None):
         print(f'Base de datos: {resumen["motor"]} con {resumen["alumnos"]} alumnos inscritos.')
     else:
         print(f'Sin base de datos ({problema}): funciona igual, sin comparar contra el padrón.')
-    print(f'Clave para SIDP-Validador.exe: {clave}')
-    print('Cierra esta ventana para apagarlo.', flush=True)
+    if args.sin_mostrar_clave:
+        print(f'Clave para SIDP-Validador.exe: guardada en {args.clave}', flush=True)
+    else:
+        print(f'Clave para SIDP-Validador.exe: {clave}')
+        print('Cierra esta ventana para apagarlo.', flush=True)
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

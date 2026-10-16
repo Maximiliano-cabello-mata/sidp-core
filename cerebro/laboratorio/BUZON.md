@@ -479,3 +479,61 @@ en esta tarea solo se borra lo que dice el paso 7, y antes se respalda la base (
     git push origin claude/project-thread-vp6ab8
     ```
 13. Avísale a Maximiliano que la PC 4 ya está lista para el inventario, el análisis y los respaldos.
+
+## Tarea 012: la PC 4 arranca sola sin monitor, y el modelo que ve (2026-10-16)
+
+La PC 4 va a trabajar sin monitor: se enciende y debe tener listos, sin que nadie inicie sesión, la base
+(PostgreSQL), los modelos (Ollama) y el cerebro (puerto 8771). El script `cerebro\pc4\instalar_servicios.ps1`
+lo deja así con tareas programadas de Windows; se puede deshacer con `-Quitar`. Además se instala el modelo
+que ve (lee letra a mano) para el escaneo.
+
+**No se borra nada en esta tarea.** El acceso de Ollama del inicio de sesión no se borra: el script lo mueve a
+`C:\SIDP-datos\servicios\accesos_de_inicio_guardados`. Nada de nombres, CURP, clave, contraseñas ni IP en el informe.
+
+1. Actualiza la rama (en la carpeta del repositorio):
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   ```
+2. Cierra la ventana del cerebro si está abierta. Abre **PowerShell como administrador** (clic derecho >
+   Ejecutar como administrador; si tú no puedes, pídeselo a Maximiliano), entra a la carpeta del repositorio y corre:
+   ```
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
+   ```
+   Debe terminar con `Tarea SIDP-Ollama lista.`, `Tarea SIDP-Cerebro lista.`, `PostgreSQL (...): arranque
+   automático.` y `Listo.`. Si sale un error en rojo, cópialo completo al informe y detente.
+3. Espera un minuto y revisa (PowerShell normal):
+   ```
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
+   ```
+   Debe decir que PostgreSQL, Ollama y el cerebro escuchan, `Cerebro: responde. Base: PostgreSQL ..., 191 alumnos`
+   y la lista de modelos.
+4. Instala el modelo que ve (pesa unos 6 GB; puede tardar). Ollama no está en el PATH, así que usa la ruta completa:
+   ```
+   & "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen3-vl:8b
+   ```
+   Si dice que no existe o falla, instala este otro en su lugar:
+   ```
+   & "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen2.5vl:7b
+   ```
+   Luego comprueba cuál quedó:
+   ```
+   python -m validacion.vision modelos
+   ```
+5. Mide cuánto tarda en leer una hoja (con documentos inventados, fuera del repositorio):
+   ```
+   python -m validacion.ejemplo.fotos C:\SIDP-datos\fotos_inventadas
+   Get-ChildItem C:\SIDP-datos\fotos_inventadas -Recurse -Include *.jpg,*.png | Select-Object -First 3 | ForEach-Object { python -m validacion.vision prueba $_.FullName }
+   ```
+   Cada renglón dice en cuántos segundos leyó la hoja. Anota los tres.
+6. Prueba de verdad (con Maximiliano): reinicia la PC 4 (`Restart-Computer`) y **no inicies sesión**. Después de
+   3 minutos, en la PC del administrador abre el panel de SIDP-Validador y revisa que diga que el cerebro está
+   conectado. Luego inicia sesión en la PC 4 y vuelve a correr el paso 3.
+7. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea012_pc4.md` con lo que imprimieron los pasos 2 a 6
+   (sin la clave ni la IP) y cualquier error completo. Revisa que no tenga nombres ni CURP.
+8. Sube solo ese archivo:
+   ```
+   git add cerebro/laboratorio/resultados/
+   git commit -m "laboratorio: resultado de la tarea 012"
+   git pull --rebase origin claude/project-thread-vp6ab8
+   git push origin claude/project-thread-vp6ab8
+   ```
