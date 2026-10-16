@@ -201,18 +201,26 @@ def test_la_constancia_con_otro_nombre_queda_por_revisar(entorno):
     assert app.bandeja.registro.db.execute('SELECT curp_confirmada FROM alumno').fetchone()[0] == 0
 
 
-def test_un_nombre_pegado_en_la_lista_se_valida_y_queda_como_lo_escribe_renapo(entorno):
+def test_un_nombre_pegado_en_la_lista_se_valida_y_queda_como_lo_escribe_renapo(entorno, monkeypatch):
     """En el PDF de la lista oficial a veces se pierde el espacio entre dos apellidos: RENAPO dice cómo va."""
     app, url = entorno
     token = {'X-SIDP-Token': app.token}
-    pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'A', 'filas': [
-        {'nombres': 'ALBERTO', 'primer_apellido': 'HERNANDEZRAMOS', 'segundo_apellido': 'LUIS', 'curp': CURP}]}, token)
+    pegado = {'nombres': 'ALBERTO', 'primer_apellido': 'HERNANDEZRAMOS', 'segundo_apellido': 'LUIS', 'curp': CURP}
+    pedir(url, '/api/listas/guardar', {'grado': 3, 'letra': 'A', 'filas': [pegado]}, token)
+    enviados = []
+    monkeypatch.setattr(cerebro_red, 'padron_a_cerebro', lambda ciclo, alumnos, *_: enviados.append(alumnos) or {'alumnos': len(alumnos)})
+    monkeypatch.setattr(cerebro_red, 'alumnos_de_cerebro', lambda *_: {'grupos': [{'grado': 3, 'letra': 'A', 'filas': [pegado]}]})
+    app.bandeja.cerebro = ('http://127.0.0.1:9', 'clave-de-prueba')
     codigo, respuesta = subir_constancia(url, app, constancia(nombre='LUIS ALBERTO HERNANDEZ RAMOS'))
     assert codigo == 200 and respuesta['estado'] == 'validada', respuesta
     assert 'venía pegado' in respuesta['mensaje']
     fila = app.bandeja.registro.db.execute('SELECT primer_apellido, segundo_apellido, nombres, curp_confirmada FROM alumno WHERE curp = ?',
                                            (CURP,)).fetchone()
     assert tuple(fila) == ('HERNANDEZ', 'RAMOS', 'LUIS ALBERTO', 1)
+    # El nombre corregido va ya a la PC 4, y si la PC 4 todavía lo tiene pegado, aquí se queda el de RENAPO.
+    assert enviados[-1][0]['primer_apellido'] == 'HERNANDEZ'
+    app.bandeja.traer_alumnos()
+    assert app.bandeja.registro.db.execute('SELECT primer_apellido FROM alumno WHERE curp = ?', (CURP,)).fetchone()[0] == 'HERNANDEZ'
     # Si de verdad falta una palabra, sigue quedando por revisar.
     from validacion import renapo
     texto = comparador.normalizar('LUIS ALBERTO HERNANDEZ RAMOS')

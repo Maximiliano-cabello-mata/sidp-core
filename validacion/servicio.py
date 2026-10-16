@@ -208,6 +208,7 @@ class Bandeja:
         """Los alumnos de la base de la PC 4 entran a las listas de grupo de aquí.
 
         Si un alumno ya estaba (misma CURP), toma el nombre de la PC 4, con su bitácora; si no, se agrega a su grupo.
+        Un alumno validado con su constancia de RENAPO se queda con el nombre de RENAPO: ese nombre es el que va a la PC 4.
         """
         if not (self.cerebro and self.grupos):
             return None
@@ -226,7 +227,7 @@ class Bandeja:
                 continue
             for fila in filas:
                 alumno = self.registro.alumno_por(fila['curp'], None) if fila['curp'] else None
-                if alumno:
+                if alumno and not self.registro.db.execute('SELECT curp_confirmada FROM alumno WHERE id = ?', (alumno,)).fetchone()[0]:
                     antes = self.registro.db.execute('SELECT version FROM alumno WHERE id = ?', (alumno,)).fetchone()[0]
                     self.registro.completar_alumno(alumno, fila, 'PC 4')
                     corregidos += self.registro.db.execute('SELECT version FROM alumno WHERE id = ?', (alumno,)).fetchone()[0] != antes
@@ -1014,9 +1015,12 @@ class Bandeja:
                 archivo.write_bytes(contenido)
             return archivo.relative_to(self.carpeta).as_posix()
         try:
-            return self.registro.validar_constancia(contenido, guardar)
+            resultado = self.registro.validar_constancia(contenido, guardar)
         except renapo.ErrorConstancia as error:
             raise ErrorBandeja(str(error)) from error
+        if resultado.get('corregido'):
+            self.enviar_padron()  # El nombre corregido va ya a la PC 4.
+        return resultado
 
     def renapo_no_encontrada(self, alumno_id):
         if not self.registro:
