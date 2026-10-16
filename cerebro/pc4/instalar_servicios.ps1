@@ -176,7 +176,12 @@ powercfg /change hibernate-timeout-ac 0 | Out-Null
 Set-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name HiberbootEnabled -Value 0
 Write-Host 'Energía: sin suspensión, sin hibernación y sin inicio rápido.'
 
-# 7. Arranca ya, sin esperar a reiniciar: cierra lo que se haya abierto a mano.
+# 7. Arranca ya, sin esperar a reiniciar: cierra lo que se haya abierto a mano y lo de la corrida anterior.
+#    Detener la tarea no cierra a sus hijos (Tarea 013): primero los lanzadores, para que no los vuelvan a abrir,
+#    y luego Ollama con todo su árbol, para que no quede uno viejo ocupando el puerto 11434.
+Get-CimInstance Win32_Process -Filter "Name like 'powershell%'" | Where-Object { $_.CommandLine -like '*SIDP-datos\servicios\*' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+cmd.exe /c 'taskkill /F /T /IM ollama.exe >nul 2>&1'  # Dentro de cmd: si no hay ninguno, su aviso no detiene el script.
 Get-Process -Name 'ollama app', 'ollama' -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -like '*validacion.cerebro_red*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force }

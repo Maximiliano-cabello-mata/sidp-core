@@ -626,3 +626,29 @@ Los `detalle_local*.csv` traen lo que se leyó de cada hoja: **no se suben**.
     git pull --rebase origin claude/project-thread-vp6ab8
     git push origin claude/project-thread-vp6ab8
     ```
+
+## Tarea 013, segunda parte: la letra fea y el modelo grande (2026-10-16)
+
+Gracias: con 6 hojas, `qwen2.5vl:3b` con dos lecturas sacó bien el 99 % y no hubo ningún peligroso. Pero esas 6
+hojas eran todas de **letra clara**; la letra fea está en las familias 04, 05, 06, 10, 11 y 12. Falta medirla,
+que es lo que más importa. Es para la corrida nocturna, en este orden. No se borra nada.
+
+1. Actualiza la rama (`git pull origin claude/project-thread-vp6ab8`). No hace falta reiniciar servicios.
+2. Las 24 hojas como trabaja el taller (la más importante; unos 40 minutos):
+   ```
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen2.5vl:3b --etiqueta taller
+   ```
+3. qwen3-vl:8b con una lectura, en 6 hojas, para saber si vale lo que tarda:
+   ```
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen3-vl:8b --hojas 6 --lecturas 1 --etiqueta qwen3_8b
+   ```
+4. Si sobra tiempo: `--hojas 6 --lado 1600 --etiqueta lado1600` con `qwen2.5vl:3b`.
+5. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea013b_lectura.md` con el contenido completo de cada
+   `resumen_lectura_*.md` nuevo (sobre todo las tablas "Por letra" y "Por campo"). Solo números; revisa que no
+   haya nombres, CURP, teléfonos ni IP. Súbelo solo a él:
+   ```
+   git add cerebro/laboratorio/resultados/2026-10-16_tarea013b_lectura.md
+   git commit -m "laboratorio: resultado de la tarea 013, segunda parte"
+   git pull --rebase origin claude/project-thread-vp6ab8
+   git push origin claude/project-thread-vp6ab8
+   ```
