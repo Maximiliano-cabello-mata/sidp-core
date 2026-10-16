@@ -1,56 +1,75 @@
 # Informe Integral de Sesión - PC 4 (Laboratorio Cerebro) para el Agente Claude
 
-- **Fecha:** 2026-10-15
+- **Fecha de actualización:** 2026-10-16
 - **Equipo:** PC 4 (`DESKTOP-8RJIA6B`)
+- **Procesador / APU:** AMD Ryzen 5 5600G with Radeon Graphics (6 núcleos / 12 hilos)
+- **Memoria RAM:** 24 GB
+- **Almacenamiento:** Disco mecánico WDC WD1600 (160 GB)
 - **Sistema Operativo:** Windows 11 Enterprise (10.0.22000)
+- **Python:** 3.15.0a8 (`C:\Python315\python.exe`)
 - **Rama:** `claude/project-thread-vp6ab8`
 - **Operador local:** Maximiliano Cabello Mata
 
 ---
 
-## 1. Resumen de Actividades Realizadas en PC 4
+## 1. Resumen Cronológico de Tareas Realizadas en PC 4 (Tareas 001 a 012)
 
-Durante la sesión del día de hoy en el hardware real (PC 4), se ejecutaron y validaron las siguientes tareas del buzón:
+Durante las sesiones de trabajo en el hardware real de la PC 4 se ejecutaron, diagnosticaron y validaron las siguientes tareas del buzón:
 
-### Tarea 005: Entorno de validación y servicio cerebro
+### Tareas 001 a 004: Modelos `sidp-revisor` / `sidp-revisor-2` y Validador de Ejemplo
+- Creación y evaluación de `sidp-revisor` y `sidp-revisor-2` en Ollama sobre 11 fichas y 30 pares en zona gris.
+- Ajuste de reglas deterministas para dejar en "duda" casos críticos (apellidos faltantes, orden invertido, variaciones de más de una letra) sin consultar al modelo.
+- Prueba integral del validador sobre expedientes de ejemplo (`0 de 6` falsos negativos peligrosos).
+
+### Tarea 005: Entorno de validación y servicio cerebro por red
 - Instalación de Tesseract OCR 5.5 con soporte de idioma español (`spa.traineddata`) y herramientas de visión (`pypdf`, `pypdfium2`, `opencv-python-headless`, `zxing-cpp`).
 - Configuración de la red local como **Privada** y habilitación de la regla de firewall `SIDP Cerebro 8771` (Inbound TCP 8771).
-- Puesta en marcha de Ollama con el modelo `sidp-revisor-2`.
-- Verificación con expedientes de prueba: 0 % de falsos negativos peligrosos (6 de 6 trampas detectadas).
+- Puesta en marcha del servidor HTTP del cerebro (`validacion.cerebro_red`) con `sidp-revisor-2`.
 
-### Tarea 006: Lector de documentos y fotos
-- Medición de rendimiento y precisión del lector con transformaciones geométricas (recorte de bordes, corrección de perspectiva, sombras y rotación de INE/documentos).
-- Evaluación comparativa de OCR sobre fotos del padrón de prueba.
+### Tarea 006: Nuevo lector de documentos y fotos
+- Medición de rendimiento y precisión del lector con transformaciones geométricas (recorte de bordes, corrección de perspectiva, sombras, rotación y lectura de QR / franja MRZ `<<<` de INE) sobre 49 fotos sintéticas.
+- Nota de compatibilidad documentada: `PaddleOCR` / `paddlepaddle` aún no publica ruedas precompiladas para Python 3.15 (`cp315`), por lo que el lector opera de forma estable sobre `Tesseract 5.5` + `OpenCV` + `zxing-cpp`.
 
-### Tarea 007: Escaneo del día de pruebas
+### Tarea 007: Escaneo del día de pruebas (`/leer`)
 - Verificación del endpoint `/leer` para recibir expedientes completos escaneados directamente desde `SIDP-Validador.exe` sin almacenar archivos temporales permanentes en disco.
 
-### Tarea 008: Base de datos PostgreSQL para el cerebro
-- Descarga e instalación desatendida de **PostgreSQL 17.11** en Windows.
-- Restricción estricta de escucha en `127.0.0.1:5432` y `[::1]:5432` (`localhost`), garantizando que nadie en la red pueda atacar el puerto de la base.
+### Tarea 008: Base de datos PostgreSQL 17.11 para el cerebro
+- Descarga e instalación desatendida de **PostgreSQL 17.11** (`postgresql-x64-17`) en Windows.
+- Restricción estricta de escucha en `127.0.0.1:5432` y `[::1]:5432` (`localhost`), garantizando que ningún equipo externo en la red pueda conectarse directamente al puerto de PostgreSQL.
 - Desactivación de reglas públicas de firewall para PostgreSQL.
-- Creación segura del rol `sidp` y la base de datos `sidp_cerebro`.
-- Contraseñas almacenadas exclusivamente en `%USERPROFILE%\.sidp\` (fuera del repositorio).
-- Instalación del conector `pg8000` e inicialización del primer esquema.
+- Creación segura del rol `sidp` y la base de datos `sidp_cerebro`, con credenciales resguardadas exclusivamente en `%USERPROFILE%\.sidp\` (fuera del repositorio).
 
 ### Tarea 009: Esquema v2 y carga del padrón oficial de la SEP
 - Migración al esquema relacional v2 de `sidp` con tablas para alumnos, grupos, tutores, inscripciones, documentos, revisiones, lecturas y bitácora de auditoría.
-- Recepción de la lista oficial de la escuela en `C:\SIDP-datos\lista_oficial.pdf` y carga de los 191 alumnos oficiales en sus 6 grupos.
-- Comprobación de idempotencia: el sistema rechaza duplicados si el mismo archivo se vuelve a cargar.
+- Carga de los **191 alumnos** oficiales desde `C:\SIDP-datos\lista_oficial.pdf` en sus 6 grupos y comprobación de idempotencia ante recargas.
 
-### Tarea 010: Base de la PC 4 desde cero con la lista revisada
-- Vaciado total de la base mediante `python -m validacion.base_cerebro borrar --si-borrar-todo`.
-- Recarga desde `C:\SIDP-datos\lista_oficial.pdf` utilizando el parser mejorado de extracción (separación inteligente de nombres y tratamiento correcto de la letra `Ñ` y acentos).
-- Disminución de renglones dudosos a 0 en casi todos los grupos (solo 1 en 1° A).
-- Verificación del nuevo endpoint `/alumnos`, que entrega directamente la estructura de grupos y alumnos hacia `SIDP-Validador.exe`.
+### Tarea 010: Reconstrucción limpia de la base con el parser mejorado
+- Vaciado total de la base mediante `python -m validacion.base_cerebro borrar --si-borrar-todo` y recarga limpia desde `C:\SIDP-datos\lista_oficial.pdf` con separación mejorada de nombres y soporte de `Ñ`.
+- Disminución de renglones dudosos a `0` en cinco de los seis grupos (solo `1` en 1° A).
+- Verificación del endpoint `/alumnos` entregando los 6 grupos completos a `SIDP-Validador.exe`.
+
+### Tarea 011: Respaldo previo, pandas, inventario de bienes, limpieza y `/respaldo`
+- Instalación de `pandas 3.0.6`.
+- Generación de respaldo completo previo a cambios mediante `pg_dump` en `C:\SIDP-datos\respaldos\sidp_cerebro_20261015_180723.dump` (`0.11 MB`).
+- Actualización del esquema con las tablas de inventario escolar y mantenimiento de base (`VACUUM ANALYZE` + `REINDEX`, tamaño en disco `10.4 MB`).
+- Ejecución de `python -m validacion.base_cerebro analisis` con cruce estadístico en pandas.
+- Limpieza autorizada exclusivamente sobre caché de pip (`81.7 MB` liberados) y carpeta temporal `$env:TEMP` (`~452 MB` liberados), liberando más de **533 MB** sin tocar `C:\SIDP-datos`, PostgreSQL ni modelos de Ollama.
+- Creación de `C:\SIDP-datos\respaldo` y verificación de los endpoints `/analisis`, `/inventario` y `/respaldo`.
+
+### Tarea 012: Arranque autónomo sin ventanas (`SIDP-Ollama` y `SIDP-Cerebro`) y modelo de visión
+- Ejecución de `cerebro\pc4\instalar_servicios.ps1` con privilegios de Administrador para registrar las tareas programadas de Windows (`SIDP-Ollama` y `SIDP-Cerebro`) mediante arranque `S4U` al encender la PC sin necesidad de iniciar sesión ni dejar ventanas abiertas.
+- Configuración de `postgresql-x64-17` en arranque automático y desactivación de suspensión, hibernación e inicio rápido de energía.
+- Descarga y evaluación de `qwen3-vl:8b` (`6.1 GB`) y `qwen2.5vl:3b` (`3.2 GB`).
+- Diagnóstico profundo de tiempos de inferencia visual en el APU Ryzen 5 5600G + HDD mecánico:
+  - **Causa de lentitud en `qwen3-vl:8b` (~531 s en frío):** lectura de 6.1 GB desde disco mecánico + warmup (`169.1 s`), resolución mínima forzada de 1 MP (~1,950 tokens visuales, `49.4 s` de prompt eval) y activación por defecto del modo *thinking* en Ollama (`1,171` tokens de pensamiento interno antes de responder). Desactivando `think: False`, el tiempo de `qwen3-vl:8b` en caliente baja a `~105 s`.
+  - **Optimización con `qwen2.5vl:3b`:** modelo nativo sin sobrecarga de pensamiento interno (`eval time` de solo `3.9 s` a `5.4 s` a `11.9 - 14.0 tokens/s`). Con `LADO=1600` promedió **108.4 s** en las primeras 3 hojas de `C:\SIDP-datos\fotos_inventadas` (`acta_alumno.jpg`: `108.3 s`, `boleta.jpg`: `108.2 s`, `certificado_medico.jpg`: `108.8 s`), y al reducir `lado=960` bajó a **35.7 - 39.1 s** por hoja.
+- Configuración de `SIDP_MODELO_VISION=qwen2.5vl:3b`, `OLLAMA_KEEP_ALIVE=24h`, `OLLAMA_FLASH_ATTENTION=1` y `OLLAMA_IGPU_ENABLE=1`.
 
 ---
 
 ## 2. Estado Actual de la Base de Datos (`sidp_cerebro`)
 
-La base de datos se encuentra limpia, íntegra y completamente poblada con los datos del ciclo escolar 2026-2027:
-
-### Resumen por Grado y Grupo
+La base de datos se encuentra limpia, respaldada, optimizada e íntegra con el padrón del ciclo escolar **2026-2027**:
 
 | Grupo | Alumnos Inscritos | Hombres | Mujeres | Extraedad | Renglones Dudosos al Cargar |
 | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -62,50 +81,29 @@ La base de datos se encuentra limpia, íntegra y completamente poblada con los d
 | **6° A** | 29 | 12 | 17 | 0 | 0 |
 | **Total** | **191** | **93** | **98** | **0** | **1** |
 
-### Métricas de Matrícula (Estadística 911 por Edad al 31 de Diciembre)
-- **1° Grado:** 6 años: 18 H, 15 M | 7 años: 1 H
-- **2° Grado:** 7 años: 14 H, 16 M | 8 años: 1 H
-- **3° Grado:** 8 años: 15 H, 18 M
-- **4° Grado:** 9 años: 17 H, 14 M | 10 años: 1 H, 14 M
-- **5° Grado:** 10 años: 13 H, 18 M | 11 años: 1 H
-- **6° Grado:** 11 años: 12 H, 17 M
-
-### Estado de Alertas y Auditoría
-- **Alertas activas:**
-  - `curp_digito: 1`: Se detectó una CURP en el PDF de origen cuyo dígito verificador no coincide con el algoritmo RENAPO (requiere revisión física con el acta de nacimiento).
-  - `renapo_pendiente: 191`: Padrón inicial cargado pendiente de cotejo oficial.
-- **Bitácora de auditoría:** 382 eventos inmutables registrados (altas e inscripciones iniciales).
-- **Expedientes por completar:** 191 alumnos pendientes de validación documental en el Validador.
+- **Tamaño en disco de `sidp_cerebro`:** `10.4 MB` (tras `VACUUM ANALYZE` y `REINDEX`).
+- **Respaldo disponible en:** `C:\SIDP-datos\respaldos\sidp_cerebro_20261015_180723.dump`.
+- **Alertas activas:** `curp_digito: 1` (una CURP del PDF original con dígito verificador distinto al calculado por algoritmo RENAPO) y `renapo_pendiente: 191`.
+- **Bitácora de auditoría:** 382 eventos registrados.
+- **Inventario escolar:** Esquema inicializado (`0` bienes registrados actualmente).
 
 ---
 
-## 3. Estado de Servicios y Conectividad en PC 4
+## 3. Estado Actual de Servicios y Modelos en PC 4
 
-1. **PostgreSQL 17.11:** Servicio `postgresql-x64-17` activo en segundo plano, escuchando exclusivamente en `127.0.0.1:5432`.
-2. **Cerebro Red (`validacion.cerebro_red`):** Servicio HTTP activo en el puerto 8771. En su arranque registra:
-   ```text
-   Cerebro escuchando en http://<IP-LOCAL>:8771  (modelo sidp-revisor-2)
-   Base de datos: PostgreSQL 17.11 con 191 alumnos inscritos.
-   Clave para SIDP-Validador.exe: <OCULTO>
-   Cierra esta ventana para apagarlo.
-   ```
-3. **Ollama:** En ejecución local con el modelo `sidp-revisor-2` en el puerto 11434.
-4. **Verificación `/salud`:** Responde HTTP 200 con herramientas de lectura en `true`, modelo listo y base en versión 2 con 191 alumnos.
-5. **Verificación `/alumnos`:** Responde HTTP 200 entregando la lista de los 6 grupos y sus filas completas al Validador.
+1. **PostgreSQL (`postgresql-x64-17`):** `Running` (Automatic), escuchando únicamente en `127.0.0.1:5432` y `[::1]:5432`.
+2. **Tarea programada `SIDP-Ollama`:** `Running`, escuchando en `127.0.0.1:11434`.
+   - Modelos instalados en `C:\Users\DELFINO_PANDO_13\.ollama\models`:
+     - `qwen2.5vl:3b` (configurado como predeterminado en `SIDP_MODELO_VISION`)
+     - `qwen3-vl:8b`
+     - `sidp-revisor-2:latest`
+     - `sidp-revisor:latest`
+     - `llama3.1:latest`
+3. **Tarea programada `SIDP-Cerebro`:** `Running`, escuchando en el puerto `8771` y respondiendo en `/salud`, `/alumnos`, `/leer`, `/analisis`, `/inventario` y `/respaldo`.
 
 ---
 
-## 4. Herramienta de Visualización Local para el Operador
+## 4. Protocolo de Seguridad y Privacidad Cumplido
 
-Para facilitar la supervisión directa sin exponer datos personales al exterior, se preparó un script de consola interactivo para Maximiliano en:
-- `C:\SIDP-datos\ver_alumnos_postgres.bat`
-- Acceso directo en el Escritorio: `Ver_Alumnos_PostgreSQL.bat`
-
-Esta herramienta permite al operador consultar en pantalla la lista completa de los 191 alumnos, filtrar por grupo, buscar por nombre o CURP y acceder a la consola interactiva `psql` conectada a `sidp_cerebro`.
-
----
-
-## 5. Protocolo de Seguridad y Privacidad
-
-- **Cero filtración de credenciales:** Ninguna contraseña de superusuario ni de rol, ni la clave del cerebro, fueron registradas en el repositorio, en los informes ni en mensajes públicos.
-- **Protección de datos de menores:** El archivo original `lista_oficial.pdf` permanece en `C:\SIDP-datos\` fuera del árbol git. Todos los informes subidos a GitHub contienen exclusivamente datos estadísticos, conteos y estados de validación.
+- **Cero filtración de información sensible:** Ningún nombre de alumno, CURP, teléfono, domicilio, contraseña de PostgreSQL, clave del cerebro ni dirección IP local fue incluido en este informe ni en ningún archivo del repositorio.
+- **Archivos protegidos fuera del árbol Git:** `C:\SIDP-datos\lista_oficial.pdf`, `C:\SIDP-datos\respaldos\`, `C:\SIDP-datos\fotos_inventadas\` y `%USERPROFILE%\.sidp\` permanecen estrictamente en el almacenamiento local de la PC 4.
