@@ -17,16 +17,51 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
 
+  base_cerebro:
+    # La base de datos del cerebro (PostgreSQL en la PC 4): el padrón y la comparación contra lo leído.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sidp
+          POSTGRES_PASSWORD: prueba
+          POSTGRES_DB: sidp_cerebro
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.txt "pypdf>=5.1" "pg8000>=1.31"
+      - run: python -m pytest -q pruebas/test_base_cerebro.py pruebas/test_datos_alumno.py
+        env:
+          SIDP_PRUEBA_BASE: postgresql://sidp:prueba@127.0.0.1:5432/sidp_cerebro
+          SIDP_SIN_PADDLE: '1'
+
   ejecutable:
     # Ejecutables sin paquete de instalación: los secretos nunca pasan por CI.
     needs: pruebas
     runs-on: windows-latest
+    permissions:
+      contents: write  # Solo para publicar la versión al fusionar a main (último paso).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements-build.txt
+      # Los scripts de la PC 4 se corren a mano allá: aquí solo se revisa que PowerShell los entienda.
+      - shell: pwsh
+        run: |
+          $mal = 0
+          foreach ($archivo in Get-ChildItem cerebro/pc4 -Filter *.ps1) {
+            $errores = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($archivo.FullName, [ref]$null, [ref]$errores) | Out-Null
+            foreach ($e in $errores) { Write-Host "$($archivo.Name): $($e.Message) (línea $($e.Extent.StartLineNumber))"; $mal++ }
+          }
+          if ($mal) { exit 1 }
       # Dos ejecutables (ADR-029): uno para el servidor y otro para las demás computadoras.
       - run: python despliegue/compilar.py --tipo servidor
       - run: python despliegue/compilar.py --tipo equipo
@@ -35,6 +70,30 @@ jobs:
       - run: python -m pip install "pypdf>=5.1"
       - run: python despliegue/compilar.py --tipo validador
       - run: dist/SIDP-Validador.exe validacion/ejemplo --hoy 2026-10-14 --revisar --sin-modelo
+      # El instalable del servidor: SIDP.exe (ventana propia, sin consola) dentro de SIDP-Instalador.exe.
+      - run: python -m pip install "pillow>=10.0" "openpyxl==3.1.5"  # openpyxl: el Excel por grado con gráficas.
+      - run: python despliegue/compilar.py --tipo escritorio
+        env:
+          SIDP_VERSION: 1.0.${{ github.run_number }}
+      - name: El SIDP.exe instalado arranca, contesta y se apaga
+        shell: pwsh
+        run: |
+          $carpeta = Join-Path $env:RUNNER_TEMP 'sidp'
+          Start-Process dist/SIDP.exe -ArgumentList '--segundo-plano', '--carpeta', $carpeta
+          $hola = $null
+          foreach ($i in 1..30) { Start-Sleep 2; try { $hola = Invoke-RestMethod http://127.0.0.1:8770/api/hola; break } catch {} }
+          if (-not $hola -or $hola.sidp -ne 'servidor') { Get-Content "$carpeta/sistema/registros/sidp.log" -ErrorAction SilentlyContinue; exit 1 }
+          Write-Host "SIDP $($hola.version) contesta"
+          Start-Process dist/SIDP.exe -ArgumentList '--apagar', '--carpeta', $carpeta -Wait
+          Start-Sleep 2
+          try { Invoke-RestMethod http://127.0.0.1:8770/api/hola; Write-Host 'No se apagó'; exit 1 } catch { Write-Host 'Apagado' }
+      - name: Instalador (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DVersion=1.0.${{ github.run_number }}" despliegue\instalador.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - run: dist/SIDP-Servidor.exe --help
       - run: dist/SIDP-Equipo.exe --help
       # Tres equipos simulados con los .exe reales: alta, descubrimiento, TLS, ida y vuelta, reparto
@@ -45,8 +104,21 @@ jobs:
         with:
           name: sidp-windows
           path: |
+            dist/SIDP.exe
             dist/SIDP-Servidor.exe
             dist/SIDP-Equipo.exe
             dist/SIDP-Validador.exe
+            dist/SIDP-Instalador.exe
             dist/PRUEBA_DOS_EQUIPOS.md
             dist/ENTORNO_PRUEBAS.md
+      # Al fusionar a main: versión v1.0.N con SIDP.exe y el instalador. La PC 4 la baja sola cada hora y el
+      # servidor de la escuela se actualiza desde la PC 4 (validacion/actualizar.py), sin conectarse a GitHub.
+      - name: Publicar la versión (solo en main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.0.${{ github.run_number }}" dist/SIDP.exe dist/SIDP-Instalador.exe `
+            --target "${{ github.sha }}" --title "SIDP 1.0.${{ github.run_number }}" `
+            --notes "Compilado de main. La PC 4 lo baja sola y el servidor se actualiza desde ella."

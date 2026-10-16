@@ -18,6 +18,7 @@ import mimetypes
 import secrets
 import sys
 import threading
+import time
 import webbrowser
 from email.parser import BytesParser
 from email.policy import default as politica_correo
@@ -25,7 +26,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from validacion import cerebro_red, prueba
+from validacion import cerebro_red, codigo_barras, prueba
 from validacion.registro import Registro
 from validacion.servicio import Bandeja, ErrorBandeja
 
@@ -42,17 +43,23 @@ def carpeta_por_omision():
 
 
 class Aplicacion:
-    def __init__(self, carpeta, hoy=None, puerto=PUERTO, usar_modelo=True):
+    def __init__(self, carpeta, hoy=None, puerto=PUERTO, usar_modelo=True, expedientes=None, conectar_al_abrir=True):
         self.carpeta = Path(carpeta).resolve()
+        self.vigia = None  # En el .exe instalado (escritorio.Vigia) cuida la conexión con la PC 4.
+        self.actualizador = None  # En el .exe instalado (actualizar.Actualizador) toma de la PC 4 la versión nueva.
+        self.servidor = None
+        self.ultimo_cambio = time.time()  # La versión nueva se pone cuando nadie ha cambiado nada en un rato.
         self.carpeta.mkdir(parents=True, exist_ok=True)
         self.token = secrets.token_urlsafe(16)  # Sin él, otra página del navegador no puede usar el panel.
         self.puerto = puerto
         self.candado = threading.Lock()
-        self.bandeja = Bandeja(self.carpeta, hoy, usar_modelo=usar_modelo, registro=Registro(self.carpeta / 'plataforma_prueba.db'))
+        self.bandeja = Bandeja(self.carpeta, hoy, usar_modelo=usar_modelo, registro=Registro(self.carpeta / 'plataforma_prueba.db'),
+                               expedientes=expedientes)
         self.archivo_configuracion = self.carpeta / 'configuracion.json'
         self.configuracion = {}
         if self.archivo_configuracion.exists():
             self.configuracion = json.loads(self.archivo_configuracion.read_text(encoding='utf-8'))
+        if self.configuracion and conectar_al_abrir:
             self.bandeja.conectar_cerebro(self.configuracion.get('cerebro_url'), self.configuracion.get('cerebro_clave', ''))
 
     def configurar(self, url, clave):
@@ -60,6 +67,18 @@ class Aplicacion:
         self.configuracion = {'cerebro_url': (url or '').strip(), 'cerebro_clave': (clave or '').strip()}
         self.archivo_configuracion.write_text(json.dumps(self.configuracion), encoding='utf-8')
         return problema
+
+    def estado_configuracion(self, problema=None):
+        estado = {**self.configuracion, 'cerebro_conectado': bool(self.bandeja.cerebro), 'padron': self.bandeja.padron_aviso,
+                  'traidos': self.bandeja.traidos_aviso, 'respaldo': self.bandeja.respaldo_aviso, 'direccion_padres': self.direccion_padres(),
+                  'expedientes': str(self.bandeja.expedientes_alumno) if self.bandeja.expedientes_alumno else None}
+        if self.vigia:
+            estado['vigia'] = self.vigia.estado
+        if self.actualizador:
+            estado['actualizacion'] = self.actualizador.estado
+        if problema is not None:
+            estado['problema'] = problema
+        return estado
 
     def datos_para_cerebro(self):
         """Lo extraído y decidido, sin archivos: lo que el cerebro necesita para el análisis."""
@@ -78,7 +97,20 @@ class Aplicacion:
         return f'http://{cerebro_red.ip_local()}:{self.puerto}/padres'
 
 
-def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
+def respaldar_seguido(app, cada=3600, primera=120):
+    """Cada hora (la primera vez, 2 minutos después de abrir) copia a la PC 4 lo nuevo; si no está, lo intenta después."""
+    import time
+    time.sleep(primera)
+    while True:
+        if app.bandeja.cerebro:
+            try:
+                app.bandeja.respaldar()
+            except ErrorBandeja as error:
+                print(error, flush=True)
+        time.sleep(cada)
+
+
+def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
     app = aplicacion
 
     class Manejador(BaseHTTPRequestHandler):
@@ -88,6 +120,16 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
             self.send_response(codigo)
             self.send_header('Content-Type', tipo)
             self.send_header('Content-Length', str(len(cuerpo)))
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.end_headers()
+            self.wfile.write(cuerpo)
+
+        def _descargar(self, nombre, cuerpo, tipo):
+            self.send_response(200)
+            self.send_header('Content-Type', tipo)
+            self.send_header('Content-Length', str(len(cuerpo)))
+            self.send_header('Content-Disposition', f'attachment; filename="{nombre}"')
             self.send_header('Cache-Control', 'no-store')
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
@@ -113,6 +155,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
 
         def _cuerpo(self):
             largo = int(self.headers.get('Content-Length') or 0)
+            if largo < 0:
+                raise ErrorBandeja('Envío no válido')
             if largo > MAXIMO_ENVIO:
                 raise ErrorBandeja('El envío es demasiado grande (máximo 100 MB)')
             return self.rfile.read(largo)
@@ -127,9 +171,15 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     return self._enviar(200, app.pagina('panel.html'), 'text/html; charset=utf-8')
                 if url.path in ('/padres', '/padres.html'):
                     return self._enviar(200, app.pagina('padres.html'), 'text/html; charset=utf-8')
+                if url.path == '/api/hola':  # Para saber si SIDP ya está abierto en esta PC; no dice nada más.
+                    from validacion import escritorio
+                    return self._enviar(200, {'sidp': 'servidor', 'version': escritorio.version()})
                 if url.path in ESTATICOS:
                     nombre = ESTATICOS[url.path]
                     return self._enviar(200, (INTERFAZ / nombre).read_bytes(), mimetypes.guess_type(nombre)[0] + '; charset=utf-8')
+                if url.path == '/api/padres/documentos':  # Qué documentos pide la página de padres.
+                    with app.candado:
+                        return self._enviar(200, {'documentos': app.bandeja.documentos_padres()})
                 if url.path == '/api/cerebro/datos':
                     if self._cerebro():
                         with app.candado:
@@ -137,6 +187,26 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                     return
                 if not url.path.startswith('/api/') or not self._admin(consulta):
                     return self._enviar(404, {'error': 'no existe'}) if not url.path.startswith('/api/') else None
+                # Lo que vive en la PC 4 no detiene el panel mientras responde (el análisis con IA tarda).
+                if url.path == '/api/inventario':
+                    return self._enviar(200, app.bandeja.inventario())
+                if url.path == '/api/analisis_pc4':
+                    return self._enviar(200, app.bandeja.analisis_pc4(consulta.get('ia', [''])[0] == '1'))
+                if url.path == '/api/respaldo':
+                    return self._enviar(200, {'aviso': app.bandeja.respaldo_aviso, 'conectado': bool(app.bandeja.cerebro)})
+                if url.path == '/api/trabajos':
+                    return self._enviar(200, app.bandeja.trabajos_pc4())
+                if url.path == '/api/por_confirmar':
+                    return self._enviar(200, app.bandeja.por_confirmar())
+                if url.path == '/api/alumno':
+                    return self._enviar(200, app.bandeja.alumno_pc4(consulta.get('curp', [''])[0]))
+                if url.path == '/api/pdf':  # Un PDF de C:\SIDP\Expedientes, para verlo en la ventana.
+                    return self._enviar(200, app.bandeja.pdf(consulta.get('ruta', [''])[0]), 'application/pdf')
+                if url.path == '/api/etiquetas':  # Página para imprimir las etiquetas con código de barras.
+                    pedidos = [c for c in consulta.get('codigos', [''])[0].upper().split(',') if c]
+                    piezas = {p['codigo']: p for p in app.bandeja.inventario()['piezas']}
+                    return self._enviar(200, codigo_barras.hoja_etiquetas([piezas[c] for c in pedidos if c in piezas]).encode(),
+                                        'text/html; charset=utf-8')
                 with app.candado:
                     if url.path == '/api/estado':
                         return self._enviar(200, app.bandeja.estado())
@@ -144,9 +214,28 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         return self._enviar(200, app.bandeja.detalle(consulta.get('id', [''])[0]))
                     if url.path == '/api/base':
                         return self._enviar(200, app.bandeja.base())
+                    if url.path == '/api/curps':
+                        return self._enviar(200, app.bandeja.curps())
                     if url.path == '/api/configuracion':
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro),
-                                                  'direccion_padres': app.direccion_padres()})
+                        return self._enviar(200, app.estado_configuracion())
+                    if url.path == '/api/plantillas':
+                        return self._enviar(200, app.bandeja.lista_plantillas())
+                    if url.path == '/api/grupos':
+                        return self._enviar(200, app.bandeja.grupos_lista())
+                    if url.path == '/api/grupo':
+                        return self._enviar(200, app.bandeja.grupo_alumnos(consulta.get('id', [''])[0]))
+                    if url.path == '/api/buscar_alumno':
+                        return self._enviar(200, app.bandeja.buscar_alumno(consulta.get('nombre', [''])[0], consulta.get('curp', [''])[0]))
+                    if url.path == '/api/analisis':
+                        return self._enviar(200, app.bandeja.analisis())
+                    if url.path == '/api/exportar':
+                        return self._descargar(*app.bandeja.exportar(consulta.get('que', [''])[0], consulta.get('formato', ['xlsx'])[0]))
+                    if url.path == '/api/plantillas/muestra':
+                        ruta = app.bandeja.plantilla_muestra(consulta.get('clave', [''])[0], consulta.get('archivo', [''])[0])
+                        return self._enviar(200, ruta.read_bytes(), mimetypes.guess_type(ruta.name)[0] or 'application/octet-stream')
+                    if url.path == '/api/escaneo/pagina':
+                        ruta = app.bandeja.escaneo_pagina(consulta.get('lote', [''])[0], consulta.get('archivo', [''])[0])
+                        return self._enviar(200, ruta.read_bytes(), mimetypes.guess_type(ruta.name)[0] or 'application/octet-stream')
                     if url.path == '/api/archivo':
                         carpeta = app.bandeja._carpeta(consulta.get('id', [''])[0])
                         nombre = Path(consulta.get('nombre', [''])[0]).name
@@ -160,6 +249,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
 
         def do_POST(self):
             url = urlparse(self.path)
+            app.ultimo_cambio = time.time()
             try:
                 if url.path == '/api/padres/enviar':
                     captura, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())
@@ -173,18 +263,84 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
                         archivo.write_bytes(self._cuerpo()[:1024 * 1024])
                         self._enviar(200, {'guardado': archivo.name})
                     return
+                if url.path == '/api/apagar':  # SIDP.exe --apagar, desde esta misma PC.
+                    if clave_apagar and self._local() and secrets.compare_digest(self.headers.get('X-SIDP-Apagar', ''), clave_apagar):
+                        self._enviar(200, {'apagado': True})
+                        threading.Thread(target=servidor.shutdown, daemon=True).start()
+                    else:
+                        self._enviar(403, {'error': 'no permitido'})
+                    return
                 if not self._admin():
                     return
+                if url.path == '/api/cerebro/buscar':  # Plan de emergencia: encontrar a la PC 4 aunque haya cambiado de IP.
+                    from validacion import escritorio
+                    guardada = app.configuracion.get('cerebro_url')
+                    encontrados = escritorio.buscar_cerebro(guardada)
+                    return self._enviar(200, {'encontrados': encontrados, 'diagnostico': escritorio.diagnostico(guardada)})
+                if url.path == '/api/escaneo/leer':  # Escaneos de un alumno ya revisado en papel.
+                    archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.escaneo_leer(archivos))
+                if url.path == '/api/listas/leer':  # La lista de un grupo: escaneada (archivos) o escrita (campo "captura").
+                    datos, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.lista_leer([(n, c) for _, n, c in archivos], datos.get('texto', ''),
+                                                                        datos.get('apellidos_primero', True) is not False))
+                if url.path == '/api/plantillas/leer':  # Muestras de un documento: se proponen sus textos fijos.
+                    archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.plantilla_leer(archivos))
+                if url.path == '/api/plantillas/campos':  # Una muestra: el modelo que ve de la PC 4 propone sus campos.
+                    archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
+                    if not archivos:
+                        raise ErrorBandeja('Sube una muestra del documento')
+                    return self._enviar(200, app.bandeja.campos_proponer(*archivos[0]))
+                if url.path == '/api/plantillas/guardar':  # Los datos de la plantilla (campo "captura") y sus muestras.
+                    datos, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.plantilla_guardar(datos, [(n, c) for _, n, c in archivos]))
+                if url.path == '/api/renapo/constancia':  # El PDF tal cual, arrastrado al panel.
+                    contenido = self._cuerpo()
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.constancia_renapo(self.headers.get('X-SIDP-Nombre', ''), contenido))
                 datos = json.loads(self._cuerpo() or b'{}')
+                if url.path == '/api/inventario/alta':
+                    return self._enviar(200, app.bandeja.inventario_alta(datos))
+                if url.path == '/api/dato/confirmar':
+                    return self._enviar(200, app.bandeja.dato_confirmar(datos))
+                if url.path == '/api/dato/agregar':
+                    return self._enviar(200, app.bandeja.dato_agregar(datos))
+                if url.path in ('/api/alumno/baja', '/api/alumno/borrar'):
+                    with app.candado:
+                        return self._enviar(200, app.bandeja.alumno_baja(datos, borrar=url.path.endswith('borrar')))
+                if url.path == '/api/inventario/cambiar':
+                    return self._enviar(200, app.bandeja.inventario_cambiar(datos))
+                if url.path == '/api/respaldo':
+                    return self._enviar(200, app.bandeja.respaldar())
                 with app.candado:
                     if url.path == '/api/revisar_todo':
                         return self._enviar(200, app.bandeja.revisar_todo())
                     if url.path == '/api/decidir':
                         return self._enviar(200, app.bandeja.decidir(datos.get('id', ''), datos.get('decision', ''), datos.get('motivo', '')))
+                    if url.path == '/api/escaneo/guardar':
+                        return self._enviar(200, app.bandeja.escaneo_guardar(datos.get('lote', ''), datos))
+                    if url.path == '/api/escaneo/descartar':
+                        return self._enviar(200, app.bandeja.escaneo_descartar(datos.get('lote', '')))
+                    if url.path == '/api/listas/guardar':
+                        return self._enviar(200, app.bandeja.lista_guardar(datos))
+                    if url.path == '/api/listas/traer':
+                        return self._enviar(200, app.bandeja.lista_traer())
+                    if url.path == '/api/grupos/ubicar':
+                        return self._enviar(200, app.bandeja.ubicar_alumno(datos.get('alumno_id'), datos.get('grupo_id'), datos.get('mismo_que')))
+                    if url.path == '/api/grupos/crear':
+                        return self._enviar(200, app.bandeja.grupo_crear(datos.get('grado'), datos.get('letra')))
+                    if url.path == '/api/plantillas/activa':
+                        return self._enviar(200, app.bandeja.plantilla_activa(datos.get('clave', ''), datos.get('activa')))
+                    if url.path == '/api/renapo/no_encontrada':
+                        return self._enviar(200, app.bandeja.renapo_no_encontrada(datos.get('alumno', '')))
                     if url.path == '/api/configuracion':
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
-                        return self._enviar(200, {**app.configuracion, 'cerebro_conectado': bool(app.bandeja.cerebro), 'problema': problema,
-                                                  'direccion_padres': app.direccion_padres()})
+                        return self._enviar(200, app.estado_configuracion(problema))
                 self._enviar(404, {'error': 'no existe'})
             except (ErrorBandeja, ValueError) as error:
                 self._enviar(400, {'error': str(error)})
@@ -192,7 +348,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0'):
         def log_message(self, formato, *args):  # Sin datos de los padres en la ventana.
             print(f'{self.client_address[0]} {formato % args}', flush=True)
 
-    return ThreadingHTTPServer((anfitrion, app.puerto), Manejador)
+    servidor = ThreadingHTTPServer((anfitrion, app.puerto), Manejador)
+    return servidor
 
 
 def leer_formulario(tipo, cuerpo):
@@ -210,6 +367,14 @@ def leer_formulario(tipo, cuerpo):
     if captura is None:
         raise ErrorBandeja('Faltan los datos del formulario')
     return captura, archivos
+
+
+def leer_archivos(tipo, cuerpo):
+    """Solo los archivos de un formulario multipart: [(nombre, contenido)]."""
+    if not tipo.startswith('multipart/form-data'):
+        raise ErrorBandeja('Se esperaba un formulario con archivos')
+    mensaje = BytesParser(policy=politica_correo).parsebytes(f'Content-Type: {tipo}\r\n\r\n'.encode() + cuerpo)
+    return [(parte.get_filename(), parte.get_payload(decode=True) or b'') for parte in mensaje.iter_parts() if parte.get_filename()]
 
 
 def main(argumentos=None):
@@ -245,6 +410,7 @@ def main(argumentos=None):
     print('Cierra esta ventana para apagarlo.', flush=True)
     if not args.no_abrir:
         threading.Timer(1.0, webbrowser.open, (panel,)).start()
+    threading.Thread(target=respaldar_seguido, args=(app,), daemon=True).start()
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

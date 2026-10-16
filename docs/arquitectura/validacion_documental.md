@@ -114,3 +114,122 @@ Lo construido hasta hoy, en versión de prueba:
 - **Cerebro** (PC 4): valida por IP con clave y opina en la zona gris.
 
 Cómo se arma: [ENTORNO_PRUEBAS.md](../guias/ENTORNO_PRUEBAS.md). Resultados y errores: [bitácora del 2026-10-15](../bitacoras/2026-10-15.md).
+
+## CURP ante RENAPO, asistida por una persona (2026-10-15)
+
+Decisión de Maximiliano: el sistema no tiene que estar automatizado al 100%. No hay bots ni se
+resuelve el captcha de forma automática. Así funciona:
+
+1. Toda CURP entra "Sin validar" (`alumno.curp_confirmada = 0`).
+2. En el panel, la persona copia la CURP y abre gob.mx/curp. Ahí la pega, resuelve el captcha,
+   descarga la constancia en PDF y la arrastra al panel.
+3. `validacion/renapo.py` lee la constancia: busca la frase de RENAPO, la CURP con su dígito
+   verificador correcto y el nombre.
+4. El alumno se encuentra por la CURP, sin elegirlo a mano. Si el nombre coincide,
+   `sp_validar_curp_renapo` guarda la constancia como documento `curp` validado y pone
+   `curp_confirmada = 1`. La revisión y la bitácora registran quién y cuándo.
+5. Si el nombre no coincide, o si la constancia trae otra CURP pero el nombre de un alumno, el
+   documento queda rechazado y el motivo se muestra para hablar con el padre.
+6. "RENAPO no la encontró" queda anotado en la bitácora.
+
+Pendiente: confirmar con una constancia real que su texto se lee con pypdf. Solo se probó con
+constancias inventadas, porque gob.mx no se puede abrir desde el entorno en la nube.
+
+Además, desde ese mismo día el vínculo tutor–alumno se aplica solo cuando el administrador
+autoriza el expediente. Antes se aplicaba al recibirlo, y cualquiera que escribiera la CURP de un
+alumno quedaba como su tutor principal.
+
+## Expedientes escaneados, ya revisados en papel (2026-10-15)
+
+Para las carpetas que la escuela ya revisó, no se corre la validación completa: solo se extraen los
+datos. En el panel, el cuadro "Escanear expediente" recibe los escaneos de un alumno (un PDF con varias
+hojas o varios archivos), separa las hojas, reconoce cada documento por sus textos fijos y propone los
+datos del alumno y del tutor (`validacion/extraer.py`, procesos fijos, sin IA):
+
+- La CURP se busca con su dígito verificador; las confusiones del OCR (O y 0, I y 1...) se corrigen por
+  posición. Una letra de más solo se quita si queda una sola CURP posible que cuadre con un nombre del texto.
+- El nombre se encuentra con las letras que trae la CURP, en cualquier orden del documento. Si no, se usan
+  las etiquetas del acta ("Nombre(s): ... Primer apellido: ...") o del frente de la INE, con un aviso.
+- La persona revisa, corrige y guarda. El expediente queda "validado en papel": sus documentos quedan
+  validados con origen `escaneo`, el tutor vinculado, y "Revisar todo" no lo vuelve a revisar. La CURP
+  sigue "sin validar" ante RENAPO hasta que alguien haga ese paso.
+
+## Plantillas de documentos (2026-10-15)
+
+Pedido de Maximiliano: que los administrativos agreguen documentos sin programar, y que se validen por
+plantilla. Una plantilla (`validacion/plantillas.py`) es solo datos:
+
+| Campo | Qué es |
+|---|---|
+| nombre, de | Cómo lo ven los padres y si es del alumno o del tutor |
+| obligatorio, para_padres | Si falta es hallazgo; si la página de padres lo pide |
+| textos | Frases fijas del documento (título, etiquetas), sin datos de nadie |
+| minimo | Cuántas de esas frases debe tener para aceptarlo |
+| reglas | Elegidas de una lista fija: nombre del alumno, nombre del tutor, CURP del alumno, domicilio, fecha reciente (con meses) |
+
+- **Cómo se arma.** El administrativo sube una muestra: el formato en blanco, o dos o tres llenos de personas
+  distintas. El sistema propone los renglones que se repiten y, de cada "Etiqueta: dato", solo la etiqueta.
+  La persona quita lo que sobre y guarda.
+- **Dónde se usa.** La página de padres pide los documentos con `para_padres`; el escaneo reconoce las hojas
+  de cada plantilla (las de la escuela ganan a las de fábrica porque son más específicas); la revisión valida
+  cada documento con sus textos y sus reglas, en esta PC o en el cerebro (la plantilla viaja con el pedido).
+- **De fábrica.** Acta, INE, comprobante y demás aparecen como plantillas versión 0. Se les pueden agregar
+  textos fijos (otra compañía de agua o de luz) y cambiar si son obligatorios; sus revisiones propias (CURP
+  del acta, franja de la INE, vigencia) siguen siendo código.
+- **Sin sobrescribir.** Cada cambio es otra versión (`plantillas/<clave>/v001.json`) y las muestras se guardan
+  junto a ella. Dar de baja un documento es otra versión con `activa: false`.
+- **En la base.** Cada plantilla de la escuela es una fila de `tipo_documento` (clave `p_...`), así sus
+  documentos se registran como cualquier otro.
+- **Límite honesto.** La plantilla reconoce un documento por lo que dice, no por cómo se ve: un documento
+  falso que copie las frases pasa este filtro. Para eso siguen la persona que autoriza y, después, el modelo
+  que ve (borrador en `propuestas/`).
+
+## Listas de grupo y panel por pestañas (2026-10-15)
+
+Pedido de Maximiliano: un solo panel, por pestañas, con el diseño de Paola, y los expedientes divididos
+por grado y grupo. El trabajo empieza por las listas de cada grupo y después va el expediente de cada niño.
+
+- **Listas de grupo** (`validacion/grupos.py`). La lista escaneada o escrita se lee renglón por renglón
+  (`extraer.lista_de_grupo`, `extraer.grado_y_grupo`); una CURP mal leída no se mete al nombre y el
+  renglón queda como duda. La persona corrige y guarda; cada alumno se inscribe en su grupo del ciclo
+  (agosto a julio) con `sp_inscribir_alumno`. Guardar otra vez no duplica (misma CURP, o mismo nombre sin CURP).
+- **Ligar expedientes.** Al escanear, el sistema propone los alumnos parecidos de las listas (nombre sin
+  orden ni acentos) y **la persona elige**; nunca se liga solo. El alumno de la lista recibe CURP, fecha y
+  sexo, con versión y bitácora (`alumno.completado`). Lo de la página de padres cae solo en su grupo cuando
+  el nombre es idéntico o la CURP ya está; si no, el panel propone el parecido y la persona lo ubica
+  (`alumno.unido`: el renglón de la lista, sin documentos, se cancela y se archiva; nada se borra).
+- **Análisis.** Matrícula por grado y sexo, faltantes por alumno y descargas a Excel (`validacion/hoja.py`,
+  `.xlsx` sin instalar nada) y CSV con protección contra fórmulas.
+- **Panel** (`validacion/interfaz/panel.html`): Inicio, 1 Listas de grupo, 2 Escanear expediente
+  (validación manual), 3 Fila de revisión (validación automática, por grupo y estado), 4 CURP y RENAPO,
+  Análisis 911 y SAID, Plantillas y Ajustes. Funciona sin internet (sin Tailwind ni Font Awesome) y en celular.
+
+## Lista oficial de la escuela y base de datos del cerebro (2026-10-15)
+
+Pedido de Maximiliano: usar la lista oficial de la estadística de la SEP (un PDF con toda la escuela, un
+grupo por grado) como base de alumnos, y que la PC 4 tenga su propia base de datos, PostgreSQL, para hacer
+mejores procesos. Después solo se escanean los documentos físicos de cada alumno.
+
+- **Formato del PDF oficial.** Es una hoja de cálculo exportada: cada renglón trae CURP, número y nombre
+  (primer apellido, segundo apellido, nombre). Hay que leerlo con `extract_text(extraction_mode='layout')`;
+  el modo normal no separa los renglones. Algunas CURP traen letras griegas que se ven iguales a las
+  latinas (Α, Ε, Μ...): `expediente.mayusculas` las cambia. El número del encabezado es la **fase**, no el
+  grado, así que el grado sale de la edad de la mayoría (`extraer.grado_por_edad`: año de inicio del ciclo
+  − año de nacimiento − 5). La letra no viene: se pone A y la persona la confirma.
+- **Importar de un jalón.** `lista_leer` lee hoja por hoja y devuelve todos los grupos; una hoja que sigue
+  la lista del grupo anterior se une a él, y las hojas sin CURP (instrucciones) se ignoran.
+  `lista_guardar({'grupos': [...]})` revisa todo antes de guardar, así nada queda a medias.
+- **Base del cerebro** (`validacion/base_cerebro.py` y `base_cerebro.sql`). PostgreSQL en la PC 4,
+  escuchando solo en 127.0.0.1. Guarda `padron_alumno` (un alumno que sale de la lista se apaga, no se
+  borra) y `lectura` (cuánto se leyó de cada página y qué tan cerca quedó del padrón, para medir).
+  Los procesos viven en la base: `sidp_cargar_padron`, `sidp_curp_cercana` (levenshtein, hasta 2 letras)
+  y `sidp_nombre_cercano` (trigramas: aguanta faltas de ortografía y otro orden). Se conecta con pg8000,
+  que es solo Python. Sin PostgreSQL el cerebro funciona igual, sin comparar.
+- **Cómo se usa.** El .exe manda el padrón al cerebro (`POST /padron`, con la clave) al conectarse y cada
+  vez que se guardan listas. En `/leer`, cada página regresa con sus sugerencias del padrón. Al escanear,
+  si la CURP leída no es de nadie pero está a una o dos letras de la de un alumno, o no se leyó la CURP y
+  el nombre se parece a uno solo, el panel propone ese alumno **con un aviso**; la persona compara con el
+  acta y decide. Dos alumnos igual de parecidos (hermanos) no se proponen.
+- **Dónde vive cada cosa.** El .exe del administrador sigue guardando los archivos y su SQLite; la base
+  de la PC 4 es para procesar mejor. Desde la versión 2 guarda el expediente completo con sus procesos:
+  ver [base_cerebro.md](base_cerebro.md). Instalación: Tarea 008; carga de los alumnos: Tarea 009.

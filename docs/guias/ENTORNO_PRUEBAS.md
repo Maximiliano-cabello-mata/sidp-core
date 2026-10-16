@@ -178,13 +178,52 @@ schtasks /create /tn "SIDP Cerebro" /tr "\"$PWD\validacion\iniciar_cerebro.bat\"
    - Si Windows dice "Windows protegió su PC": **Más información** y luego **Ejecutar de todas formas**.
    - Si el firewall pregunta: marca **Redes privadas** y da **Permitir**. Sin esto los padres no llegan.
    - Se abre el navegador con el panel. La ventana negra se queda abierta mientras dure la prueba.
-3. En el panel, en **Cerebro de la PC 4**, escribe la dirección (`http://192.168.1.40:8771`) y la
-   clave que muestra la ventana del cerebro. Da **Conectar**. Debe decir **Conectado**.
-4. Abajo de ese cuadro aparece la dirección para los padres, por ejemplo
-   `http://192.168.1.30:8770/padres`. Ábrela desde un celular conectado al mismo Wi-Fi. Ahí se
-   capturan los datos y se toman las fotos o se suben los PDF.
-5. Cada envío aparece en el panel con su resultado. Tú autorizas o rechazas; al rechazar, el panel
-   muestra el reporte que recibiría el padre.
+El panel tiene una barra azul a la izquierda con pestañas, en el orden en que se trabaja.
+**Inicio** dice qué falta y lleva a la pestaña que toca.
+
+3. **Ajustes.** En **Cerebro de la PC 4** escribe la dirección (`http://192.168.1.40:8771`) y la
+   clave que muestra la ventana del cerebro. Da **Conectar**: debe decir **Conectado**. Ahí mismo
+   aparece la dirección para los padres, por ejemplo `http://192.168.1.30:8770/padres`. Se abre
+   desde un celular conectado al mismo Wi-Fi.
+4. **1 · Listas de grupo** (primero que todo). Da **Subir la lista de un grupo**, suelta la lista
+   escaneada (o escribe los nombres, uno por renglón) y da **Leer la lista**. El sistema separa
+   apellidos y nombres y encuentra el grado y el grupo. Revisa la tabla (lo dudoso sale en amarillo),
+   corrige y da **Guardar lista**. Los grupos quedan por grado; al abrir uno se ven sus alumnos, quién
+   ya tiene expediente y quién no. Guardar la misma lista otra vez no repite a nadie.
+5. **2 · Escanear expediente** (validación manual, para lo que la escuela ya revisó en papel).
+   1. Elige el grupo y el alumno (o desde la lista del grupo da **Escanear** en su renglón).
+   2. Suelta los escaneos del alumno: todo en un PDF o en varios.
+   3. El sistema reconoce cada hoja y llena los datos. En **¿De qué alumno es?** confirma el alumno
+      de la lista: si el nombre del acta no se parece al que elegiste, te avisa. Si no está en las
+      listas, marca "alumno nuevo" y elige su grupo.
+   4. Revisa, corrige y da **Guardar expediente**. El alumno de la lista recibe la CURP, la fecha y
+      el sexo (no se crea otro), y el sistema te pone al siguiente alumno del grupo.
+
+   Para leer escaneos (PDF que son solo imagen) se necesita el cerebro **conectado** (paso 3), con
+   el código actualizado (Parte 1, pasos 1 y 5). Sin cerebro, esta PC solo lee los PDF que traen
+   texto, y el panel lo avisa.
+6. **3 · Fila de revisión** (validación automática, lo que suben los padres). Da **Revisar todo**.
+   La lista sale dividida por grupo; arriba se filtra por grupo y por estado ("Por decidir" de
+   inicio). Tú autorizas o rechazas; al rechazar, el panel muestra el reporte que recibiría el
+   padre. El tutor queda vinculado al alumno **solo cuando autorizas**. Si el padre escribió el
+   nombre igual que en la lista, el expediente cae solo en su grupo; si no, el expediente dice
+   "no está en ninguna lista" y propone al alumno parecido: da clic en **Es ...** o elige su grupo.
+7. **4 · CURP y RENAPO.** Da **Copiar CURP y abrir RENAPO**, pega la CURP en la página oficial
+   (Ctrl + V), resuelve el captcha, descarga el PDF y suéltalo en esa pestaña. El sistema encuentra
+   al alumno por la CURP, compara el nombre y la marca **Validada en RENAPO**; la constancia se
+   guarda en `SIDP-prueba\renapo\`. Si RENAPO no la encuentra, da **RENAPO no la encontró**.
+8. **Análisis, 911 y SAID.** Matrícula por grado y sexo, lo que falta por alumno (CURP, sexo,
+   fecha, documentos) y descargas para Excel: la lista de alumnos (una hoja por grupo) y la
+   matrícula por grado. Se guardan en Descargas; tienen datos personales.
+9. **Plantillas.** Da **Agregar un documento**. Escribe su nombre, elige si es del alumno o del
+   tutor y suelta una muestra (el formato en blanco, o dos llenos de personas distintas). El sistema
+   propone sus textos fijos: quita los que tengan datos de alguien, elige qué más se revisa y da
+   **Guardar plantilla**. La página de padres lo pide desde ese momento, el escaneo lo reconoce y la
+   revisión lo valida. A los documentos del sistema (por ejemplo, el comprobante) se les pueden
+   agregar textos con **Abrir**.
+
+Los archivos se pueden soltar en cualquier parte de la pestaña abierta: van a lo que toca ahí
+(lista, escaneo, constancia o muestra).
 
 Si el celular no abre la página, revisa que la red de esta PC también sea **Privada** (paso 4a de
 la Parte 1) y que la regla del firewall exista:
