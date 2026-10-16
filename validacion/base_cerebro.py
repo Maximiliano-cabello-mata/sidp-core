@@ -69,26 +69,44 @@ class BaseCerebro:
             import pg8000.dbapi
         except ImportError:
             raise ErrorBase('falta pg8000: python -m pip install -r validacion/requisitos.txt')
-        partes = urllib.parse.urlsplit(url)
+        self._cortada = (OSError, pg8000.dbapi.InterfaceError)  # La conexión se cayó, no la consulta.
+        self.url = url
+        self.conexion = self._conectar()
+        self._candado = threading.Lock()  # Una conexión para todo el cerebro: una consulta a la vez.
+
+    def _conectar(self):
+        import pg8000.dbapi
+        partes = urllib.parse.urlsplit(self.url)
         try:
-            self.conexion = pg8000.dbapi.connect(
+            conexion = pg8000.dbapi.connect(
                 user=urllib.parse.unquote(partes.username or 'sidp'), password=urllib.parse.unquote(partes.password or ''),
                 host=partes.hostname or '127.0.0.1', port=partes.port or 5432, database=partes.path.lstrip('/') or 'sidp_cerebro',
                 timeout=30)
         except Exception as error:
             raise ErrorBase(f'no se pudo conectar a PostgreSQL ({type(error).__name__})')
-        self.conexion.autocommit = True
-        self.url = url
-        self._candado = threading.Lock()  # Una conexión para todo el cerebro: una consulta a la vez.
+        conexion.autocommit = True
+        return conexion
 
     def _consulta(self, sql, parametros=()):
         with self._candado:
-            cursor = self.conexion.cursor()
-            cursor.execute(sql, parametros) if parametros else cursor.execute(sql)
             try:
-                return [list(fila) for fila in cursor.fetchall()]
-            except Exception:  # Sentencias sin filas (CREATE, INSERT).
-                return []
+                return self._ejecutar(sql, parametros)
+            except self._cortada:
+                # PostgreSQL se reinició o cortó la conexión: sin esto, el cerebro fallaba en todo hasta reiniciarlo.
+                try:
+                    self.conexion.close()
+                except Exception:
+                    pass
+                self.conexion = self._conectar()
+                return self._ejecutar(sql, parametros)
+
+    def _ejecutar(self, sql, parametros):
+        cursor = self.conexion.cursor()
+        cursor.execute(sql, parametros) if parametros else cursor.execute(sql)
+        try:
+            return [list(fila) for fila in cursor.fetchall()]
+        except Exception:  # Sentencias sin filas (CREATE, INSERT).
+            return []
 
     def _uno(self, sql, parametros=()):
         return self._consulta(sql, parametros)[0][0]

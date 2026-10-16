@@ -259,6 +259,11 @@ def test_el_panel_trae_la_lista_de_la_pc4_y_corrige_los_nombres(base, tmp_path):
         traido = pedir(url, '/api/listas/traer', {}, token)[1]
         assert traido['aviso'] == 'De la PC 4: 7 alumnos (0 nuevos aquí, 0 con el nombre corregido).'
         assert base.resumen()['alumnos'] == 7
+        # Si PostgreSQL corta la conexión (se reinició), el cerebro abre otra y sigue: antes daba error 500 hasta reiniciarlo.
+        otra = base_cerebro.BaseCerebro(os.environ['SIDP_PRUEBA_BASE'])
+        otra._consulta('SELECT pg_terminate_backend(%s)', (base._uno('SELECT pg_backend_pid()'),))
+        traido = pedir(url, '/api/listas/traer', {}, token)[1]
+        assert traido['aviso'].startswith('De la PC 4: 7 alumnos') and 'Padrón en la base del cerebro' in traido['padron']
     finally:
         servidor.shutdown()
         cerebro.shutdown()

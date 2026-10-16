@@ -705,3 +705,30 @@ Pasos (no se borra nada):
 3. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea015.md` con: la lista de modelos de `ollama list` (solo
    nombres), la salida del paso 2 (solo números; sin IP, claves, nombres ni CURP) y cualquier error completo. Súbelo
    solo a él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).
+
+## Tarea 016: el cerebro contesta "error 500" con la lista de alumnos (2026-10-16)
+
+**Qué pasa.** SIDP.exe se conecta al cerebro, pero `/alumnos` y `/padron` contestan error 500. Lo más probable es que
+PostgreSQL se haya reiniciado o haya cortado la conexión. El cerebro usa una sola conexión y no la volvía a abrir,
+así que fallaba en todo hasta reiniciarlo. Ya está arreglado en la rama: ahora se vuelve a conectar solo y anota el
+error completo en `cerebro.error.log`.
+
+No borres nada, no cambies la base y no toques archivos fuera de `resultados/`.
+
+1. **Antes de reiniciar**, guarda el error. Copia las últimas 40 líneas de `C:\SIDP-datos\registros\cerebro.error.log`
+   y de `C:\SIDP-datos\registros\cerebro.log`, y revisa si PostgreSQL se reinició hoy:
+   ```
+   Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'} -MaxEvents 300 | Where-Object Message -match 'postgresql' | Select-Object -First 5 TimeCreated, Message
+   ```
+2. Actualiza la rama y reinicia los servicios:
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
+   ```
+3. Comprueba que ya contesta. Solo imprime cuántos, sin nombres:
+   ```
+   python -c "from pathlib import Path; from validacion import cerebro_red as c; k = (Path.home() / '.sidp' / 'clave_cerebro.txt').read_text(encoding='utf-8').strip(); g = c.alumnos_de_cerebro('http://127.0.0.1:8771', k)['grupos']; print(len(g), 'grupos,', sum(len(x['filas']) for x in g), 'alumnos')"
+   ```
+4. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea016.md` con lo del paso 1 (cambia cualquier nombre o CURP
+   por `[dato]`; sin IP ni claves), la salida del paso 3 y la de `cerebro\pc4\estado_servicios.ps1`. Súbelo solo a
+   él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).

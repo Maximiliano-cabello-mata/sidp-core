@@ -30,6 +30,7 @@ import socket
 import tempfile
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -130,10 +131,7 @@ def leer_en_cerebro(archivos, url, clave, espera=900):
 
 def padron_a_cerebro(ciclo, alumnos, url, clave, espera=60):
     """Lado del .exe: manda el padrón (los alumnos de las listas) a la base del cerebro."""
-    cuerpo = json.dumps({'ciclo': ciclo, 'alumnos': alumnos}, ensure_ascii=False).encode()
-    solicitud = urllib.request.Request(url.rstrip('/') + '/padron', cuerpo, {'Content-Type': 'application/json', 'X-SIDP-Clave': clave})
-    with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
-        return json.load(respuesta)
+    return pedir_a_cerebro(url, clave, '/padron', {'ciclo': ciclo, 'alumnos': alumnos}, espera)
 
 
 def bajar_de_cerebro(url, clave, ruta, espera=600):
@@ -165,10 +163,8 @@ class ErrorCerebro(Exception):
 
 
 def alumnos_de_cerebro(url, clave, espera=60):
-    """Lado del .exe: los alumnos inscritos en la base de la PC 4, por grupo."""
-    solicitud = urllib.request.Request(url.rstrip('/') + '/alumnos', headers={'X-SIDP-Clave': clave})
-    with urllib.request.urlopen(solicitud, timeout=espera) as respuesta:
-        return json.load(respuesta)
+    """Lado del .exe: los alumnos inscritos en la base de la PC 4, por grupo. Un error sube con lo que dijo la PC 4."""
+    return pedir_a_cerebro(url, clave, '/alumnos', espera=espera)
 
 
 def senas(vistas):
@@ -261,7 +257,12 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 resultado['estudio'] = estudio.guardado() if estudio else None
                 return self._responder(200, resultado)
             except Exception as error:
-                return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}'})
+                return self._fallo_base(error)
+
+        def _fallo_base(self, error):
+            traceback.print_exc()  # Queda en cerebro.error.log de la PC 4.
+            detalle = ' '.join(str(error).split())[:160]
+            return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}' + (f' ({detalle})' if detalle else '')})
 
         def _leer_json(self, maximo):
             largo = int(self.headers.get('Content-Length') or 0)
@@ -403,7 +404,7 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 except (ValueError, KeyError, TypeError) as error:
                     return self._responder(400, {'error': f'padrón mal formado: {error}'})
                 except Exception as error:
-                    return self._responder(500, {'error': f'la base de datos falló: {type(error).__name__}'})
+                    return self._fallo_base(error)
                 return self._responder(200, {'ok': True, 'cargados': cargados, **base.resumen()})
             if self.path in ('/validar', '/leer'):
                 if not 0 < largo <= MAXIMO_EXPEDIENTE:
