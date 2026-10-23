@@ -2,6 +2,7 @@
 #   powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
 # No imprime la clave del cerebro ni la dirección de la base.
 $puertos = @{ 5432 = 'PostgreSQL'; 11434 = 'Ollama'; 8771 = 'Cerebro' }
+if (Test-Path 'C:\SIDP\sistema') { $puertos[8770] = 'Servidor (SIDP.exe)' }  # El servidor que también es el cerebro.
 
 foreach ($tarea in 'SIDP-Ollama', 'SIDP-Cerebro', 'SIDP-Vigia') {
     $t = Get-ScheduledTask -TaskName $tarea -ErrorAction SilentlyContinue

@@ -59,7 +59,8 @@ def test_el_servidor_se_reconecta_solo_y_guarda_los_pdf_por_alumno(cerebro, tmp_
     servidor_cerebro, url_cerebro = cerebro
     app = aplicacion.Aplicacion(tmp_path / 'sistema', puerto=0, expedientes=tmp_path / 'Expedientes', conectar_al_abrir=False)
     app.configuracion = {'cerebro_url': 'http://127.0.0.1:9', 'cerebro_clave': 'clave-de-prueba'}  # La IP de antes.
-    vigia = escritorio.Vigia(app, redes=[ipaddress.ip_network('127.0.0.0/30')], puerto=servidor_cerebro.server_port)
+    vigia = escritorio.Vigia(app, redes=[ipaddress.ip_network('127.0.0.0/30')], puerto=servidor_cerebro.server_port,
+                             archivo_clave=tmp_path / 'sin_clave.txt')
     app.vigia = vigia
     assert vigia.revisar()['conectado'] is True
     assert app.configuracion['cerebro_url'] == url_cerebro and app.bandeja.cerebro
@@ -79,3 +80,20 @@ def test_el_servidor_se_reconecta_solo_y_guarda_los_pdf_por_alumno(cerebro, tmp_
     # Apagar pide la clave que solo conoce esta PC.
     assert pedir(url, '/api/apagar', {}, {'X-SIDP-Apagar': 'otra'})[0] == 403
     assert pedir(url, '/api/apagar', {}, {'X-SIDP-Apagar': 'adios'})[0] == 200
+
+
+def test_el_servidor_que_tambien_es_cerebro_se_conecta_sin_escribir_la_clave(cerebro, tmp_path):
+    servidor_cerebro, url_cerebro = cerebro
+    archivo = tmp_path / '.sidp' / 'clave_cerebro.txt'
+    app = aplicacion.Aplicacion(tmp_path / 'sistema', puerto=0, expedientes=tmp_path / 'Expedientes', conectar_al_abrir=False)
+    vigia = escritorio.Vigia(app, redes=[], puerto=servidor_cerebro.server_port, archivo_clave=archivo)
+    assert vigia.revisar()['problema'] == 'Falta escribir la clave del cerebro (Ajustes).'  # Sin cerebro en esta PC.
+    archivo.parent.mkdir()
+    archivo.write_text('otra-clave', encoding='utf-8')
+    assert vigia.revisar()['conectado'] is False and not app.configuracion  # Con otra clave no se toca Ajustes.
+    # Ajustes aún tiene la PC 4 de antes, que ya no contesta: se toma el cerebro de esta PC con su clave.
+    archivo.write_text('clave-de-prueba\n', encoding='utf-8')
+    app.configuracion = {'cerebro_url': 'http://127.0.0.1:9', 'cerebro_clave': 'la-de-la-pc4'}
+    assert vigia.revisar()['conectado'] is True and app.bandeja.cerebro
+    assert app.configuracion == {'cerebro_url': url_cerebro, 'cerebro_clave': 'clave-de-prueba'}
+    assert escritorio.cerebro_local(9, archivo) is None  # En ese puerto no hay nadie.

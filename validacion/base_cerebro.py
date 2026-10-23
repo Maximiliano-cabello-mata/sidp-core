@@ -37,7 +37,8 @@ from validacion.expediente import mayusculas
 
 ESQUEMA = Path(__file__).with_name('base_cerebro.sql')
 ARCHIVO = Path.home() / '.sidp' / 'base_cerebro.txt'
-CARPETA_RESPALDOS = Path('C:/SIDP-datos/respaldos') if os.name == 'nt' else Path.home() / 'SIDP-datos' / 'respaldos'
+# SIDP_RESPALDOS: otra carpeta, por ejemplo en el disco externo cuando el servidor también es el cerebro (Tarea 019).
+CARPETA_RESPALDOS = Path(os.environ.get('SIDP_RESPALDOS') or (Path('C:/SIDP-datos/respaldos') if os.name == 'nt' else Path.home() / 'SIDP-datos' / 'respaldos'))
 CURP_MAXIMO = 2       # Letras distintas que se aceptan para proponer una CURP de la base.
 NOMBRE_MINIMO = 0.6   # Parecido mínimo para proponer a un alumno por su nombre.
 

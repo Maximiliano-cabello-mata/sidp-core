@@ -10,6 +10,7 @@
 - Busca sola a la PC 4: primero en la dirección guardada y, si cambió (la red le dio otra IP), en toda la red
   local. La clave del cerebro se escribe una sola vez. Si la PC 4 no aparece, todo sigue funcionando en esta PC y
   se reintenta cada minuto (ver docs/guias/PLAN_DE_EMERGENCIA.md).
+- Si el cerebro corre en esta misma PC (Tarea 019), se conecta solo con la clave que dejó en esta cuenta.
 - Se actualiza solo desde la PC 4, sin depender del repositorio (validacion/actualizar.py): cada hora pregunta si
   hay versión nueva y la pone cuando nadie la está usando.
 
@@ -137,23 +138,41 @@ def diagnostico(url):
     return 'La PC 4 contesta: si no conecta, revisa la clave.'
 
 
+def cerebro_local(puerto=PUERTO_CEREBRO, archivo=None):
+    """El cerebro en esta misma PC (el servidor también hace de cerebro): (dirección, clave) si contesta con la clave
+    que guardó en esta cuenta; si no, None. Así nadie tiene que copiar la clave a Ajustes."""
+    archivo = Path(archivo or Path.home() / '.sidp' / 'clave_cerebro.txt')
+    try:
+        clave = archivo.read_text(encoding='utf-8').strip()
+    except OSError:
+        return None
+    url = f'http://127.0.0.1:{puerto}'
+    from validacion import modelo
+    return (url, clave) if clave and _abierto('127.0.0.1', puerto) and not modelo.salud_remota(url, clave) else None
+
+
 class Vigia:
     """Cuida la conexión con la PC 4: reconecta solo y, si cambió de IP, la vuelve a encontrar."""
 
-    def __init__(self, app, cada=CADA, redes=None, puerto=PUERTO_CEREBRO):
+    def __init__(self, app, cada=CADA, redes=None, puerto=PUERTO_CEREBRO, archivo_clave=None):
         self.app = app
         self.cada = cada
         self.redes, self.puerto = redes, puerto
+        self.archivo_clave = archivo_clave  # La clave del cerebro de esta misma PC (cerebro_local).
         self.estado = {'conectado': bool(app.bandeja.cerebro), 'buscando': False, 'problema': None, 'revisado': None}
 
     def revisar(self):
         config = self.app.configuracion
         url, clave = config.get('cerebro_url'), config.get('cerebro_clave', '')
+        from validacion import modelo
+        problema = (modelo.salud_remota(url, clave) if url else 'sin dirección') if clave else 'sin clave'
+        local = cerebro_local(self.puerto, self.archivo_clave) if problema else None
+        if local:  # El cerebro está en esta PC: se conecta con su clave, aunque Ajustes tenga la de la PC 4 de antes.
+            url, clave = local
+            problema = self.app.configurar(url, clave)
         if not clave:
             self.estado.update(conectado=False, problema='Falta escribir la clave del cerebro (Ajustes).')
             return self.estado
-        from validacion import modelo
-        problema = modelo.salud_remota(url, clave) if url else 'sin dirección'
         if problema:
             self.estado['buscando'] = True
             encontrados = buscar_cerebro(url, self.puerto, self.redes)

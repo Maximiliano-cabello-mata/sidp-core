@@ -511,6 +511,9 @@ def main(argumentos=None):
     parser.add_argument('--exigir-base', action='store_true', help='si PostgreSQL no contesta, salir en vez de seguir sin base')
     parser.add_argument('--actualizaciones', type=Path, default=actualizar.carpeta_pc4(),
                         help='dónde guarda la PC 4 las versiones de SIDP.exe que toma el servidor')
+    # Si el servidor también es el cerebro (Tarea 019), SIDP_CEREBRO_ANFITRION=127.0.0.1: nadie de la red llega al 8771.
+    parser.add_argument('--anfitrion', default=os.environ.get('SIDP_CEREBRO_ANFITRION') or '0.0.0.0',
+                        help='0.0.0.0 = toda la red (PC 4 aparte); 127.0.0.1 = solo esta PC')
     args = parser.parse_args(argumentos)
     clave = clave_guardada(args.clave)
     base, problema = base_cerebro.abrir(args.base)
@@ -528,11 +531,11 @@ def main(argumentos=None):
         estudio = analisis_datos.Estudio(base, args.ollama, ocupado=lambda: bool(taller and (taller.ahora or base._uno(
             "SELECT count(*) FROM sidp.trabajo WHERE estado = 'pendiente'"))))
         threading.Thread(target=estudio.vigilar, daemon=True).start()
-    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, base=base, taller=taller, actualizaciones=args.actualizaciones,
-                              estudio=estudio)
+    servidor = crear_servidor(clave, args.puerto, args.modelo, args.ollama, anfitrion=args.anfitrion, base=base, taller=taller,
+                              actualizaciones=args.actualizaciones, estudio=estudio)
     if os.environ.get('SIDP_ACTUALIZAR_GITHUB', '1') != '0':  # Cada hora baja de GitHub la versión nueva de SIDP.exe.
         threading.Thread(target=actualizar.vigilar_github, args=(args.actualizaciones,), daemon=True).start()
-    print(f'Cerebro escuchando en http://{ip_local()}:{args.puerto}  (modelo {args.modelo})')
+    print(f'Cerebro escuchando en http://{ip_local() if args.anfitrion == "0.0.0.0" else args.anfitrion}:{args.puerto}  (modelo {args.modelo})')
     if base:
         resumen = base.resumen()
         print(f'Base de datos: {resumen["motor"]} con {resumen["alumnos"]} alumnos inscritos.')

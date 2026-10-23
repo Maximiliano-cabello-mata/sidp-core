@@ -17,6 +17,8 @@ El problema que resuelve: el personal pierde horas capturando, buscando, llenand
 | Cerebro (IA) | Ayudante opcional: redacta borradores, propone campos de formatos, analiza datos | PC 4 dedicada (Ryzen 5, 24 GB, disco mecánico de 128 GB solo para temporales). No aloja la plataforma |
 | Plataforma web de padres | Página en internet donde los padres se registran con su correo, suben documentos y reciben el resultado | Hosting en la nube. El servidor descarga lo nuevo; no se abre el módem |
 
+**Cambio del 2026-10-23.** La PC 4 dio problemas: el servidor también hace de cerebro, con el cerebro, Ollama y PostgreSQL escuchando solo en esa PC y con prioridad baja (Tarea 019 de `cerebro/laboratorio/BUZON.md`). Por eso el respaldo tiene que ir a un disco externo.
+
 Principios:
 
 1. **Una sola plataforma, un solo servidor** (ADR-019, ADR-027). Las demás PCs protegen los datos con copias; no guardan pedazos de ellos.

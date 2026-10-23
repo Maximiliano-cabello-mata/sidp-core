@@ -16,7 +16,10 @@
 #   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -ComoSistema
 # Para quitarlo todo y volver a como estaba:
 #   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -Quitar
-param([switch]$Quitar, [switch]$ComoSistema)
+# En el servidor que también es el cerebro (Tarea 019), con -MismaPC: el cerebro escucha solo en esta PC, Ollama y el
+# cerebro trabajan con prioridad baja para que el panel no se alente, y un solo modelo a la vez ocupa la memoria.
+#   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -MismaPC
+param([switch]$Quitar, [switch]$ComoSistema, [switch]$MismaPC)
 $ErrorActionPreference = 'Stop'
 
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -84,6 +87,7 @@ while ($true) {
     Add-Content "$registro.ciclo.log" ((Get-Date -Format s) + ' arranca')
     $p = Start-Process -FilePath '__PROGRAMA__' -ArgumentList '__ARGUMENTOS__' -WorkingDirectory '__CARPETA__' `
         -NoNewWindow -PassThru -RedirectStandardOutput "$registro.log" -RedirectStandardError "$registro.error.log"
+    if ($env:SIDP_PRIORIDAD) { try { $p.PriorityClass = $env:SIDP_PRIORIDAD } catch { } }  # Lo que abra después la hereda.
     $p.WaitForExit()
     Add-Content "$registro.ciclo.log" ((Get-Date -Format s) + " se detuvo (código $($p.ExitCode)); vuelve a arrancar en 10 s")
     Start-Sleep -Seconds 10
@@ -96,9 +100,25 @@ while ($true) {
 
 # Ajustes que se conservan: este script nunca sobrescribe ajustes.ps1. La primera vez se llena con lo que se
 # haya agregado a mano a los lanzadores (para no perderlo) y con valores para una PC sin tarjeta de video.
+# Con -MismaPC se agregan los del servidor que también es el cerebro (solo los que falten).
 $archivoAjustes = Join-Path $servicios 'ajustes.ps1'
+$deMismaPC = @(
+    "`$env:SIDP_CEREBRO_ANFITRION = '127.0.0.1'",
+    "`$env:SIDP_PRIORIDAD = 'BelowNormal'",
+    "`$env:OLLAMA_MAX_LOADED_MODELS = '1'",
+    "`$env:OLLAMA_NUM_PARALLEL = '1'",
+    "`$env:SIDP_SIN_PADDLE = '1'"
+)
 if (Test-Path $archivoAjustes) {
     Write-Host "Ajustes: se conservan los de $archivoAjustes"
+    if ($MismaPC) {
+        $yaPuestos = @(Get-Content $archivoAjustes | Where-Object { $_ -match '^\s*\$env:' } | ForEach-Object { ($_ -split '=')[0].Trim() })
+        $faltan = @($deMismaPC | Where-Object { $yaPuestos -notcontains ($_ -split '=')[0].Trim() })
+        if ($faltan.Count) {
+            Add-Content -Encoding UTF8 $archivoAjustes $faltan
+            Write-Host "Ajustes del servidor que también es cerebro agregados: $($faltan.Count)"
+        }
+    }
 } else {
     $previos = @()
     foreach ($nombre in 'ollama.ps1', 'cerebro.ps1') {
@@ -115,14 +135,16 @@ if (Test-Path $archivoAjustes) {
         "`$env:SIDP_LADO_VISION = '960'",
         "`$env:SIDP_LECTURAS_VISION = '1'",
         "`$env:OLLAMA_FLASH_ATTENTION = '1'",
-        "`$env:OLLAMA_KEEP_ALIVE = '24h'"
-    ) | Where-Object { $yaPuestos -notcontains ($_ -split '=')[0].Trim() })
+        "`$env:OLLAMA_KEEP_ALIVE = '$(if ($MismaPC) { '30m' } else { '24h' })'"
+    ) + @($deMismaPC | Where-Object { $MismaPC }) | Where-Object { $yaPuestos -notcontains ($_ -split '=')[0].Trim() })
     $encabezado = @(
         '# Ajustes de la PC 4. instalar_servicios.ps1 no toca este archivo: lo que cambies aquí se queda.',
         '# Después de cambiar algo, reinicia la PC 4 (o vuelve a correr instalar_servicios.ps1).',
         '#   SIDP_MODELO_VISION: el modelo que ve (python -m validacion.vision modelos dice cuáles hay).',
         '#   SIDP_LADO_VISION: píxeles de la hoja para el modelo (menos = más rápido, pero la letra chica se pierde).',
         '#   SIDP_LECTURAS_VISION: 1 (aceptado); 2 = lee cada hoja dos veces y lo que no coincide queda por confirmar (más lento).',
+        '#   SIDP_RESPALDO y SIDP_RESPALDOS: carpetas del respaldo del servidor y de la copia diaria de la base (por omisión en C:\SIDP-datos).',
+        '#   Servidor que también es cerebro (-MismaPC): SIDP_CEREBRO_ANFITRION, SIDP_PRIORIDAD, OLLAMA_MAX_LOADED_MODELS, SIDP_SIN_PADDLE.',
         '#   OLLAMA_HOST y OLLAMA_MODELS no van aquí: los pone el lanzador (Ollama solo en 127.0.0.1).'
     )
     Set-Content -Encoding UTF8 $archivoAjustes ($encabezado + $previos + $porOmision)

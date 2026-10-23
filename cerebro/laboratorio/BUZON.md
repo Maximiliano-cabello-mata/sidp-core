@@ -788,3 +788,268 @@ No borres nada, no cambies la base a mano y no toques archivos fuera de `resulta
 3. Escribe `cerebro\laboratorio\resultados\2026-10-23_tarea018.md` con la salida del paso 2 y cualquier error
    completo (sin IP, claves, nombres ni CURP). Súbelo solo a él, como siempre (`git add` de ese archivo, `commit`,
    `pull --rebase`, `push`).
+
+## Tarea 019: el servidor también es el cerebro (2026-10-23)
+
+**Para quién.** Para el agente de la computadora que es el **servidor** de SIDP: donde corre SIDP.exe, con el panel en
+el puerto 8770 y los expedientes en `C:\SIDP`. Las tareas 001 a 018 eran de la PC 4; **no las hagas**. Esta tarea trae
+todo lo que hacía falta de ellas, en orden.
+
+**Qué cambia.** La PC 4 dio problemas. Desde ahora esta misma computadora hace las dos cosas: es el servidor (SIDP.exe)
+y es el cerebro (PostgreSQL con la base de los alumnos, Ollama con los modelos y el cerebro en el puerto 8771).
+Maximiliano autorizó instalar todo lo que dice esta tarea.
+
+**Reglas.**
+
+1. Nunca escribas la clave del cerebro, las contraseñas de PostgreSQL ni la IP en el repositorio, en el informe ni en un
+   mensaje. Viven solo en `%USERPROFILE%\.sidp\`. El repositorio es público.
+2. Nunca subas documentos ni datos reales de alumnos (nombres, CURP, fotos). Al informe solo van números.
+3. Ollama, PostgreSQL y el cerebro escuchan **solo en 127.0.0.1**. Lo único de esta PC abierto a la red es el panel
+   (8770), que ya abrió el instalador de SIDP.
+4. No borres, muevas ni cambies nada en `C:\SIDP`: son los expedientes de la escuela.
+5. Solo agregas archivos en `cerebro/laboratorio/resultados/`. Si quieres proponer un cambio de código, déjalo como
+   `.patch` ahí y dilo en el informe.
+6. No reinicies la computadora hasta que Maximiliano diga que nadie la está usando.
+7. Si un paso falla, anota el error completo, no intentes un arreglo que borre algo y avísale a Maximiliano.
+
+Todo se hace en **PowerShell como administrador**, con la cuenta de Windows que se usa todos los días en este servidor:
+SIDP.exe busca la clave del cerebro en esa cuenta.
+
+### 1. Revisar la computadora
+
+```
+Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version
+Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors
+[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
+Get-CimInstance Win32_VideoController | Select-Object Name
+Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{n='LibreGB'; e={[math]::Round($_.Free / 1GB, 1)}}
+Test-Path C:\SIDP\sistema\plataforma_prueba.db
+Get-NetTCPConnection -State Listen -LocalPort 8770 -ErrorAction SilentlyContinue | Select-Object LocalAddress
+Get-Service postgresql* -ErrorAction SilentlyContinue
+Get-Command python, git, winget -ErrorAction SilentlyContinue | Select-Object Name, Source
+```
+
+Con lo que salió:
+
+- Si `Test-Path` dice `False`, SIDP no está instalado aquí. **Para** y avísale a Maximiliano: primero instala
+  `SIDP-Instalador.exe` (GitHub > Actions > la corrida más nueva de la rama `claude/project-thread-vp6ab8` > artefacto
+  `sidp-windows`). Si los datos de SIDP están en otra computadora, que se lo diga a Claude antes de seguir.
+- Si ya hay un PostgreSQL instalado, no lo toques: anótalo, **para** y avísale.
+- Con menos de 8 GB de memoria o menos de 25 GB libres en `C:`, **para** y avísale: no alcanza para los modelos.
+- De 8 a 15 GB de memoria: **modo ligero** (en el paso 6 solo se baja el modelo que ve).
+- 16 GB o más: **modo completo** (los tres modelos).
+
+### 2. Git, Python y el código
+
+Instala lo que no salió en el último renglón del paso 1 (Python **para todos los usuarios**, así lo encuentran los
+servicios):
+
+```
+winget install -e --id Git.Git --accept-package-agreements --accept-source-agreements
+winget install -e --id Python.Python.3.13 --scope machine --accept-package-agreements --accept-source-agreements
+```
+
+Cierra PowerShell y ábrelo otra vez como administrador, para que encuentre `git` y `python`. Si `python --version` abre
+la Tienda de Microsoft, apaga el alias en Configuración > Aplicaciones > Configuración avanzada de aplicaciones > Alias
+de ejecución de aplicaciones (`python.exe` y `python3.exe`).
+
+```
+New-Item -ItemType Directory -Force C:\SIDP-cerebro | Out-Null
+cd C:\SIDP-cerebro
+git clone https://github.com/Maximiliano-cabello-mata/sidp-core.git
+cd sidp-core
+git checkout claude/project-thread-vp6ab8
+python --version
+```
+
+Configura tu nombre y correo de Git **solo para este repositorio** (`git config user.name "..."` y
+`git config user.email "..."`), con los que te diga Maximiliano. Desde aquí, todos los comandos van en
+`C:\SIDP-cerebro\sidp-core`.
+
+### 3. Lo que necesita el lector
+
+```
+python -m pip install -r validacion\requisitos.txt
+winget install -e --id UB-Mannheim.TesseractOCR --accept-package-agreements --accept-source-agreements
+Invoke-WebRequest https://github.com/tesseract-ocr/tessdata_fast/raw/main/spa.traineddata `
+  -OutFile "C:\Program Files\Tesseract-OCR\tessdata\spa.traineddata"
+$env:SIDP_SIN_PADDLE = '1'; python -m validacion.lector
+```
+
+PaddleOCR **no** se instala en el servidor: es pesado y aquí comparte la computadora con el panel. El lector usa
+Tesseract y el modelo que ve. En `python -m validacion.lector` todo debe decir `true` menos PaddleOCR.
+
+### 4. PostgreSQL 17, solo en esta PC
+
+1. Crea las dos contraseñas (quedan solo en esta PC):
+   ```
+   New-Item -ItemType Directory -Force "$env:USERPROFILE\.sidp" | Out-Null
+   $admin = [guid]::NewGuid().ToString('N'); $admin | Set-Content -NoNewline -Encoding ascii "$env:USERPROFILE\.sidp\postgres_admin.txt"
+   $clavePg = [guid]::NewGuid().ToString('N')
+   ```
+2. Baja el instalador de Windows x86-64 de https://www.enterprisedb.com/downloads/postgres-postgresql-downloads (la
+   versión 17 más nueva) y córrelo así, con el nombre del archivo que bajaste:
+   ```
+   & ".\postgresql-17.X-X-windows-x64.exe" --mode unattended --unattendedmodeui none --superpassword $admin `
+     --serverport 5432 --disable-components pgAdmin,stackbuilder
+   ```
+3. En `C:\Program Files\PostgreSQL\17\data\postgresql.conf` deja la línea `listen_addresses = 'localhost'` (sin `#`
+   al inicio) y reinicia el servicio. En `netstat` solo deben salir `127.0.0.1:5432` y `[::1]:5432`:
+   ```
+   Get-Service postgresql* | Restart-Service
+   netstat -ano | findstr :5432
+   Get-NetFirewallRule | Where-Object DisplayName -like '*Postgre*' | Disable-NetFirewallRule
+   ```
+4. Crea el usuario y la base del cerebro:
+   ```
+   $env:PGPASSWORD = $admin
+   $psql = "C:\Program Files\PostgreSQL\17\bin\psql.exe"
+   & $psql -U postgres -h 127.0.0.1 -c "CREATE ROLE sidp LOGIN PASSWORD '$clavePg'"
+   & $psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE sidp_cerebro OWNER sidp"
+   Remove-Item Env:PGPASSWORD
+   "postgresql://sidp:$clavePg@127.0.0.1:5432/sidp_cerebro" | Set-Content -NoNewline -Encoding ascii "$env:USERPROFILE\.sidp\base_cerebro.txt"
+   ```
+
+### 5. Traer la base de la PC 4, si se puede
+
+Pregúntale a Maximiliano si la PC 4 todavía enciende. Si sí, que copie a una memoria USB el archivo
+`sidp_cerebro_*.dump` más nuevo de `C:\SIDP-datos\respaldos` de la PC 4 y la conecte aquí. Restáuralo **antes** de crear
+las tablas (cambia `E:\...` por la ruta del archivo). Si avisa de errores con `COMMENT ON EXTENSION`, no importan:
+
+```
+$env:PGPASSWORD = (Get-Content "$env:USERPROFILE\.sidp\postgres_admin.txt" -Raw).Trim()
+& "C:\Program Files\PostgreSQL\17\bin\pg_restore.exe" -U postgres -h 127.0.0.1 -d sidp_cerebro --no-owner --role=sidp "E:\sidp_cerebro_AAAAMMDD_HHMMSS.dump"
+Remove-Item Env:PGPASSWORD
+```
+
+Si la PC 4 ya no enciende, sáltate la restauración: la base empieza vacía y SIDP.exe le manda su lista de alumnos al
+conectarse (paso 9).
+
+Crea o pone al día las tablas. Debe decir `Base lista: PostgreSQL 17...` con el número de alumnos:
+
+```
+python -m validacion.base_cerebro
+```
+
+### 6. Ollama y los modelos
+
+```
+winget install -e --id Ollama.Ollama --accept-package-agreements --accept-source-agreements
+$ollama = "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe"
+& $ollama pull qwen2.5vl:3b
+```
+
+En **modo completo**, además:
+
+```
+& $ollama pull llama3.1:latest
+& $ollama create sidp-revisor-2 -f cerebro\laboratorio\Modelfile.2
+```
+
+Si `pull` dice que no puede conectarse, abre Ollama desde el menú Inicio y vuelve a intentarlo. Termina con
+`& $ollama list`. No bajes `qwen3-vl:8b`: es demasiado lento. Sin `llama3.1`, el estudio de los alumnos sale sin el
+resumen escrito y el modelo que opina contesta "duda"; todo lo demás funciona igual.
+
+### 7. La clave del cerebro
+
+Se crea una vez y se queda en esta PC. No la muestres ni la copies a ningún lado:
+
+```
+python -c "from pathlib import Path; from validacion.cerebro_red import clave_guardada; clave_guardada(Path.home() / '.sidp' / 'clave_cerebro.txt'); print('clave lista')"
+```
+
+### 8. Que todo arranque solo, en la misma PC
+
+`-MismaPC` deja al cerebro escuchando solo en esta PC, a Ollama y al cerebro con prioridad baja (el panel no se alenta
+mientras la IA lee) y un solo modelo a la vez en la memoria:
+
+```
+powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -MismaPC
+```
+
+Espera 2 minutos y revisa:
+
+```
+powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
+```
+
+Debe decir: las tareas SIDP-Ollama, SIDP-Cerebro y SIDP-Vigia existen; PostgreSQL, Ollama y el cerebro escuchan en
+`127.0.0.1` (si el cerebro dice `0.0.0.0`, algo falló con `-MismaPC`); el servidor (SIDP.exe) escucha en el 8770; y
+`Cerebro: responde. Base: PostgreSQL 17...`.
+
+Si el cerebro no responde y `C:\SIDP-datos\registros\cerebro.error.log` dice `ModuleNotFoundError`, o el resultado de
+SIDP-Cerebro o SIDP-Ollama no es `0x0` ni `0x41301`, corre otra vez el instalador con `-MismaPC -ComoSistema` y revisa
+de nuevo.
+
+Cuando Maximiliano diga que nadie usa el servidor, pídele que lo reinicie y que espere 6 minutos antes de pedirte que
+sigas. Corre otra vez `estado_servicios.ps1` y copia `C:\SIDP-datos\registros\vigia.log`. Si el cerebro no quedó listo
+solo, usa `-MismaPC -ComoSistema` y repite.
+
+### 9. Conectar SIDP.exe con el cerebro de esta PC
+
+Esto lo hace Maximiliano en el panel, de una de dos formas:
+
+- **Con el SIDP más nuevo de esta rama** (`SIDP-Instalador.exe` del artefacto `sidp-windows`): se conecta solo al
+  cerebro de esta PC en menos de un minuto. No hay que escribir nada.
+- **Con el SIDP que ya tiene**: en Ajustes, en la dirección del cerebro, escribe `http://127.0.0.1:8771`. Para la clave
+  abre `notepad $env:USERPROFILE\.sidp\clave_cerebro.txt`, la copia, la pega en Ajustes, da Conectar y cierra el Bloc
+  de notas sin guardar.
+
+Después comprueba. Solo imprime números; el documento no se guarda:
+
+```
+python -c "import json, urllib.request as u; from pathlib import Path; k = (Path.home() / '.sidp' / 'clave_cerebro.txt').read_text(encoding='utf-8').strip(); h = {'X-SIDP-Clave': k, 'Content-Type': 'application/json'}; g = lambda r: json.load(u.urlopen(u.Request('http://127.0.0.1:8771' + r, headers=h), timeout=60)); s = g('/salud')['base'] or {}; print('base', s.get('motor'), 'alumnos', s.get('alumnos')); a = g('/alumnos'); print('grupos', len(a['grupos']), 'alumnos por grupo', [len(x['filas']) for x in a['grupos']]); d = g('/documentos'); print('documentos', len(d['documentos'])); p = json.load(u.urlopen(u.Request('http://127.0.0.1:8771/documento', json.dumps({'clave': 'lista', 'formato': 'pdf'}).encode(), h), timeout=120)); print('lista en PDF', len(p['contenido']), 'caracteres')"
+```
+
+Debe salir el mismo número de alumnos que tiene el panel (191 en 6 grupos, si no se agregó a nadie).
+
+### 10. El respaldo, fuera de esta computadora
+
+Antes el servidor copiaba sus archivos a la PC 4 cada hora. Ahora el cerebro está en la misma PC: si este disco falla,
+se pierde todo. Pregúntale a Maximiliano si hay un disco externo o una memoria USB que se quede conectada siempre. Si
+sí, con su letra (aquí `E:`):
+
+```
+$disco = 'E:'
+New-Item -ItemType Directory -Force "$disco\SIDP-respaldo\servidor", "$disco\SIDP-respaldo\base" | Out-Null
+Add-Content -Encoding UTF8 C:\SIDP-datos\servicios\ajustes.ps1 "`$env:SIDP_RESPALDO = '$disco\SIDP-respaldo\servidor'", "`$env:SIDP_RESPALDOS = '$disco\SIDP-respaldo\base'"
+powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -MismaPC
+```
+
+(Agrega `-ComoSistema` al final si el paso 8 lo necesitó.) El servidor manda su copia cada hora, sin borrar nada, y el
+cerebro guarda ahí una copia de la base al día. Después de una hora, comprueba:
+
+```
+Get-ChildItem "$disco\SIDP-respaldo" -Recurse -File | Measure-Object Length -Sum | Select-Object Count, @{n='MB'; e={[math]::Round($_.Sum / 1MB, 1)}}
+```
+
+Si no hay disco, escribe en el informe **SIN RESPALDO FUERA DE ESTA PC** y díselo a Maximiliano.
+
+### 11. Qué tan rápido lee esta PC
+
+Con hojas inventadas, fuera del repositorio:
+
+```
+python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos --cuantas 2
+python -m validacion.medir_lectura C:\SIDP-datos\manuscritos --modelo qwen2.5vl:3b --lecturas 1 --lado 960 --hojas 4 --etiqueta servidor
+```
+
+Mientras corre, abre el panel en otra PC de la red y anota si se siente lento.
+
+### 12. Informe
+
+Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea019.md` (con la fecha de hoy) con: lo que salió del paso 1,
+el modo (ligero o completo), las versiones de Python y PostgreSQL, si se restauró la base de la PC 4, la salida de
+`estado_servicios.ps1` (y de `vigia.log` si se reinició), los números del paso 9, el respaldo del paso 10 (o SIN
+RESPALDO), el resumen de `resumen_lectura_servidor.md` del paso 11 y cualquier error completo. Sin IP, claves, nombres
+ni CURP. Súbelo solo a él:
+
+```
+git add cerebro/laboratorio/resultados/
+git commit -m "laboratorio: resultado de la tarea 019"
+git pull --rebase
+git push origin claude/project-thread-vp6ab8
+```
+
+Si al subir se abre una ventana para entrar a GitHub, pídele a Maximiliano que entre con su cuenta. Al final avísale
+que ya se subió y qué le falta a él (el paso 9 o el disco del paso 10).
