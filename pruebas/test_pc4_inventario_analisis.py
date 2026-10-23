@@ -77,12 +77,14 @@ def _datos_inventados(base):
     base.cargar('2026-2027', alumnos() + alumnos(SEGUNDO, 2), 'lista_oficial', 'lista oficial')
     juan, regina, diego = CURP_JUAN, generar.curp(SEGUNDO[0][3]), generar.curp(SEGUNDO[1][3])
     for curp, campo, valor in [
-            (juan, 'peso', '30'), (juan, 'talla', '1.15'), (juan, 'tipo_sangre', 'O positivo'), (juan, 'alergia', 'Penicilina'),
-            (juan, 'padecimiento', 'Asma'), (juan, 'medicamento', 'Salbutamol'), (juan, 'agudeza_visual', '20/40'),
-            (juan, 'salud_bucal', 'Presenta caries'), (regina, 'peso', '24'), (regina, 'talla', '1.25'), (regina, 'tipo_sangre', 'O+'),
-            (regina, 'alergia', 'Negadas'), (regina, 'discapacidad', 'Hipoacusia leve'), (regina, 'vacunas', 'Esquema incompleto'),
-            (diego, 'peso', '26'), (diego, 'talla', '1.28'), (diego, 'tipo_sangre', 'A+')]:
+            (juan, 'alergia', 'Penicilina'), (juan, 'padecimiento', 'Asma'), (juan, 'medicamento', 'Salbutamol'),
+            (regina, 'alergia', 'Negadas'), (regina, 'discapacidad', 'Hipoacusia leve'), (diego, 'padecimiento', 'Ninguno'),
+            (diego, 'alergia', 'Polvo')]:
         base.agregar_dato(curp, 'salud', campo, valor, 'Secretaria')
+    # Lo del 911 que pone la escuela.
+    base.agregar_dato(regina, 'escolar', 'repite_grado', 'sí', 'Secretaria')
+    base.agregar_dato(diego, 'escolar', 'repite_grado', 'no', 'Secretaria')
+    base.agregar_dato(juan, 'escolar', 'beca', 'federal', 'Secretaria')
     for curp, municipio, colonia in [(juan, 'Chalco', 'San Martín'), (regina, 'CHALCO, EDO. MEX.', 'Col. San Martin'),
                                      (diego, 'Valle de Chalco Solidaridad', 'Darío Martínez')]:
         base.agregar_dato(curp, 'domicilio', 'municipio', municipio, 'Secretaria')
@@ -100,12 +102,16 @@ def test_el_analisis_es_de_los_alumnos_no_de_los_documentos(entorno, base):
     assert codigo == 200, r
     assert r['kpis']['alumnos'] == 7 and r['matricula']['filas'][-1] == ['Total', 4, 3, 7]
     assert not {'avance_por_grupo', 'faltan_por_documento', 'documentos_por_estado', 'recibidos_14_dias', 'lecturas'} & set(r)
-    # Salud: la OMS clasifica con peso, talla, edad y sexo; "Negadas" no es una alergia.
-    assert r['kpis']['medidos'] == 3 and r['kpis']['sobrepeso_obesidad'] == 1  # Juan: 30 kg y 1.15 m a los 6 años.
-    assert r['salud']['alergias'] == [['PENICILINA', 1]] and r['kpis']['con_alergias'] == 1
-    assert r['salud']['sangre'][0] == ['O+', 2]
+    # Salud: solo lo necesario; "Negadas" no es una alergia.
+    assert set(r['salud']) == {'alergias', 'padecimientos', 'medicamentos'} and 'medidos' not in r['kpis']
+    assert sorted(r['salud']['alergias']) == [['PENICILINA', 1], ['POLVO', 1]] and r['kpis']['con_alergias'] == 2
+    assert r['salud']['padecimientos'] == [['ASMA', 1]] and r['kpis']['con_medicamento'] == 1
     assert ['Hipoacusia', 1, 1] in [f[:1] + f[-2:] for f in r['discapacidad_911']['filas']]
-    assert any('necesitan valoración' in h for h in r['hallazgos']) and any('dentista' in h for h in r['hallazgos'])
+    assert any('toman medicamento' in h for h in r['hallazgos']) and not any('dentista' in h or 'peso' in h for h in r['hallazgos'])
+    # Lo del 911 que pone la escuela: cuántos ya lo tienen y cuántos faltan.
+    repite = next(x for x in r['para_911'] if x['dato'] == 'Repiten el grado')
+    assert (repite['con'], repite['si'], repite['de']) == (2, 1, 7) and r['becas'] == [['federal', 1]]
+    assert any('Para el 911 faltan datos' in h and '5 sin el dato de «repiten el grado»' in h for h in r['hallazgos'])
     # Dónde viven: "CHALCO, EDO. MEX." y "Chalco" son el mismo municipio.
     assert r['domicilio']['municipios'][0] == ['Chalco', 2] and r['domicilio']['colonias'][0] == ['San Martin', 2]
     assert any('La mayoría vive en Chalco' in h for h in r['hallazgos'])
@@ -152,7 +158,7 @@ def test_el_estudio_de_la_ia_se_rehace_solo_cuando_hay_datos_nuevos(base, tmp_pa
         from pruebas.test_lista_oficial import PRIMERO, SEGUNDO
         from validacion.ejemplo import generar
         for _, _, _, c in PRIMERO[1:] + SEGUNDO[2:]:  # Ya la mayoría tiene datos de salud.
-            base.agregar_dato(generar.curp(c), 'salud', 'peso', '25', 'Secretaria')
+            base.agregar_dato(generar.curp(c), 'salud', 'alergia', 'Polen', 'Secretaria')
         assert estudio.una_vez()['texto'] == 'Salud: estudio inventado.'
         guardado = estudio.guardado()
         assert guardado['al_dia'] and guardado['alumnos'] == 7 and guardado['texto'].startswith('Salud')

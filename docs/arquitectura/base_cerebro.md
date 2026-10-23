@@ -26,6 +26,12 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
 | `lectura` | Lo que leyó el cerebro en cada página y qué tan cerca quedó de un alumno |
 | `sugerencia_ia` | Lo que propone la IA; solo una persona lo acepta o lo corrige |
 | `bitacora` | Cada alta y cambio, con el antes, el después y quién lo hizo |
+| `dato` | Lo que sale del escaneo, campo por campo, solo los del estándar (`validacion/estandar.py`) |
+| `biblio_titulo`, `biblio_isbn` | Cada libro distinto (título, autor, editorial, año, serie de Libros del Rincón) y sus ISBN |
+| `biblio_ejemplar` | Cada libro físico con su etiqueta `LIB-000001`, dónde se guarda y cómo está |
+| `biblio_regla` | Cuántos días y cuántos libros: alumno 7 días y 2 libros; personal 14 días y 5 libros |
+| `biblio_prestamo` | Quién se llevó cada ejemplar, cuándo lo regresa y cómo regresó |
+| `biblio_consulta` | Lo que contestó el catálogo de Open Library por ISBN, para no volver a preguntar |
 
 ## Defensas en el motor
 
@@ -60,6 +66,14 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
     - posible duplicado;
     - RENAPO pendiente.
 - **Resumen:** `resumen()`, solo números, para copiar a un informe.
+- **Biblioteca (2026-10-23):**
+  - `isbn13` revisa el dígito y pasa un ISBN-10 a 13; `biblio_codigo` corrige lo que escribe el lector de código
+    de barras (`LIB'000001` → `LIB-000001`).
+  - `biblio_parecidos` busca títulos parecidos (pg_trgm); de 0.8 para arriba se toma como el mismo libro.
+  - `biblio_ejemplares_alta` da de alta los ejemplares y regresa sus etiquetas; `biblio_prestar` revisa la regla
+    (los diccionarios y enciclopedias no se prestan) y `biblio_devolver` cuenta los días de atraso.
+  - Vistas `v_biblio_titulos` y `v_biblio_prestamos`. Si se borra a un alumno, sus préstamos se quedan con
+    "Alumno borrado".
 
 ## Comandos (en la PC 4, desde la raíz del repositorio)
 

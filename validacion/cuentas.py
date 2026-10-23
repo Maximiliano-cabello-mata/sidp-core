@@ -22,9 +22,9 @@ ROLES = {'direccion': 'Dirección', 'secretaria': 'Secretaría', 'apoyo': 'Apoyo
 EN_BASE = {'direccion': ('direccion', 'director'), 'secretaria': ('administrativo', 'secretaria'),
            'apoyo': ('administrativo', 'apoyo'), 'docente': ('docente', 'docente')}
 PERMISOS = {
-    'direccion': {'expedientes', 'documentos', 'decidir', 'renapo', 'grupos', 'ver_grupos', 'capturar', 'personal', 'ajustes'},
-    'secretaria': {'expedientes', 'documentos', 'decidir', 'renapo', 'grupos', 'ver_grupos'},
-    'apoyo': {'expedientes', 'renapo'},
+    'direccion': {'expedientes', 'documentos', 'decidir', 'renapo', 'grupos', 'ver_grupos', 'capturar', 'personal', 'ajustes', 'biblioteca'},
+    'secretaria': {'expedientes', 'documentos', 'decidir', 'renapo', 'grupos', 'ver_grupos', 'biblioteca'},
+    'apoyo': {'expedientes', 'renapo', 'biblioteca'},  # Quien atiende la biblioteca presta y registra libros.
     'docente': set(),  # Sus grupos se revisan uno por uno (Escolar.revisar_grupo).
 }
 ITERACIONES = 240_000
@@ -121,7 +121,8 @@ class Cuentas:
     def _publico(fila):
         rol = rol_de(fila['rol_bd'], fila['puesto'])
         return {'id': fila['id'], 'personal_id': fila['personal_id'], 'usuario': fila['usuario'], 'rol': rol,
-                'rol_texto': ROLES[rol], 'nombre': f"{fila['nombres']} {fila['apellido']}", 'nombres': fila['nombres']}
+                'rol_texto': ROLES[rol], 'nombre': f"{fila['nombres']} {fila['apellido']}", 'nombres': fila['nombres'],
+                'permisos': sorted(PERMISOS.get(rol, set()))}  # El panel muestra solo lo que la cuenta puede usar.
 
     def entrar(self, usuario, contrasena):
         """Token de sesión, o ErrorCuenta. Tras 5 intentos fallidos la cuenta espera 15 minutos."""

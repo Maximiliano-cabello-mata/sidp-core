@@ -21,6 +21,7 @@ import secrets
 import sys
 import threading
 import time
+import traceback
 import webbrowser
 from email.parser import BytesParser
 from email.policy import default as politica_correo
@@ -30,6 +31,7 @@ from urllib.parse import parse_qs, urlparse
 
 from validacion import cerebro_red, codigo_barras, prueba
 from validacion.cuentas import Cuentas, ErrorCuenta, PERMISOS
+from validacion.escuela import ErrorEscuela, Escuela
 from validacion.registro import Registro
 from validacion.servicio import Bandeja, ErrorBandeja
 
@@ -49,9 +51,12 @@ PERMISO_RUTA = (
     ('/api/alumno/', 'decidir'), ('/api/alumno', 'documentos'), ('/api/decidir', 'decidir'), ('/api/revisar_todo', 'decidir'),
     ('/api/grupo', 'grupos'), ('/api/listas', 'grupos'), ('/api/inventario', 'grupos'), ('/api/etiquetas', 'grupos'),
     ('/api/analisis', 'ver_grupos'), ('/api/exportar', 'ver_grupos'), ('/api/cuentas', 'personal'),
+    ('/api/documentos/completar', 'documentos'), ('/api/documentos', 'ver_grupos'), ('/api/biblioteca', 'biblioteca'),
+    ('/api/escuela/guardar', 'ajustes'), ('/api/escuela', None),  # El nombre de la escuela lo ve cualquier cuenta.
 )
 SOLO_ESTA_PC = ('/api/configuracion', '/api/cerebro/buscar', '/api/base', '/api/respaldo')
-LOCAL = {'id': None, 'usuario': 'servidor', 'rol': 'direccion', 'rol_texto': 'Dirección', 'nombre': 'Esta PC (servidor)', 'local': True}
+LOCAL = {'id': None, 'usuario': 'servidor', 'rol': 'direccion', 'rol_texto': 'Dirección', 'nombre': 'Esta computadora', 'local': True,
+         'permisos': sorted(PERMISOS['direccion'])}
 
 
 def permiso_de(ruta):
@@ -79,6 +84,7 @@ class Aplicacion:
         self.bandeja = Bandeja(self.carpeta, hoy, usar_modelo=usar_modelo, registro=Registro(self.carpeta / 'plataforma_prueba.db'),
                                expedientes=expedientes)
         self.cuentas = Cuentas(self.bandeja.registro.db)  # Quién entra desde las otras PC de la escuela.
+        self.escuela = Escuela(self.bandeja.registro.db)  # Nombre, CCT y director: lo que llevan los documentos oficiales.
         self.archivo_configuracion = self.carpeta / 'configuracion.json'
         self.configuracion = {}
         if self.archivo_configuracion.exists():
@@ -95,6 +101,7 @@ class Aplicacion:
     def estado_configuracion(self, problema=None):
         estado = {**self.configuracion, 'cerebro_conectado': bool(self.bandeja.cerebro), 'padron': self.bandeja.padron_aviso,
                   'traidos': self.bandeja.traidos_aviso, 'respaldo': self.bandeja.respaldo_aviso, 'direccion_padres': self.direccion_padres(),
+                  'direccion_red': self.direccion_red(),
                   'expedientes': str(self.bandeja.expedientes_alumno) if self.bandeja.expedientes_alumno else None}
         if self.vigia:
             estado['vigia'] = self.vigia.estado
@@ -240,6 +247,22 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                         return self._enviar(200, app.cuentas_estado())
                 if url.path == '/api/inventario':
                     return self._enviar(200, app.bandeja.inventario())
+                if url.path == '/api/documentos':
+                    with app.candado:
+                        escuela = app.escuela.datos()
+                    return self._enviar(200, app.bandeja.documentos_lista(escuela))
+                if url.path == '/api/documentos/completar':
+                    with app.candado:
+                        grupo = consulta.get('grupo_id', [''])[0]
+                        app.bandeja._grupo_de(grupo)  # Que exista aquí antes de preguntarle a la PC 4.
+                    return self._enviar(200, app.bandeja.documentos_completar(grupo))
+                if url.path == '/api/biblioteca':
+                    return self._enviar(200, app.bandeja.biblioteca())
+                if url.path == '/api/biblioteca/etiquetas':  # Página para imprimir las etiquetas de los libros.
+                    with app.candado:
+                        escuela = app.escuela.datos().get('nombre')
+                    codigos = [c for c in consulta.get('codigos', [''])[0].upper().split(',') if c]
+                    return self._enviar(200, app.bandeja.biblioteca_etiquetas(codigos, escuela).encode(), 'text/html; charset=utf-8')
                 if url.path == '/api/analisis_pc4':
                     return self._enviar(200, app.bandeja.analisis_pc4(consulta.get('ia', [''])[0] == '1'))
                 if url.path == '/api/respaldo':
@@ -258,6 +281,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                     return self._enviar(200, codigo_barras.hoja_etiquetas([piezas[c] for c in pedidos if c in piezas]).encode(),
                                         'text/html; charset=utf-8')
                 with app.candado:
+                    if url.path == '/api/escuela':
+                        return self._enviar(200, app.escuela.datos())
                     if url.path == '/api/estado':
                         return self._enviar(200, app.bandeja.estado())
                     if url.path == '/api/expediente':
@@ -296,6 +321,17 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                 self._enviar(404, {'error': 'no existe'})
             except ErrorBandeja as error:
                 self._enviar(400, {'error': str(error)})
+            except Exception as error:
+                self._fallo(error)
+
+        def _fallo(self, error):
+            """Algo que no se esperaba: queda en el registro y el panel lo dice en palabras (con el detalle para soporte)."""
+            traceback.print_exc()
+            try:
+                self._enviar(500, {'error': 'Algo falló en el servidor. Vuelve a intentarlo; si sigue, avisa a Dirección.',
+                                   'tecnico': f'{type(error).__name__}: {error}'[:300]})
+            except OSError:
+                pass  # El navegador ya se fue.
 
         def do_POST(self):
             url = urlparse(self.path)
@@ -358,6 +394,9 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                     datos, archivos = leer_formulario(self.headers.get('Content-Type', ''), self._cuerpo())
                     with app.candado:
                         return self._enviar(200, app.bandeja.plantilla_guardar(datos, [(n, c) for _, n, c in archivos]))
+                if url.path == '/api/biblioteca/identificar':  # Fotos de la portada y la contraportada de un libro.
+                    archivos = leer_archivos(self.headers.get('Content-Type', ''), self._cuerpo())
+                    return self._enviar(200, app.bandeja.biblioteca_identificar(archivos, self.usuario['nombre']))
                 if url.path == '/api/renapo/constancia':  # El PDF tal cual, arrastrado al panel.
                     contenido = self._cuerpo()
                     with app.candado:
@@ -377,7 +416,17 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                 if url.path == '/api/respaldo':
                     return self._enviar(200, app.bandeja.respaldar())
                 quien = 'administrador' if self.usuario.get('local') else self.usuario['nombre']
+                if url.path == '/api/dato/varios':
+                    return self._enviar(200, app.bandeja.dato_varios(datos, quien))
+                if url.path in ('/api/biblioteca/alta', '/api/biblioteca/prestar', '/api/biblioteca/devolver'):
+                    return self._enviar(200, app.bandeja.biblioteca_hacer(url.path.rsplit('/', 1)[1], datos, quien))
+                if url.path == '/api/documentos/generar':
+                    with app.candado:
+                        preparado, escuela = app.bandeja.documento_preparar(datos), app.escuela.datos()
+                    return self._descargar(*app.bandeja.documento_generar(preparado, escuela))
                 with app.candado:
+                    if url.path == '/api/escuela/guardar':
+                        return self._enviar(200, app.escuela.guardar(datos))
                     if url.path == '/api/cuentas/crear':
                         app.cuentas.crear(datos, actor=self.usuario['id'] or 'servidor')
                         return self._enviar(200, app.cuentas_estado())
@@ -408,10 +457,12 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
                         return self._enviar(200, app.estado_configuracion(problema))
                 self._enviar(404, {'error': 'no existe'})
-            except ErrorCuenta as error:
+            except (ErrorCuenta, ErrorEscuela) as error:
                 self._enviar(400, {'error': str(error)})
             except (ErrorBandeja, ValueError) as error:
                 self._enviar(400, {'error': str(error)})
+            except Exception as error:
+                self._fallo(error)
 
         def log_message(self, formato, *args):  # Sin datos de los padres en la ventana.
             print(f'{self.client_address[0]} {formato % args}', flush=True)

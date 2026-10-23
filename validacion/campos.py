@@ -45,7 +45,7 @@ def campo(clave, etiqueta, tipo, categoria, nombre=None, de=''):
     return {'clave': clave, 'etiqueta': etiqueta, 'tipo': tipo, 'categoria': categoria, 'campo': nombre or clave, 'de': de}
 
 
-# Los documentos que trae el sistema, con lo que se espera de cada uno.
+# Los documentos que trae el sistema, con lo que se espera de cada uno: solo datos del estándar (validacion/estandar.py).
 FABRICA = {
     'acta_alumno': [
         campo('curp', 'CURP del alumno', 'curp', 'alumno'),
@@ -60,34 +60,11 @@ FABRICA = {
         campo('curp_padre', 'CURP del padre', 'curp', 'padre', 'curp'),
     ],
     'certificado_medico': [
-        # Cada certificado viene distinto: se piden los datos de salud que suelen traer y, al final, todo lo demás
-        # que esté escrito (otros_datos), para conocer el estado de salud completo del alumno.
-        campo('tipo_sangre', 'Tipo de sangre (grupo y RH)', 'sangre', 'salud'),
+        # Solo lo necesario (estandar.py, decisión del 23/10/2026): lo que hay que cuidar y la discapacidad para el 911.
         campo('alergias', 'Alergias', 'lista', 'salud', 'alergia'),
         campo('padecimientos', 'Enfermedades o padecimientos (crónicos o actuales)', 'lista', 'salud', 'padecimiento'),
         campo('medicamentos', 'Medicamentos o tratamiento que toma', 'lista', 'salud', 'medicamento'),
-        campo('peso', 'Peso en kilos', 'numero', 'salud'),
-        campo('talla', 'Talla o estatura en metros', 'numero', 'salud'),
-        campo('estado_nutricional', 'Estado nutricional o diagnóstico de peso (normal, bajo peso, sobrepeso, obesidad)', 'texto', 'salud'),
-        campo('presion', 'Presión arterial', 'texto', 'salud'),
-        campo('frecuencia_cardiaca', 'Frecuencia cardiaca', 'numero', 'salud'),
-        campo('agudeza_visual', 'Agudeza visual o revisión de la vista', 'texto', 'salud'),
-        campo('usa_lentes', '¿Usa lentes o necesita lentes?', 'si_no', 'salud'),
-        campo('audicion', 'Audición o revisión del oído', 'texto', 'salud'),
-        campo('salud_bucal', 'Salud bucal o dental (caries, revisión dental)', 'texto', 'salud'),
-        campo('vacunas', 'Vacunas o cartilla de vacunación (completa, incompleta)', 'texto', 'salud'),
-        campo('discapacidad', 'Discapacidad o condición especial', 'lista', 'salud', 'discapacidad'),
-        campo('cirugias', 'Cirugías, fracturas u hospitalizaciones', 'lista', 'salud', 'cirugia'),
-        campo('educacion_fisica', 'Restricciones para educación física o deporte', 'texto', 'salud'),
-        campo('apto', '¿Dice que está sano o apto para actividades escolares?', 'si_no', 'salud'),
-        campo('observaciones', 'Observaciones o diagnóstico del médico', 'texto', 'salud'),
-        campo('recomendaciones', 'Recomendaciones del médico', 'texto', 'salud'),
-        campo('servicio_medico', 'Institución o servicio médico (IMSS, ISSSTE, centro de salud, particular)', 'texto', 'salud'),
-        campo('medico', 'Nombre del médico', 'nombre', 'salud'),
-        campo('cedula', 'Cédula profesional del médico', 'texto', 'salud'),
-        campo('fecha_certificado', 'Fecha del certificado', 'fecha', 'salud'),
-        campo('otros_datos', 'Cualquier otro dato de salud que esté escrito (uno por renglón, con su nombre: "Vista: usa lentes")',
-              'lista', 'salud', 'otro_dato'),
+        campo('discapacidad', 'Discapacidad o condición (por ejemplo: baja visión, sordera, autismo, TDAH)', 'lista', 'salud', 'discapacidad'),
     ],
     'boleta': [
         # Hay una boleta por cada año cursado (un alumno de 6.° trae las de 1.° a 5.°): cada hoja se lee aparte y sus
@@ -99,9 +76,6 @@ FABRICA = {
         campo('saberes', 'Calificación final de Saberes y pensamiento científico (o Matemáticas)', 'numero', 'escolar'),
         campo('etica', 'Calificación final de Ética, naturaleza y sociedades', 'numero', 'escolar'),
         campo('humano', 'Calificación final de De lo humano y lo comunitario', 'numero', 'escolar'),
-        campo('materias', 'Otras materias con su calificación final (una por renglón: "Inglés: 9")', 'lista', 'escolar', 'materia'),
-        campo('inasistencias', 'Total de inasistencias o faltas', 'numero', 'escolar'),
-        campo('observaciones_boleta', 'Observaciones o recomendaciones del docente', 'texto', 'escolar'),
         campo('escuela_procedencia', 'Nombre de la escuela', 'texto', 'escolar'),
         campo('cct_procedencia', 'Clave de la escuela (CCT)', 'texto', 'escolar'),
     ],
@@ -111,20 +85,16 @@ FABRICA = {
         campo('domicilio_ine', 'Domicilio', 'domicilio', 'domicilio', 'domicilio'),
         campo('colonia_ine', 'Colonia o localidad del domicilio', 'texto', 'domicilio', 'colonia'),
         campo('municipio_ine', 'Municipio o alcaldía del domicilio', 'texto', 'domicilio', 'municipio'),
-        campo('vigencia_ine', 'Vigencia', 'texto', 'tutor', 'vigencia_ine'),
     ],
     'acta_tutor': [
         campo('nombre_tutor', 'Nombre completo de la persona registrada', 'nombre', 'tutor', 'nombre'),
         campo('curp_tutor', 'CURP de la persona registrada', 'curp', 'tutor', 'curp'),
-        campo('nacimiento_tutor', 'Fecha de nacimiento', 'fecha', 'tutor', 'fecha_nacimiento'),
     ],
     'comprobante': [
         campo('domicilio', 'Domicilio del servicio', 'domicilio', 'domicilio'),
         campo('colonia', 'Colonia o localidad', 'texto', 'domicilio'),
         campo('municipio', 'Municipio o alcaldía', 'texto', 'domicilio'),
         campo('cp', 'Código postal', 'cp', 'domicilio'),
-        campo('titular', 'Nombre del titular', 'nombre', 'domicilio'),
-        campo('fecha_comprobante', 'Fecha del recibo o periodo', 'fecha', 'domicilio'),
     ],
 }
 

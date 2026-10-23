@@ -1,5 +1,6 @@
-// Motor de las pantallas de validación. Las mismas pantallas funcionan de dos formas:
-// - "local": dentro de SIDP-Validador.exe; las llamadas van a su servidor.
+// Motor de las pantallas de validación. Las mismas pantallas funcionan de tres formas:
+// - "local": en el servidor (SIDP.exe); las llamadas van a su servidor con el token que se le dio al panel.
+// - "red": desde otra computadora de la escuela, con la sesión de un usuario de Ajustes.
 // - "demo": en GitHub Pages; el código de Python del repositorio corre en el navegador (Pyodide)
 //   sobre expedientes inventados y nada sale del navegador.
 const SIDP = window.SIDP || { modo: 'local' };
@@ -8,8 +9,21 @@ function crearMotor() {
   return SIDP.modo === 'demo' ? motorDemo() : motorLocal();
 }
 
+// Un error que la persona entiende (message) y, aparte, lo que necesita el técnico (tecnico).
+function errorClaro(mensaje, tecnico) {
+  const error = new Error(mensaje);
+  error.tecnico = tecnico || '';
+  return error;
+}
+const SIN_LECTURA = /urlopen|Errno|HTTP Error 5\d\d|InterfaceError|timed out|Connection (refused|reset)|ConnectionRefused|RemoteDisconnected|la base de datos falló/i;
+function mensajeClaro(texto, codigo) {
+  if (SIN_LECTURA.test(texto)) return errorClaro('La computadora de lectura automática no contesta. Puedes seguir trabajando: lo que falte se hace solo cuando vuelva.', texto);
+  if (codigo >= 500) return errorClaro('Algo falló en el servidor. Intenta otra vez; si sigue pasando, avisa en la dirección.', texto);
+  return errorClaro(texto);
+}
+
 function motorLocal() {
-  async function api(ruta, cuerpo) {
+  async function pedir(ruta, cuerpo) {
     const opciones = { headers: { 'X-SIDP-Token': SIDP.token || '' } };
     if (cuerpo instanceof FormData) Object.assign(opciones, { method: 'POST', body: cuerpo });
     else if (cuerpo !== undefined) {
@@ -17,13 +31,75 @@ function motorLocal() {
       opciones.headers['Content-Type'] = 'application/json';
       opciones.body = JSON.stringify(cuerpo);
     }
-    const respuesta = await fetch(ruta, opciones);
-    const datos = await respuesta.json();
-    if (!respuesta.ok || datos.error) throw new Error(datos.error || respuesta.statusText);
+    let respuesta;
+    try {
+      respuesta = await fetch(ruta, opciones);
+    } catch (error) {
+      throw errorClaro('No hay conexión con el servidor de la escuela. Revisa que esta computadora esté en la red y que el servidor esté encendido.',
+        `${ruta}: ${error.message}`);
+    }
+    if (respuesta.status === 401 && window.sesionTerminada) window.sesionTerminada();
+    return respuesta;
+  }
+  async function api(ruta, cuerpo) {
+    const respuesta = await pedir(ruta, cuerpo);
+    const texto = await respuesta.text();
+    let datos;
+    try { datos = JSON.parse(texto); } catch (error) {
+      throw mensajeClaro(`${ruta}: respuesta ${respuesta.status} que no es JSON: ${texto.slice(0, 300)}`, respuesta.status || 500);
+    }
+    if (!respuesta.ok || datos.error) {
+      const error = mensajeClaro(datos.error || `${respuesta.status} ${respuesta.statusText}`, respuesta.status);
+      if (datos.tecnico) error.tecnico = [error.tecnico, datos.tecnico].filter(Boolean).join('\n');
+      throw error;
+    }
     return datos;
   }
+  // Un archivo para la carpeta Descargas (Excel, Word o PDF que se arma en el momento).
+  async function bajar(ruta, cuerpo) {
+    const respuesta = await pedir(ruta, cuerpo);
+    if (!respuesta.ok) {
+      const texto = await respuesta.text();
+      let mensaje = texto;
+      try { mensaje = JSON.parse(texto).error || texto; } catch (error) { /* No era JSON. */ }
+      throw mensajeClaro(mensaje, respuesta.status);
+    }
+    const nombre = decodeURIComponent((/filename\*?=(?:UTF-8'')?"?([^";]+)/i.exec(respuesta.headers.get('Content-Disposition') || '') || [])[1] || 'documento');
+    const enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(await respuesta.blob());
+    enlace.download = nombre;
+    document.body.appendChild(enlace); enlace.click(); enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(enlace.href), 60000);
+    return { nombre };
+  }
+  const fotos = (archivos) => {
+    const formulario = new FormData();
+    for (const archivo of archivos) formulario.append('archivo', archivo, archivo.name);
+    return formulario;
+  };
   return {
     listo: Promise.resolve(),
+    // Quién usa el panel: en esta PC, el servidor; desde otra, la cuenta con la que se entró.
+    yo: () => api('/api/yo'),
+    entrar: (usuario, contrasena) => api('/api/entrar', { usuario, contrasena }),
+    salir: () => api('/api/salir', {}),
+    cuentas: () => api('/api/cuentas'),
+    cuentaCrear: (datos) => api('/api/cuentas/crear', datos),
+    cuentaEstado: (id, activo) => api('/api/cuentas/estado', { id, activo }),
+    escuela: () => api('/api/escuela'),
+    escuelaGuardar: (datos) => api('/api/escuela/guardar', datos),
+    // Documentos oficiales (911, constancias, listas): los arma el motor de documentos.
+    documentos: () => api('/api/documentos'),
+    documento: (clave, formato, opciones = {}) => bajar('/api/documentos/generar', { clave, formato, ...opciones }),
+    // Biblioteca: los libros viven en la base de la PC 4.
+    completar911: (grupo) => api(`/api/documentos/completar?grupo_id=${encodeURIComponent(grupo)}`),
+    datosVarios: (lista) => api('/api/dato/varios', { datos: lista }),
+    biblioteca: () => api('/api/biblioteca'),
+    bibliotecaIdentificar: (archivos) => api('/api/biblioteca/identificar', fotos(archivos)),
+    bibliotecaAlta: (datos) => api('/api/biblioteca/alta', datos),
+    bibliotecaPrestar: (datos) => api('/api/biblioteca/prestar', datos),
+    bibliotecaDevolver: (datos) => api('/api/biblioteca/devolver', datos),
+    bibliotecaEtiquetasUrl: (codigos) => `/api/biblioteca/etiquetas?codigos=${encodeURIComponent(codigos.join(','))}&t=${encodeURIComponent(SIDP.token || '')}`,
     estado: () => api('/api/estado'),
     revisarTodo: () => api('/api/revisar_todo', {}),
     detalle: (id) => api('/api/expediente?id=' + encodeURIComponent(id)),
@@ -37,10 +113,16 @@ function motorLocal() {
     enviar: (formulario) => api('/api/padres/enviar', formulario),
     curps: () => api('/api/curps'),
     constancia: async (archivo) => {
-      const respuesta = await fetch('/api/renapo/constancia', { method: 'POST', body: archivo,
-        headers: { 'X-SIDP-Token': SIDP.token || '', 'Content-Type': 'application/pdf', 'X-SIDP-Nombre': encodeURIComponent(archivo.name) } });
-      const datos = await respuesta.json();
-      if (!respuesta.ok || datos.error) throw new Error(datos.error || respuesta.statusText);
+      let respuesta;
+      try {
+        respuesta = await fetch('/api/renapo/constancia', { method: 'POST', body: archivo,
+          headers: { 'X-SIDP-Token': SIDP.token || '', 'Content-Type': 'application/pdf', 'X-SIDP-Nombre': encodeURIComponent(archivo.name) } });
+      } catch (error) {
+        throw errorClaro('No hay conexión con el servidor de la escuela.', error.message);
+      }
+      if (respuesta.status === 401 && window.sesionTerminada) window.sesionTerminada();
+      const datos = await respuesta.json().catch(() => ({ error: `${respuesta.status} ${respuesta.statusText}` }));
+      if (!respuesta.ok || datos.error) throw mensajeClaro(datos.error || respuesta.statusText, respuesta.status);
       return datos;
     },
     renapoNoEncontrada: (alumno) => api('/api/renapo/no_encontrada', { alumno }),

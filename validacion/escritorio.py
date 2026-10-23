@@ -217,13 +217,13 @@ def edge():
 
 
 def abrir_ventana(url, perfil):
-    """Una ventana propia (Edge en modo aplicación); si no hay Edge, el navegador de siempre."""
+    """Una ventana propia (Edge en modo aplicación) y su proceso; si no hay Edge, el navegador de siempre y None."""
     programa = edge()
     if programa:
-        subprocess.Popen([str(programa), f'--app={url}', f'--user-data-dir={perfil}', '--no-first-run',
-                          '--disable-features=Translate', '--window-size=1440,900'])
-    else:
-        webbrowser.open(url)
+        return subprocess.Popen([str(programa), f'--app={url}', f'--user-data-dir={perfil}', '--no-first-run',
+                                 '--disable-features=Translate', '--window-size=1440,900'])
+    webbrowser.open(url)
+    return None
 
 
 def ya_abierto(puerto):

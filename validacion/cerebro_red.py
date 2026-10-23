@@ -36,7 +36,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from validacion import actualizar, base_cerebro, campos, expediente, extraer, lector, modelo, respaldo, taller as taller_mod, vision
+from validacion import actualizar, base_cerebro, biblioteca, campos, documentos, estandar, expediente, extraer, lector, modelo, respaldo
+from validacion import taller as taller_mod, vision
 
 PUERTO = 8771
 MAXIMO = 4096  # Una pregunta son dos textos cortos; nada más grande pasa.
@@ -203,7 +204,7 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
         def do_GET(self):
             ruta, _, consulta = self.path.partition('?')
             if ruta not in ('/salud', '/alumnos', '/inventario', '/analisis', '/respaldo', '/trabajos', '/alumno', '/por_confirmar',
-                            '/actualizacion', '/actualizacion/programa'):
+                            '/actualizacion', '/actualizacion/programa', '/documentos', '/registros') and not ruta.startswith('/biblioteca'):
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
@@ -241,6 +242,20 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                     return self._responder(200, taller.estado() if taller else {'trabajos': {}, 'sin_taller': True})
                 if ruta == '/por_confirmar':
                     return self._responder(200, {'datos': base.por_confirmar()})
+                if ruta in ('/documentos', '/registros'):  # El motor de documentos (validacion/documentos.py).
+                    from urllib.parse import parse_qs
+                    ciclo, registros = estandar.registros(base)
+                    if ruta == '/documentos':
+                        return self._responder(200, {'ciclo': ciclo, 'alumnos': len(registros), 'documentos': documentos.catalogo(),
+                                                     'faltan': estandar.faltan(registros)})
+                    pedido = parse_qs(consulta)
+                    grado, letra = pedido.get('grado', [''])[0], pedido.get('letra', [''])[0]
+                    elegidos = [r for r in registros if (not grado or str(r['grado']) == grado) and (not letra or r['letra'] == letra)]
+                    return self._responder(200, {'ciclo': ciclo, 'columnas': estandar.columnas_911(),
+                                                 'alumnos': [{k: r.get(k) for k in estandar.PARA_COMPLETAR} for r in elegidos]})
+                if ruta.startswith('/biblioteca'):
+                    from urllib.parse import parse_qs
+                    return self._responder(200, biblioteca.consultar(base, ruta, parse_qs(consulta)))
                 if ruta == '/alumno':
                     from urllib.parse import parse_qs
                     try:
@@ -256,6 +271,8 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                     resultado['ia'] = estudio.hacer(resultado) if estudio else analisis_datos.redactar(resultado, url)
                 resultado['estudio'] = estudio.guardado() if estudio else None
                 return self._responder(200, resultado)
+            except biblioteca.ErrorBiblioteca as error:
+                return self._responder(400, {'error': str(error)})
             except Exception as error:
                 return self._fallo_base(error)
 
@@ -361,6 +378,8 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 elif ruta == '/dato/agregar':
                     hecho = base.agregar_dato(pedido['curp'], pedido['categoria'], pedido['campo'], pedido['valor'], persona,
                                               {'de': pedido['de']} if pedido.get('de') else None)
+                elif ruta == '/dato/varios':  # «Completar datos del 911»: lo que la escuela anota de un grupo, de una vez.
+                    hecho = base.agregar_varios(pedido['datos'], persona)
                 elif ruta == '/alumno/baja':
                     hecho = base.dar_baja_alumno(pedido['curp'], pedido.get('motivo'), persona)
                 else:
@@ -377,16 +396,58 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 detalle = mensaje.get('M') if isinstance(mensaje, dict) else str(error)
                 return self._responder(400, {'error': detalle[:300]})
 
+        def _documento(self):
+            """Un documento oficial armado aquí con la base de todos los alumnos; los datos de la escuela llegan con el pedido."""
+            if not base:
+                return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
+            pedido = self._leer_json(MAXIMO_INVENTARIO)
+            if pedido is None:
+                return
+            try:
+                ciclo, registros = estandar.registros(base)
+                nombre, contenido, tipo = documentos.generar(pedido['clave'], pedido['formato'], registros, pedido.get('escuela'), ciclo or '',
+                                                             grado=pedido.get('grado'), letra=pedido.get('letra'), curp=pedido.get('curp'))
+            except documentos.ErrorDocumento as error:
+                return self._responder(400, {'error': str(error)})
+            except (ValueError, KeyError, TypeError) as error:
+                return self._responder(400, {'error': f'pedido mal formado: {error}'})
+            except Exception as error:
+                return self._fallo_base(error)
+            return self._responder(200, {'nombre': nombre, 'tipo': tipo, 'contenido': base64.b64encode(contenido).decode()})
+
+        def _biblioteca(self, ruta):
+            if not base:
+                return self._responder(503, {'error': 'el cerebro no tiene base de datos (PostgreSQL)'})
+            pedido = self._leer_json(MAXIMO_EXPEDIENTE if ruta == '/biblioteca/identificar' else MAXIMO_INVENTARIO)
+            if pedido is None:
+                return
+            try:
+                return self._responder(200, biblioteca.hacer(base, ruta, pedido, url))
+            except biblioteca.ErrorBiblioteca as error:
+                return self._responder(400, {'error': str(error)})
+            except (ValueError, KeyError, TypeError) as error:
+                return self._responder(400, {'error': f'pedido mal formado: {error}'})
+            except Exception as error:
+                mensaje = getattr(error, 'args', [None])[0]
+                if isinstance(mensaje, dict):  # Una regla de la base (código que no existe, libro ya prestado).
+                    return self._responder(400, {'error': str(mensaje.get('M'))[:300]})
+                return self._fallo_base(error)
+
         def do_POST(self):
             if self.path not in ('/opinar', '/validar', '/leer', '/padron', '/inventario/alta', '/inventario/cambiar',
                                  '/respaldo/faltan', '/respaldo/archivo', '/respaldo/listo', '/trabajo', '/plantilla/campos',
-                                 '/clasificar', '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
+                                 '/clasificar', '/dato/confirmar', '/dato/agregar', '/dato/varios', '/alumno/baja', '/alumno/borrar',
+                                 '/documento') and self.path not in biblioteca.RUTAS_POST:
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
+            if self.path == '/documento':
+                return self._documento()
+            if self.path in biblioteca.RUTAS_POST:
+                return self._biblioteca(self.path)
             if self.path in ('/plantilla/campos', '/clasificar'):
                 return self._vision(self.path)
-            if self.path in ('/trabajo', '/dato/confirmar', '/dato/agregar', '/alumno/baja', '/alumno/borrar'):
+            if self.path in ('/trabajo', '/dato/confirmar', '/dato/agregar', '/dato/varios', '/alumno/baja', '/alumno/borrar'):
                 return self._expediente(self.path)
             if self.path.startswith('/respaldo/'):
                 return self._respaldo(self.path)

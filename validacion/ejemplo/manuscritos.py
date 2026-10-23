@@ -36,16 +36,16 @@ FICHA = [
     C('nombre_padre', 'Nombre del padre', 'nombre', 'padre', 'nombre'),
     C('telefono_padre', 'Teléfono del padre', 'telefono', 'contacto', 'telefono', 'padre'),
     C('correo', 'Correo electrónico', 'correo', 'contacto', 'correo'),
-    C('tipo_sangre', 'Tipo de sangre', 'sangre', 'salud'),
     C('alergias', 'Alergias', 'lista', 'salud', 'alergia'),
     C('enfermedades', 'Enfermedades o padecimientos', 'lista', 'salud', 'padecimiento'),
     C('contacto_emergencia', 'En caso de emergencia avisar a', 'nombre', 'contacto', 'nombre_emergencia', 'emergencia'),
     C('telefono_emergencia', 'Teléfono de emergencia', 'telefono', 'contacto', 'telefono', 'emergencia'),
 ]
-# Lo que dice impreso el certificado médico dibujado, y a qué campo de fábrica corresponde.
-MEDICO = [('Nombre del paciente', None), ('Tipo de sangre', 'tipo_sangre'), ('Alergias', 'alergias'), ('Peso (kg)', 'peso'),
-          ('Talla (m)', 'talla'), ('Observaciones', 'observaciones'), ('Apto para actividades escolares', 'apto'),
-          ('Fecha', 'fecha_certificado'), ('Nombre del médico', 'medico'), ('Cédula profesional', 'cedula')]
+# Lo que dice impreso el certificado médico dibujado, y a qué campo de fábrica corresponde. Trae peso, talla y fecha como
+# uno de verdad, pero solo se miden los cuatro datos que se sacan (Solo lo necesario, validacion/estandar.py).
+MEDICO = [('Nombre del paciente', None), ('Peso (kg)', 'peso'), ('Talla (m)', 'talla'), ('Alergias', 'alergias'),
+          ('Padecimientos', 'padecimientos'), ('Medicamentos', 'medicamentos'), ('Discapacidad o condición', 'discapacidad'),
+          ('Observaciones', 'observaciones'), ('Fecha', 'fecha'), ('Nombre del médico', 'medico'), ('Cédula profesional', 'cedula')]
 FUENTES = [('Inkfree.ttf', 'clara'), ('segoepr.ttf', 'clara'), ('comic.ttf', 'clara'),
            ('segoesc.ttf', 'fea'), ('BRADHITC.TTF', 'fea'), ('ITCKRIST.TTF', 'fea')]
 NINOS = [('MARIA FERNANDA', 'M'), ('JOSE LUIS', 'H'), ('ANA SOFIA', 'M'), ('DIEGO', 'H'), ('XIMENA', 'M'), ('SANTIAGO', 'H'),
@@ -58,6 +58,8 @@ CALLES = ['C. PINO', 'AV. HIDALGO', 'C. MORELOS', 'C. JUAREZ', 'PRIV. LAS ROSAS'
 COLONIAS = ['CENTRO', 'LA MORA', 'SAN JUAN', 'EL CARMEN', 'LAS FLORES', 'SANTA ANA']
 ALERGIAS = ['PENICILINA', 'POLVO', 'MARISCOS', 'POLEN', 'NUEZ']
 ENFERMEDADES = ['ASMA', 'RINITIS', 'DERMATITIS']
+MEDICAMENTOS = ['SALBUTAMOL', 'LORATADINA', 'METILFENIDATO']
+CONDICIONES = ['TDAH', 'BAJA VISION', 'HIPOACUSIA']
 MESES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 
 
@@ -84,12 +86,11 @@ def persona(azar):
     madre, padre = f'{azar.choice(MAMAS)} {ap2} {ap_madre2}', f'{azar.choice(PAPAS)} {ap1} {ap_padre2}'
     calle, numero, colonia, cp = azar.choice(CALLES), azar.randint(1, 250), azar.choice(COLONIAS), str(azar.randint(50000, 52999))
     correo = f'{madre.split()[0].lower()}.{ap2.lower()}{azar.randint(1, 99)}@{azar.choice(("gmail.com", "hotmail.com"))}'
-    sangre = azar.choice(['O+', 'O+', 'A+', 'B+', 'O-', 'AB+'])
     verdad = {
         'nombre_alumno': f'{nombre} {ap1} {ap2}', 'fecha_nacimiento': nacimiento.isoformat(),
         'curp': curp_inventada(nombre, ap1, ap2, nacimiento, sexo), 'domicilio': f'{calle} {numero} COL. {colonia}', 'cp': cp,
         'nombre_madre': madre, 'telefono_madre': telefonos[0], 'nombre_padre': padre, 'telefono_padre': telefonos[1], 'correo': correo,
-        'tipo_sangre': sangre, 'alergias': ', '.join(alergias) or 'NINGUNA', 'enfermedades': ', '.join(enfermedades) or 'NINGUNA',
+        'alergias': ', '.join(alergias) or 'NINGUNA', 'enfermedades': ', '.join(enfermedades) or 'NINGUNA',
         'contacto_emergencia': f'{azar.choice(MAMAS)} {ap2} {azar.choice(APELLIDOS)}', 'telefono_emergencia': telefonos[2],
     }
     escrito = {k: v.title() if k.startswith(('nombre', 'contacto')) else v for k, v in verdad.items()}
@@ -99,7 +100,6 @@ def persona(azar):
         telefono_madre=azar.choice([f'{t[0][:3]} {t[0][3:6]} {t[0][6:]}', f'{t[0][:3]}-{t[0][3:6]}-{t[0][6:]}', t[0]]),
         telefono_padre=f'{t[1][:3]} {t[1][3:]}', telefono_emergencia=t[2],
         domicilio=f'{calle.title()} #{numero}, Col. {colonia.title()}',
-        tipo_sangre=azar.choice([sangre, sangre.replace('+', ' positivo').replace('-', ' negativo')]),
         alergias=(' y '.join(a.lower() for a in alergias) or azar.choice(['ninguna', 'no', 'negadas'])).capitalize(),
         enfermedades=(', '.join(e.lower() for e in enfermedades) or azar.choice(['ninguna', 'ninguno'])).capitalize(),
     )
@@ -179,11 +179,13 @@ def datos_medico(azar):
     peso, talla = round(azar.uniform(16, 42), 1), round(azar.uniform(1.0, 1.5), 2)
     medico = f'{azar.choice(["DR.", "DRA."])} {azar.choice(PAPAS + MAMAS)} {azar.choice(APELLIDOS)}'
     cedula = str(azar.randint(1000000, 12999999))
-    verdad = {'peso': str(peso), 'talla': str(talla), 'observaciones': 'SANO', 'apto': 'sí', 'fecha_certificado': fecha.isoformat(),
-              'medico': medico.split(' ', 1)[1], 'cedula': cedula}
+    medicamentos = azar.sample(MEDICAMENTOS, azar.choice((0, 0, 0, 1)))
+    condiciones = azar.sample(CONDICIONES, azar.choice((0, 0, 0, 0, 1)))
+    verdad = {'medicamentos': ', '.join(medicamentos) or 'NINGUNO', 'discapacidad': ', '.join(condiciones) or 'NINGUNA'}
     escrito = {'peso': f'{peso} kg'.replace('.', azar.choice(['.', ','])), 'talla': f'{talla} m', 'observaciones': 'Sano',
-               'apto': azar.choice(['Sí', 'Si', 'Apto']), 'fecha_certificado': f'{fecha.day:02d}/{fecha.month:02d}/{fecha.year}',
-               'medico': medico.title(), 'cedula': cedula}
+               'fecha': f'{fecha.day:02d}/{fecha.month:02d}/{fecha.year}', 'medico': medico.title(), 'cedula': cedula,
+               'medicamentos': ', '.join(m.lower() for m in medicamentos).capitalize() or azar.choice(['Ninguno', 'No']),
+               'discapacidad': ', '.join(condiciones) or azar.choice(['Ninguna', 'No'])}
     return verdad, escrito
 
 
@@ -207,8 +209,8 @@ def crear(destino, cuantas=12, semilla=7, en_blanco=False):
     for numero in range(cuantas):
         verdad, escrito = persona(azar)
         medico_verdad, medico_escrito = datos_medico(azar)
-        medico_verdad.update(tipo_sangre=verdad['tipo_sangre'], alergias=verdad['alergias'])
-        medico_escrito.update(tipo_sangre=escrito['tipo_sangre'], alergias=escrito['alergias'], nombre_alumno=escrito['nombre_alumno'])
+        medico_verdad.update(alergias=verdad['alergias'], padecimientos=verdad['enfermedades'])
+        medico_escrito.update(alergias=escrito['alergias'], padecimientos=escrito['enfermedades'], nombre_alumno=escrito['nombre_alumno'])
         opciones = fuentes_a_mano(azar.randint(40, 54))
         nombre_fuente, letra, fuente = opciones[numero % len(opciones)]
         for tipo, imagen, respuestas in (('ficha_inscripcion', hoja_ficha(escrito, fuente, azar, letra == 'fea'), verdad),

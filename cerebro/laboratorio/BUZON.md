@@ -763,3 +763,28 @@ No borres nada, no cambies la base y no toques archivos fuera de `resultados/`.
    los usuarios con `python -m pip install -r validacion\requisitos.txt` desde PowerShell como administrador.
 5. Escribe `cerebro\laboratorio\resultados\2026-10-23_tarea017.md` con la salida de los pasos 3 y 4 (sin IP, claves,
    nombres ni CURP). Súbelo solo a él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).
+
+## Tarea 018: documentos oficiales y biblioteca en la PC 4 (2026-10-23)
+
+**Qué hay de nuevo.** El cerebro ya arma los documentos oficiales (911 en Excel, constancias, listas, "Lo que la
+maestra debe saber" y "Vive saludable") y guarda la biblioteca de la escuela. Al abrir la base crea solas sus
+tablas nuevas (`biblio_*`). El escaneo ahora solo guarda lo que pide el gobierno (`validacion/estandar.py`).
+Si la Tarea 017 no está terminada, termínala primero.
+
+No borres nada, no cambies la base a mano y no toques archivos fuera de `resultados/`.
+
+1. Actualiza la rama, instala los dos paquetes nuevos (`openpyxl` y `reportlab`) y reinicia los servicios
+   (PowerShell como administrador):
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   python -m pip install -r validacion\requisitos.txt
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
+   ```
+   Si la 017 terminó con `-ComoSistema`, vuelve a poner `-ComoSistema` al final del último renglón.
+2. Espera 1 minuto y comprueba que contesta. Solo imprime números, sin nombres; el documento no se guarda:
+   ```
+   python -c "import json, urllib.request as u; from pathlib import Path; k = (Path.home() / '.sidp' / 'clave_cerebro.txt').read_text(encoding='utf-8').strip(); h = {'X-SIDP-Clave': k, 'Content-Type': 'application/json'}; g = lambda r: json.load(u.urlopen(u.Request('http://127.0.0.1:8771' + r, headers=h), timeout=60)); d = g('/documentos'); print('alumnos', d['alumnos'], 'documentos', len(d['documentos']), 'datos que faltan', [(f['dato'], f['alumnos']) for f in d['faltan']]); print('biblioteca', g('/biblioteca')['resumen']); p = json.load(u.urlopen(u.Request('http://127.0.0.1:8771/documento', json.dumps({'clave': 'lista', 'formato': 'pdf'}).encode(), h), timeout=120)); print('lista en PDF', p['nombre'], len(p['contenido']), 'caracteres')"
+   ```
+3. Escribe `cerebro\laboratorio\resultados\2026-10-23_tarea018.md` con la salida del paso 2 y cualquier error
+   completo (sin IP, claves, nombres ni CURP). Súbelo solo a él, como siempre (`git add` de ese archivo, `commit`,
+   `pull --rebase`, `push`).

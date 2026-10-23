@@ -34,8 +34,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements-dev.txt "pypdf>=5.1" "pg8000>=1.31"
-      - run: python -m pytest -q pruebas/test_base_cerebro.py pruebas/test_datos_alumno.py
+      - run: python -m pip install -r requirements-dev.txt "pypdf>=5.1" "pg8000>=1.31" "pandas>=2.2" "zxing-cpp>=2.2" "opencv-python-headless>=4.10"
+      - run: python -m pytest -q pruebas/test_base_cerebro.py pruebas/test_datos_alumno.py pruebas/test_biblioteca.py pruebas/test_pc4_inventario_analisis.py
         env:
           SIDP_PRUEBA_BASE: postgresql://sidp:prueba@127.0.0.1:5432/sidp_cerebro
           SIDP_SIN_PADDLE: '1'
@@ -71,7 +71,8 @@ jobs:
       - run: python despliegue/compilar.py --tipo validador
       - run: dist/SIDP-Validador.exe validacion/ejemplo --hoy 2026-10-14 --revisar --sin-modelo
       # El instalable del servidor: SIDP.exe (ventana propia, sin consola) dentro de SIDP-Instalador.exe.
-      - run: python -m pip install "pillow>=10.0" "openpyxl==3.1.5"  # openpyxl: el Excel por grado con gráficas.
+      # openpyxl: el Excel por grado con gráficas; reportlab: los documentos en PDF si la PC 4 está apagada.
+      - run: python -m pip install "pillow>=10.0" "openpyxl==3.1.5" "reportlab==4.4.4"
       - run: python despliegue/compilar.py --tipo escritorio
         env:
           SIDP_VERSION: 1.0.${{ github.run_number }}
@@ -94,6 +95,8 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
           & $iscc "/DVersion=1.0.${{ github.run_number }}" despliegue\instalador.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      # La computadora de la biblioteca: solo la biblioteca estándar, pasa todo al servidor.
+      - run: python despliegue/compilar.py --tipo biblioteca
       - run: dist/SIDP-Servidor.exe --help
       - run: dist/SIDP-Equipo.exe --help
       # Tres equipos simulados con los .exe reales: alta, descubrimiento, TLS, ida y vuelta, reparto
@@ -108,6 +111,7 @@ jobs:
             dist/SIDP-Servidor.exe
             dist/SIDP-Equipo.exe
             dist/SIDP-Validador.exe
+            dist/SIDP-Biblioteca.exe
             dist/SIDP-Instalador.exe
             dist/PRUEBA_DOS_EQUIPOS.md
             dist/ENTORNO_PRUEBAS.md

@@ -11,3 +11,6 @@ zxing-cpp>=2.2
 pg8000>=1.31
 # pandas (con numpy) hace el análisis de datos de la PC 4: pestaña "Análisis de datos" y python -m validacion.base_cerebro analisis.
 pandas>=2.2
+# openpyxl y reportlab: el motor de documentos del cerebro (911 y listas en Excel; constancias y listas en PDF).
+openpyxl==3.1.5
+reportlab==4.4.4

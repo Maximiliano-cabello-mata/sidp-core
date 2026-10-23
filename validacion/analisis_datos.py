@@ -5,8 +5,9 @@ escanea. Lo que cuenta (todo en números, sin nombres ni CURP; cada alumno se cu
 - Matrícula por grupo y sexo, edades al 1 de septiembre (911) y extraedad.
 - Las tablas del 911.3: alumnos por grado, sexo y edad; discapacidad y condiciones por tipo; nacidos en otra entidad
   o en otro país (sale de la CURP).
-- Salud, como la estrategia "Vive saludable, vive feliz" de la SEP: estado nutricional con la OMS, vista, salud
-  bucal; además tipo de sangre, alergias, padecimientos, medicamentos y vacunas.
+- Salud mínima (el estándar, validacion/estandar.py): alergias, padecimientos, medicamentos y discapacidad para el 911.
+  Peso, talla, vista, dientes, sangre y vacunas ya no se estudian: los resultados de "Vive saludable" son del sector salud.
+- Lo que el 911 pide y pone la escuela: repetidores, de dónde vienen, becas, lengua indígena y afromexicanos.
 - Dónde viven: municipios, colonias y códigos postales.
 - Boletas de años anteriores: promedio por grado cursado, por campo formativo y alumnos con promedio bajo.
 - Cuántos alumnos tienen ya cada tipo de dato, para saber si los porcentajes ya valen para toda la escuela.
@@ -109,7 +110,6 @@ def analizar(base, hoy=None):
         df = vacio
     salud, domicilio, boletas = (df[df[c]] if total else df for c in ('con_salud', 'con_domicilio', 'con_boletas'))
     con_boleta_posible = df[df['grado'] > 1] if total else df  # En 1.° no traen boleta de primaria.
-    medidos = salud[salud['nutricion'].notna()] if len(salud) else salud
     cobertura = [
         {'area': 'Salud (certificado médico)', 'con': len(salud), 'de': total},
         {'area': 'Domicilio (colonia, municipio o CP)', 'con': len(domicilio), 'de': total},
@@ -121,7 +121,6 @@ def analizar(base, hoy=None):
     resultado['cobertura'] = cobertura
     resultado['suficiente'] = any(c['suficiente'] for c in cobertura)
 
-    sobre = int(medidos['nutricion'].isin(['Sobrepeso', 'Obesidad']).sum()) if len(medidos) else 0
     lista = lambda d, c: int(d[c].map(bool).sum()) if len(d) else 0  # noqa: E731 - alumnos con al menos un valor en la lista
     municipios = _conteo(domicilio['municipio'].dropna().map(indicadores.titulo)) if len(domicilio) else []
     con_municipio = sum(n for _, n in municipios)
@@ -129,7 +128,7 @@ def analizar(base, hoy=None):
     resultado['kpis'] = {
         'alumnos': total, 'hombres': int((df['sexo'] == 'H').sum()) if total else 0, 'mujeres': int((df['sexo'] == 'M').sum()) if total else 0,
         'grupos': int(df['grupo'].nunique()) if total else 0,
-        'con_salud': len(salud), 'medidos': len(medidos), 'sobrepeso_obesidad': sobre, 'por_ciento_sobrepeso': _por_ciento(sobre, len(medidos)),
+        'con_salud': len(salud),
         'con_alergias': lista(salud, 'alergias'), 'con_padecimientos': lista(salud, 'padecimientos'),
         'con_medicamento': lista(salud, 'medicamentos'), 'con_discapacidad': lista(df, 'discapacidades'),
         'promedio_general': round(float(ultimos.mean()), 1) if len(ultimos) else None,
@@ -157,18 +156,18 @@ def analizar(base, hoy=None):
     resultado['entidades'] = _conteo(df[df['nacido'] == 'Otra entidad']['entidad']) if total else []
 
     # Salud.
-    orden_nutricion = list(indicadores.NUTRICION)
     resultado['salud'] = {
-        'nutricion': _cruce(medidos, 'grado_texto', 'nutricion', orden=orden_nutricion),
-        'nutricion_escuela': [[c, int((medidos['nutricion'] == c).sum())] for c in orden_nutricion] if len(medidos) else [],
-        'sangre': _conteo(salud['tipo_sangre']) if len(salud) else [],
         'alergias': _conteo(salud['alergias'], 10) if len(salud) else [],
         'padecimientos': _conteo(salud['padecimientos'], 10) if len(salud) else [],
         'medicamentos': _conteo(salud['medicamentos'], 10) if len(salud) else [],
-        'vista': _cruce(salud, 'grado_texto', 'vista', orden=list(indicadores.VISTA)),
-        'bucal': _cruce(salud, 'grado_texto', 'bucal', orden=list(indicadores.BUCAL)),
-        'vacunas': _conteo(salud['vacunas']) if len(salud) else [],
     }
+    # Lo del 911 que pone la escuela: cuántos ya tienen el dato y cuántos dicen que sí.
+    resultado['para_911'] = [{'dato': nombre, 'con': int(df[clave].notna().sum()) if total else 0,
+                              'si': int((df[clave] == 'sí').sum()) if total else 0, 'de': total}
+                             for clave, nombre in (('repite', 'Repiten el grado'), ('lengua_indigena', 'Hablan una lengua indígena'),
+                                                   ('afro', 'Afromexicanos o afrodescendientes'))]
+    resultado['becas'] = _conteo(df['beca'].dropna()) if total else []
+    resultado['procedencia'] = _conteo(df['procedencia'].dropna()) if total else []
 
     # Dónde viven.
     resultado['domicilio'] = {
@@ -213,18 +212,6 @@ def hallazgos(r):
                   f'({cobertura["Boletas"]["porcentaje"]}% de los de 2.° a 6.°).'
                   + ('' if r['suficiente'] else ' Todavía son pocos: los números de abajo hablan solo de los ya escaneados.'))
     s = r['salud']
-    if k['medidos']:
-        cuenta = dict(s['nutricion_escuela'])
-        frases.append(f'De {k["medidos"]} alumnos con peso y talla, {cuenta.get("Sobrepeso", 0)} tienen sobrepeso y {cuenta.get("Obesidad", 0)} '
-                      f'obesidad ({k["por_ciento_sobrepeso"]}%); {cuenta.get("Delgadez", 0) + cuenta.get("Delgadez severa", 0)} tienen delgadez.')
-        por_grado = []
-        for fila in s['nutricion']['filas']:
-            if fila[0] != 'Total' and fila[-1] >= 5:
-                columnas = dict(zip(s['nutricion']['columnas'], fila[1:]))
-                por_grado.append((fila[0], _por_ciento(columnas.get('Sobrepeso', 0) + columnas.get('Obesidad', 0), fila[-1])))
-        if len(por_grado) > 1:
-            peor = max(por_grado, key=lambda g: g[1])
-            frases.append(f'El grado con más sobrepeso u obesidad es {peor[0]} ({peor[1]}% de sus alumnos medidos).')
     if k['con_alergias']:
         frases.append(f'{k["con_alergias"]} alumno(s) con alguna alergia; las más comunes: {_lista_corta(s["alergias"])}.')
     if k['con_padecimientos'] or k['con_medicamento']:
@@ -233,17 +220,9 @@ def hallazgos(r):
     if r['discapacidad_911']['filas']:
         tipos = [(f[0], f[-1]) for f in r['discapacidad_911']['filas'] if f[0] != 'Total']
         frases.append(f'{k["con_discapacidad"]} alumno(s) con discapacidad o condición para el 911: {_lista_corta(tipos, 6)}.')
-    vista = {f[0]: dict(zip(s['vista']['columnas'], f[1:])) for f in s['vista']['filas']}.get('Total', {})
-    if vista.get('Necesita valoración') or vista.get('Usa lentes'):
-        frases.append(f'Vista: {vista.get("Necesita valoración", 0)} necesitan valoración y {vista.get("Usa lentes", 0)} usan lentes.')
-    bucal = {f[0]: dict(zip(s['bucal']['columnas'], f[1:])) for f in s['bucal']['filas']}.get('Total', {})
-    if bucal.get('Necesita dentista'):
-        frases.append(f'{bucal["Necesita dentista"]} alumno(s) necesitan dentista (caries u otro problema anotado).')
-    incompletas = dict(s['vacunas']).get('Incompletas')
-    if incompletas:
-        frases.append(f'{incompletas} alumno(s) con el esquema de vacunas incompleto.')
-    if s['sangre']:
-        frases.append(f'El tipo de sangre más común es {s["sangre"][0][0]} ({s["sangre"][0][1]} de {sum(n for _, n in s["sangre"])} con el dato).')
+    faltan_911 = [f'{x["de"] - x["con"]} sin el dato de «{x["dato"].lower()}»' for x in r.get('para_911', []) if x['de'] - x['con']]
+    if faltan_911:
+        frases.append('Para el 911 faltan datos que pone la escuela: ' + ', '.join(faltan_911) + ' (se completan en «Reportes para la SEP»).')
     d = r['domicilio']
     if d['municipios']:
         primero, n = d['municipios'][0]
@@ -278,9 +257,8 @@ def _numeros_para_ia(r):
     s, d, e = r['salud'], r['domicilio'], r['escolar']
     return {
         'ciclo': r['ciclo'], 'alumnos': r['kpis'], 'cuantos_alumnos_tienen_cada_dato': r['cobertura'],
-        'estado_nutricional_escuela': s['nutricion_escuela'], 'estado_nutricional_por_grado': s['nutricion'],
-        'tipo_de_sangre': s['sangre'], 'alergias_mas_comunes': s['alergias'], 'padecimientos_mas_comunes': s['padecimientos'],
-        'medicamentos': s['medicamentos'], 'vista_por_grado': s['vista'], 'salud_bucal_por_grado': s['bucal'], 'vacunas': s['vacunas'],
+        'alergias_mas_comunes': s['alergias'], 'padecimientos_mas_comunes': s['padecimientos'], 'medicamentos': s['medicamentos'],
+        'datos_del_911_que_pone_la_escuela': r.get('para_911'), 'becas': r.get('becas'), 'de_donde_vienen': r.get('procedencia'),
         'discapacidad_911_por_grado': r['discapacidad_911'], 'municipios': d['municipios'][:8], 'colonias': d['colonias'][:10],
         'codigos_postales': d['cps'][:5], 'nacidos_por_grado': r['nacidos'], 'otras_entidades': r['entidades'][:5],
         'promedio_por_grado_cursado': e['por_grado_cursado'], 'promedio_por_campo_formativo': e['formativos'],
@@ -291,9 +269,10 @@ def _numeros_para_ia(r):
 
 PEDIDO = ('Eres asistente de la dirección de una escuela primaria pública del Estado de México. Con estos datos (solo números, '
           'sin nombres) escribe en español un estudio breve para el director y el subdirector, con estos apartados en este orden: '
-          '"Salud" (estado nutricional según la OMS, alergias, padecimientos, vista, dientes, vacunas), "Dónde viven" (municipios y '
+          '"Salud" (alergias, padecimientos y medicamentos, para que lo sepan las maestras), "Dónde viven" (municipios y '
           'colonias), "Aprovechamiento" (boletas de años anteriores), "Para el 911" (discapacidad, nacidos en otra entidad o país, '
-          'extraedad) y "Qué hacer primero" (3 acciones concretas). Cada apartado de 2 a 4 frases. Di siempre de cuántos alumnos sale '
+          'extraedad, repetidores, becas, lengua indígena) y "Qué hacer primero" (3 acciones concretas). Cada apartado de 2 a 4 frases. '
+          'No hables de peso, talla, vista, dientes, sangre ni vacunas. Di siempre de cuántos alumnos sale '
           'cada número y, si son pocos, dilo. No hables de documentos ni de expedientes. No inventes datos que no estén aquí.\n')
 
 

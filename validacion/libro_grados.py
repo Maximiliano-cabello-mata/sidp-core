@@ -1,4 +1,4 @@
-"""El Excel de la escuela por grado: la salud de cada alumno, dónde viven, sus boletas y las tablas que pide el 911.
+"""El Excel de la escuela por grado: lo que hay que cuidar de cada alumno, dónde viven, sus boletas y las tablas del 911.
 
 Lo arma el servidor (SIDP.exe) con las listas de grupo de aquí y, si la PC 4 contesta, los datos que el escaneo sacó de
 cada alumno (certificado médico, domicilio, boletas de años anteriores). Trae nombres y CURP: es un archivo de la
@@ -6,8 +6,9 @@ escuela, se descarga en la PC del administrador y no se sube a internet. No trae
 
 Hojas:
 - Resumen: un renglón por grado y las gráficas que comparan los grados.
-- Salud: un renglón por alumno con todo lo de su certificado médico; lo que la maestra debe saber, en rojo.
-- Salud por grado: estado nutricional con la OMS (como "Vive saludable, vive feliz"), vista, dientes, tipo de sangre y alergias.
+- Salud: un renglón por alumno con lo que la maestra debe saber (alergias, padecimientos, medicamentos, discapacidad), en rojo.
+- Salud por grado: cuántos tienen alergias, padecimientos, medicamentos o discapacidad, y las alergias más comunes.
+  Solo lo necesario (validacion/estandar.py): sin peso, talla, vista, dientes, sangre ni vacunas.
 - Dónde viven: municipios, colonias y códigos postales.
 - Boletas: el promedio de cada año anterior de cada alumno y el promedio por grado cursado.
 - 911: alumnos por grado, sexo y edad al 1 de septiembre; grupos; discapacidad por tipo; nacidos en otra entidad o país.
@@ -20,26 +21,21 @@ import io
 from validacion import indicadores
 
 GRADOS = range(1, 7)
-SANGRE = indicadores.SANGRE
 # (clave, encabezado, ancho): las columnas de la lista de alumnos, en las hojas "Todos" y de cada grado.
 COLUMNAS = [
     ('grupo', 'Grupo', 8), ('primer_apellido', 'Primer apellido', 16), ('segundo_apellido', 'Segundo apellido', 16),
     ('nombres', 'Nombre(s)', 20), ('curp', 'CURP', 21), ('renapo', 'CURP en RENAPO', 10), ('sexo', 'Sexo', 7),
     ('fecha_nacimiento', 'Fecha de nacimiento', 12), ('edad', 'Edad al 1 de sept. (911)', 9), ('situacion', 'Edad para el grado', 13),
-    ('peso', 'Peso (kg)', 9), ('talla', 'Talla (m)', 9), ('imc', 'IMC', 7), ('nutricion', 'Estado nutricional (OMS)', 13),
-    ('tipo_sangre', 'Tipo de sangre', 9), ('alergias', 'Alergias', 22), ('padecimientos', 'Padecimientos', 22),
+    ('repite', 'Repite el grado', 9), ('alergias', 'Alergias', 22), ('padecimientos', 'Padecimientos', 22),
     ('medicamentos', 'Medicamentos', 18), ('discapacidad', 'Discapacidad o condición (911)', 20), ('municipio', 'Municipio', 18),
     ('colonia', 'Colonia', 18), ('promedio', 'Promedio de la última boleta', 10), ('tutor', 'Tutor', 26), ('parentesco', 'Parentesco', 11),
     ('telefono', 'Teléfono', 13), ('por_confirmar', 'Datos por confirmar', 11),
 ]
 SALUD = [
     ('grupo', 'Grupo', 8), ('primer_apellido', 'Primer apellido', 15), ('segundo_apellido', 'Segundo apellido', 15), ('nombres', 'Nombre(s)', 18),
-    ('edad', 'Edad', 6), ('sexo', 'Sexo', 7), ('tipo_sangre', 'Tipo de sangre', 8), ('alergias', 'Alergias', 22),
-    ('padecimientos', 'Enfermedades o padecimientos', 22), ('medicamentos', 'Medicamentos', 18), ('discapacidad', 'Discapacidad o condición', 18),
-    ('cirugias', 'Cirugías u hospitalizaciones', 16), ('peso', 'Peso (kg)', 8), ('talla', 'Talla (m)', 8), ('imc', 'IMC', 6),
-    ('nutricion', 'Estado nutricional (OMS)', 13), ('vista', 'Vista', 13), ('bucal', 'Salud bucal', 13), ('vacunas', 'Vacunas', 11),
-    ('audicion', 'Audición', 12), ('educacion_fisica', 'Educación física', 14), ('recomendaciones', 'Recomendaciones del médico', 26),
-    ('otros_salud', 'Otros datos del certificado', 26), ('tutor', 'Tutor', 24), ('telefono', 'Teléfono', 13),
+    ('edad', 'Edad', 6), ('sexo', 'Sexo', 7), ('alergias', 'Alergias', 24),
+    ('padecimientos', 'Enfermedades o padecimientos', 24), ('medicamentos', 'Medicamentos', 20), ('discapacidad', 'Discapacidad o condición', 20),
+    ('tutor', 'Tutor', 24), ('telefono', 'Teléfono', 13), ('emergencia', 'Contacto de emergencia', 24),
 ]
 IMPORTANTES = ('alergias', 'padecimientos', 'medicamentos', 'discapacidad')  # Lo que la maestra debe saber: en rojo.
 SITUACIONES = ('En su edad', 'Extraedad', 'Menor edad', 'Sin fecha')
@@ -93,20 +89,14 @@ def alumno(fila, anio, expediente=None, hoy=None):
         parentesco = parentesco or principal.get('parentesco') or ''
         telefono = telefono or principal.get('telefono') or ''
     telefono = telefono or ', '.join(indicadores.valores_de(datos, 'contacto', 'telefono')[:2])
-    peso, talla = ind['peso'], ind['talla']
-    peso = peso if peso and 8 <= peso <= 150 else None
-    talla = talla / 100 if talla and talla > 3 else talla  # Escrita en centímetros.
-    talla = round(talla, 2) if talla and 0.6 <= talla <= 2.1 else None
     unir = lambda valores: ', '.join(valores) or None  # noqa: E731
     return {
         'grado': int(grado), 'letra': letra, 'grupo': f'{grado}° {letra}', 'primer_apellido': primer, 'segundo_apellido': segundo,
         'nombres': nombres, 'curp': curp, 'renapo': renapo, 'sexo': {'H': 'Hombre', 'M': 'Mujer'}.get(sexo, ''),
-        'fecha_nacimiento': nacimiento, 'edad': ind['edad_911'], 'situacion': situacion, 'peso': peso, 'talla': talla,
-        'imc': ind['imc'] if peso and talla else None, 'nutricion': ind['nutricion'], 'tipo_sangre': ind['tipo_sangre'],
+        'fecha_nacimiento': nacimiento, 'edad': ind['edad_911'], 'situacion': situacion,
+        'repite': {'sí': 'Sí', 'no': 'No'}.get(ind['repite']),
         'alergias': unir(ind['alergias']), 'padecimientos': unir(ind['padecimientos']), 'medicamentos': unir(ind['medicamentos']),
-        'discapacidad': unir(ind['discapacidades']), 'cirugias': unir(ind['cirugias']), 'vista': ind['vista'], 'bucal': ind['bucal'],
-        'vacunas': ind['vacunas'], 'audicion': ind['audicion'], 'educacion_fisica': ind['educacion_fisica'],
-        'recomendaciones': ind['recomendaciones'], 'otros_salud': unir(ind['otros_salud']),
+        'discapacidad': unir(ind['discapacidades']), 'emergencia': indicadores._uno(datos, 'contacto', 'nombre_emergencia'),
         'municipio': indicadores.titulo(ind['municipio']) if ind['municipio'] else None,
         'colonia': indicadores.titulo(ind['colonia']) if ind['colonia'] else None, 'cp': ind['cp'], 'nacido': ind['nacido'],
         'entidad': ind['entidad'], 'promedio': ind['ultimo_promedio'], **{f'promedio_{g}': ind['promedios'].get(g) for g in GRADOS},
@@ -128,21 +118,15 @@ def _por_ciento(parte, todo):
 def resumen_grado(alumnos):
     """Un renglón de la hoja Resumen: los números de un grado (o de la escuela)."""
     total = len(alumnos)
-    medidos = [a for a in alumnos if a['nutricion']]
-    sobre = sum(a['nutricion'] in ('Sobrepeso', 'Obesidad') for a in medidos)
     return {
         'grupos': len({a['letra'] for a in alumnos}), 'alumnos': total,
         'hombres': sum(a['sexo'] == 'Hombre' for a in alumnos), 'mujeres': sum(a['sexo'] == 'Mujer' for a in alumnos),
         'edad': _promedio([a['edad'] for a in alumnos]),
         **{s: sum(a['situacion'] == s for a in alumnos) for s in SITUACIONES},
         'con_salud': sum(1 for a in alumnos if a['ind']['con_salud']),
-        'peso': _promedio([a['peso'] for a in alumnos]), 'talla': _promedio([a['talla'] for a in alumnos]),
-        'imc': _promedio([a['imc'] for a in alumnos]), 'medidos': len(medidos), 'sobrepeso': sobre,
-        'por_ciento_sobrepeso': _por_ciento(sobre, len(medidos)),
-        'delgadez': sum(a['nutricion'] in ('Delgadez', 'Delgadez severa') for a in medidos),
         'con_alergias': sum(1 for a in alumnos if a['alergias']), 'con_padecimientos': sum(1 for a in alumnos if a['padecimientos']),
-        'vista': sum(a['vista'] == 'Necesita valoración' for a in alumnos), 'dentista': sum(a['bucal'] == 'Necesita dentista' for a in alumnos),
-        'con_discapacidad': sum(1 for a in alumnos if a['discapacidad']),
+        'con_medicamento': sum(1 for a in alumnos if a['medicamentos']), 'con_discapacidad': sum(1 for a in alumnos if a['discapacidad']),
+        'repiten': sum(1 for a in alumnos if a['repite'] == 'Sí'),
         'otra_entidad': sum(a['nacido'] in ('Otra entidad', 'Otro país') for a in alumnos),
         'promedio': _promedio([a['promedio'] for a in alumnos]),
         'bajos': sum(1 for a in alumnos if a['promedio'] is not None and a['promedio'] < indicadores.PROMEDIO_BAJO),
@@ -152,10 +136,8 @@ def resumen_grado(alumnos):
 
 RESUMEN = [('grupos', 'Grupos'), ('alumnos', 'Alumnos'), ('hombres', 'Hombres'), ('mujeres', 'Mujeres'), ('edad', 'Edad promedio (1 sept.)'),
            ('En su edad', 'En su edad'), ('Extraedad', 'Extraedad'), ('Menor edad', 'Menor edad'), ('Sin fecha', 'Sin fecha de nacimiento'),
-           ('con_salud', 'Con datos de salud'), ('peso', 'Peso promedio (kg)'), ('talla', 'Talla promedio (m)'), ('imc', 'IMC promedio'),
-           ('medidos', 'Con peso y talla'), ('sobrepeso', 'Sobrepeso u obesidad'), ('por_ciento_sobrepeso', '% sobrepeso u obesidad'),
-           ('delgadez', 'Delgadez'), ('con_alergias', 'Con alergias'), ('con_padecimientos', 'Con padecimientos'),
-           ('vista', 'Vista: necesitan valoración'), ('dentista', 'Necesitan dentista'), ('con_discapacidad', 'Con discapacidad o condición'),
+           ('con_salud', 'Con datos de salud'), ('con_alergias', 'Con alergias'), ('con_padecimientos', 'Con padecimientos'),
+           ('con_medicamento', 'Toman medicamento'), ('con_discapacidad', 'Con discapacidad o condición'), ('repiten', 'Repiten el grado'),
            ('otra_entidad', 'Nacidos en otra entidad o país'), ('promedio', 'Promedio de la última boleta'), ('bajos', 'Promedio menor a 7'),
            ('por_confirmar', 'Datos por confirmar')]
 
@@ -293,12 +275,7 @@ def _hoja_resumen(libro, alumnos, ciclo, hoy, estilos, escuela):
     graficas = [
         serie('Alumnos por grado', 'Alumnos', ['hombres', 'mujeres'], (AZUL, NARANJA), True),
         serie('Edad para el grado', 'Alumnos', list(SITUACIONES), (VERDE, NARANJA, AZUL, GRIS), True),
-        serie('Peso promedio por grado', 'kg', ['peso'], (MORADO,)),
-        serie('Talla promedio por grado', 'metros', ['talla'], (VERDE,)),
-        serie('IMC promedio por grado', 'IMC', ['imc'], (NARANJA,)),
-        serie('Sobrepeso u obesidad y delgadez (OMS)', 'Alumnos', ['sobrepeso', 'delgadez'], (ROJO, 'FFC000')),
-        serie('Alergias y padecimientos', 'Alumnos', ['con_alergias', 'con_padecimientos'], (ROJO, MORADO)),
-        serie('Vista y dientes: necesitan atención', 'Alumnos', ['vista', 'dentista'], (AZUL, NARANJA)),
+        serie('Alergias, padecimientos y medicamentos', 'Alumnos', ['con_alergias', 'con_padecimientos', 'con_medicamento'], (ROJO, MORADO, NARANJA)),
         serie('Promedio de la última boleta', 'Promedio', ['promedio'], (AZUL,)),
         serie('Discapacidad y nacidos fuera del estado', 'Alumnos', ['con_discapacidad', 'otra_entidad'], (MORADO, GRIS)),
     ]
@@ -309,45 +286,31 @@ def _hoja_salud(libro, alumnos, estilos):
     hoja = libro.create_sheet('Salud')
     _titulo(hoja, 'La salud de cada alumno',
             'Del certificado médico que se escaneó. En rojo: alergias, padecimientos, medicamentos y discapacidad, lo que su maestra debe '
-            'saber. Estado nutricional con la OMS (IMC para la edad). Usa el filtro de cada columna para ver, por ejemplo, solo los que tienen alergia.',
+            'saber. Usa el filtro de cada columna para ver, por ejemplo, solo los que tienen alergia.',
             estilos)
     _lista(hoja, 4, alumnos, estilos, SALUD, congelar=5)
 
 
 def _hoja_salud_por_grado(libro, alumnos, estilos):
     hoja = libro.create_sheet('Salud por grado')
-    _titulo(hoja, 'Salud por grado', 'Como las jornadas "Vive saludable, vive feliz" de la SEP: estado nutricional (OMS), vista y salud bucal.',
-            estilos)
-    graficas = []
-
-    def cruce(fila, titulo, clave, clases, colores, eje='Alumnos'):
-        _subtitulo(hoja, fila - 1, titulo, estilos)
-        renglones = [[f'{g}°'] + [sum(a[clave] == c for a in alumnos if a['grado'] == g) for c in clases]
-                     + [sum(1 for a in alumnos if a['grado'] == g and not a[clave])] for g in GRADOS]
-        renglones.append(['Escuela'] + [sum(r[j] for r in renglones) for j in range(1, len(clases) + 2)])
-        p, u = _tabla(hoja, fila, 1, ['Grado', *clases, 'Sin dato'], renglones, estilos, total=True)
-        graficas.append(_series(_grafica('barras', titulo, 'Grado', eje, apilada=True), hoja, list(range(2, len(clases) + 2)), fila, p, u - 1, 1,
-                                colores))
-        return u + 3
-
-    fila = cruce(5, 'Estado nutricional (OMS)', 'nutricion', indicadores.NUTRICION, (ROJO, 'FFC000', VERDE, NARANJA, MORADO))
-    fila = cruce(fila, 'Vista', 'vista', indicadores.VISTA, (VERDE, AZUL, ROJO))
-    fila = cruce(fila, 'Salud bucal', 'bucal', indicadores.BUCAL, (VERDE, ROJO))
-    fila = cruce(fila, 'Vacunas', 'vacunas', indicadores.VACUNAS, (VERDE, ROJO))
-    _subtitulo(hoja, fila - 1, 'Tipo de sangre (toda la escuela)', estilos)
-    sangre = [[s, sum(a['tipo_sangre'] == s for a in alumnos)] for s in SANGRE]
-    sangre = [s for s in sangre if s[1]] or [['Sin dato', 0]]
-    p, u = _tabla(hoja, fila, 1, ['Tipo', 'Alumnos'], sangre, estilos)
-    graficas.append(_series(_grafica('pastel', 'Tipo de sangre'), hoja, [2], fila, p, u, 1))
+    _titulo(hoja, 'Salud por grado', 'Cuántos alumnos de cada grado tienen algo que su maestra debe cuidar.', estilos)
+    claves = (('con_alergias', 'Con alergias'), ('con_padecimientos', 'Con padecimientos'), ('con_medicamento', 'Toman medicamento'),
+              ('con_discapacidad', 'Con discapacidad o condición'))
+    renglones = [[f'{g}°'] + [resumen_grado([a for a in alumnos if a['grado'] == g])[c] for c, _ in claves] for g in GRADOS]
+    renglones.append(['Escuela'] + [sum(r[j] for r in renglones) for j in range(1, len(claves) + 1)])
+    p, u = _tabla(hoja, 5, 1, ['Grado'] + [n for _, n in claves], renglones, estilos, total=True)
+    graficas = [_series(_grafica('barras', 'Lo que hay que cuidar, por grado', 'Grado', 'Alumnos'), hoja, list(range(2, len(claves) + 2)), 5, p,
+                        u - 1, 1, (ROJO, MORADO, NARANJA, AZUL))]
     fila = u + 3
-    for titulo, clave in (('Alergias más comunes', 'alergias'), ('Enfermedades o padecimientos más comunes', 'padecimientos')):
+    for titulo, clave in (('Alergias más comunes', 'alergias'), ('Enfermedades o padecimientos más comunes', 'padecimientos'),
+                          ('Medicamentos más comunes', 'medicamentos')):
         _subtitulo(hoja, fila - 1, titulo, estilos)
-        cuenta = _conteo([v for a in alumnos for v in a['ind'][clave]], 10) or [['Ninguna anotada', 0]]
+        cuenta = _conteo([v for a in alumnos for v in a['ind'][clave]], 10) or [['Ninguno anotado', 0]]
         p, u = _tabla(hoja, fila, 1, ['Cuál', 'Alumnos'], cuenta, estilos)
         graficas.append(_series(_grafica('barras', titulo, '', 'Alumnos', horizontal=True), hoja, [2], fila, p, u, 1, (ROJO,)))
         fila = u + 3
-    _anchos(hoja, [22] + [12] * 7)
-    _poner(hoja, graficas, 5, ('J', 'S'))
+    _anchos(hoja, [26] + [14] * 4)
+    _poner(hoja, graficas, 5, ('H', 'Q'))
 
 
 def _hoja_domicilio(libro, alumnos, estilos):
@@ -400,8 +363,8 @@ def _hoja_boletas(libro, alumnos, estilos):
 def _hoja_911(libro, alumnos, estilos):
     hoja = libro.create_sheet('911')
     _titulo(hoja, 'Para la estadística 911 (cuestionario 911.3, primaria)',
-            'Los números ya contados para capturarlos en f911.sep.gob.mx. La edad es la cumplida al 1 de septiembre. Nuevo ingreso y repetidores, '
-            'lengua indígena y afromexicanos se separan a mano: la base todavía no los guarda.', estilos)
+            'Los números ya contados para capturarlos en f911.sep.gob.mx. La edad es la cumplida al 1 de septiembre. El 911 completo (repetidores, '
+            'becas, lengua indígena, de dónde vienen) sale en «Reportes para la SEP» > Estadística 911.', estilos)
     edades = list(indicadores.EDADES_911)
     renglones = []
     for grado in GRADOS:
@@ -444,22 +407,7 @@ def _hoja_911(libro, alumnos, estilos):
 def _hoja_todos(libro, alumnos, estilos):
     hoja = libro.create_sheet('Todos')
     _titulo(hoja, 'Todos los alumnos', None, estilos)
-    primera, ultima = _lista(hoja, 3, alumnos, estilos)
-    if not alumnos:
-        return
-    from openpyxl.chart import Reference, Series
-    grafica = _grafica('puntos', 'Peso contra talla de todos los alumnos (un color por grado)', 'Talla (m)', 'Peso (kg)', ancho=24, alto=13)
-    grafica.style = 13
-    for grado in GRADOS:
-        filas = [primera + i for i, a in enumerate(alumnos) if a['grado'] == grado]
-        if not filas or not any(alumnos[f - primera]['peso'] and alumnos[f - primera]['talla'] for f in filas):
-            continue
-        serie = Series(Reference(hoja, min_col=_col('peso'), min_row=filas[0], max_row=filas[-1]),
-                       Reference(hoja, min_col=_col('talla'), min_row=filas[0], max_row=filas[-1]), title=f'{grado}°')
-        serie.marker.symbol, serie.graphicalProperties.line.noFill = 'circle', True
-        grafica.series.append(serie)
-    if grafica.series:
-        hoja.add_chart(grafica, f'A{ultima + 3}')
+    _lista(hoja, 3, alumnos, estilos)
 
 
 def _hoja_grado(libro, grado, alumnos, estilos):
@@ -476,10 +424,10 @@ def _hoja_grado(libro, grado, alumnos, estilos):
     renglones = []
     for letra in sorted({a['letra'] for a in alumnos}):
         n = resumen_grado([a for a in alumnos if a['letra'] == letra])
-        renglones.append([f'{grado}° {letra}', n['alumnos'], n['hombres'], n['mujeres'], n['edad'], n['Extraedad'], n['peso'], n['talla'],
-                          n['por_ciento_sobrepeso'], n['con_alergias'], n['promedio']])
-    g_primera, g_ultima = _tabla(hoja, fila, 1, ['Grupo', 'Alumnos', 'Hombres', 'Mujeres', 'Edad promedio', 'Extraedad', 'Peso promedio (kg)',
-                                                 'Talla promedio (m)', '% sobrepeso u obesidad', 'Con alergias', 'Promedio de la boleta'],
+        renglones.append([f'{grado}° {letra}', n['alumnos'], n['hombres'], n['mujeres'], n['edad'], n['Extraedad'], n['con_alergias'],
+                          n['con_padecimientos'], n['repiten'], n['promedio']])
+    g_primera, g_ultima = _tabla(hoja, fila, 1, ['Grupo', 'Alumnos', 'Hombres', 'Mujeres', 'Edad promedio', 'Extraedad', 'Con alergias',
+                                                 'Con padecimientos', 'Repiten el grado', 'Promedio de la boleta'],
                                  renglones, estilos)
     # Edades del grado (tabla chica para su gráfica).
     edades = sorted({a['edad'] for a in alumnos if a['edad'] is not None})
@@ -497,8 +445,7 @@ def _hoja_grado(libro, grado, alumnos, estilos):
     hoja.column_dimensions[get_column_letter(nombre)].hidden = True
     por_alumno = lambda titulo, eje, clave, color: _series(  # noqa: E731
         _grafica('barras', titulo, '', eje, horizontal=True, alto=alto), hoja, [_col(clave)], 3, primera, ultima, nombre, (color,))
-    graficas = [por_alumno('Peso de cada alumno', 'kg', 'peso', MORADO), por_alumno('Talla de cada alumno', 'metros', 'talla', VERDE),
-                por_alumno('IMC de cada alumno', 'IMC', 'imc', NARANJA)]
+    graficas = []
     if any(a['promedio'] for a in alumnos):
         graficas.append(por_alumno('Promedio de la última boleta de cada alumno', 'Promedio', 'promedio', AZUL))
     fila_graficas = e_ultima + 3

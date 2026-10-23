@@ -172,10 +172,26 @@ class BaseCerebro:
     def agregar_dato(self, curp, categoria, campo, valor, persona, detalle=None):
         """Un dato que escribe una persona (por ejemplo, un teléfono nuevo): queda confirmado."""
         from validacion import campos as campos_mod
+        from validacion import estandar
         nombre = campos_mod.clave_de(campo)
+        if not estandar.permitido(categoria, nombre):
+            raise ErrorBase('Ese dato no es de los que pide el gobierno ni de los que la escuela necesita: no se guarda.')
+        try:
+            valor = estandar.valor_de(categoria, nombre, valor)
+        except ValueError as error:
+            raise ErrorBase(str(error))
         return self._uno('SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)',
                          (self._alumno_id(curp), categoria, nombre, valor, json.dumps(detalle or {}, ensure_ascii=False), 'confirmado',
                           'persona', None, None, persona or 'administrador', nombre in campos_mod.VARIOS))
+
+    def agregar_varios(self, datos, persona):
+        """Varios datos de una vez (lo del 911 de todo un grupo). Los vacíos no se tocan; cada uno queda confirmado."""
+        guardados = 0
+        for dato in list(datos)[:3000]:
+            if str(dato.get('valor') or '').strip():
+                self.agregar_dato(dato['curp'], dato['categoria'], dato['campo'], dato['valor'], persona)
+                guardados += 1
+        return {'guardados': guardados}
 
     def dar_baja_alumno(self, curp, motivo, persona):
         """El alumno se va de la escuela: deja de contar en listas y análisis, pero su expediente se queda."""

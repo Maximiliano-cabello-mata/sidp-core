@@ -89,10 +89,9 @@ def test_los_procesos_fijos_leen_el_acta_la_ine_y_el_certificado():
     leidos = taller.de_procesos('acta_alumno', acta, [], HOY)
     assert leidos['curp'][0] == curp and leidos['nombre_madre'][0] == 'ROSA HERNANDEZ DIAZ' and leidos['nombre_padre'][0] == 'PEDRO GARCIA RUIZ'
     ine = taller.de_procesos('ine_tutor', generar.ine('RAMOS', 'SOTO', 'MARIA ELENA', 'C. PINO NO. 5 COL. CENTRO TOLUCA'), [], HOY)
-    assert ine == {'nombre_tutor': ('MARIA ELENA RAMOS SOTO', 'texto'), 'domicilio_ine': ('C. PINO NO. 5 COL. CENTRO TOLUCA', 'texto'),
-                   'vigencia_ine': ('2024-2034', 'texto')}
-    medico = taller.de_procesos('certificado_medico', generar.medico('JUAN GARCIA HERNANDEZ'), [], HOY)
-    assert medico == {'apto': ('sí', 'texto'), 'fecha_certificado': ('2026-09-02', 'texto')}
+    assert ine == {'nombre_tutor': ('MARIA ELENA RAMOS SOTO', 'texto'), 'domicilio_ine': ('C. PINO NO. 5 COL. CENTRO TOLUCA', 'texto')}
+    # Solo lo necesario: del certificado ya no se saca si es apto ni su fecha; lo que importa lo lee el modelo que ve.
+    assert taller.de_procesos('certificado_medico', generar.medico('JUAN GARCIA HERNANDEZ'), [], HOY) == {}
 
 
 def test_el_telefono_del_padre_no_se_toma_del_renglon_de_la_madre():
@@ -204,8 +203,8 @@ def test_si_los_procesos_ya_leyeron_todo_sin_ocr_no_se_gasta_el_modelo_que_ve():
     assert taller.necesita_ver(lista, {'curp': ('X', 'qr'), 'fecha_nacimiento': ('2020-05-12', 'ocr')})
     assert taller.necesita_ver(lista, {'curp': ('X', 'qr')})
     # Lo que los procesos sacan del texto de una foto queda marcado como OCR (por confirmar si va solo).
-    medico = taller.de_procesos('certificado_medico', generar.medico('JUAN GARCIA HERNANDEZ'), [], HOY, 'ocr')
-    assert {metodo for _, metodo in medico.values()} == {'ocr'}
+    ine = taller.de_procesos('ine_tutor', generar.ine('RAMOS', 'SOTO', 'MARIA ELENA', 'C. PINO NO. 5 COL. CENTRO TOLUCA'), [], HOY, 'ocr')
+    assert ine and {metodo for _, metodo in ine.values()} == {'ocr'}
 
 
 # ---------------------------------------------------------------- En la base de la PC 4
@@ -222,12 +221,13 @@ else:
 con_base = pytest.mark.skipif(not os.environ.get('SIDP_PRUEBA_BASE'), reason='sin PostgreSQL de prueba (SIDP_PRUEBA_BASE)')
 
 ACTA = generar.acta('JUAN', 'GARCIA', 'HERNANDEZ', '12/05/2020', 'HOMBRE', CURP_JUAN, 'PEDRO GARCIA RUIZ', 'ROSA HERNANDEZ DIAZ')
-# Lo que "ve" el modelo en cada documento (con letra a mano: un apellido mal leído, un peso dudoso).
+# Lo que "ve" el modelo en cada documento (con letra a mano: un apellido mal leído, un medicamento dudoso).
 VISTO = {
     'Acta de nacimiento': {'lugar_nacimiento': ('Toluca, México', True), 'nombre_madre': ('Rosa Hernández Díaz', True),
                            'nombre_padre': ('PEDRO GARCIA RUIS', True)},
-    'Certificado médico': {'tipo_sangre': ('O positivo', True), 'alergias': ('Penicilina y polvo', True), 'padecimientos': ('ninguno', True),
-                           'peso': ('22,5 kg', False), 'apto': ('Sí', True)},
+    'Certificado médico': {'alergias': ('Penicilina y polvo', True), 'padecimientos': ('ninguno', True),
+                           'medicamentos': ('Salbutamol', False), 'discapacidad': ('Ninguna', True),
+                           'peso': ('22,5 kg', True), 'tipo_sangre': ('O positivo', True)},  # Peso y sangre: el modelo no los ve.
 }
 
 
@@ -280,24 +280,21 @@ def test_el_taller_saca_los_datos_y_los_guarda_por_categoria(base, modelo_que_ve
     assert sorted(p.name for p in (tmp_path / 'trabajos' / str(trabajo)).iterdir()) == ['acta_alumno_1.pdf', 'certificado_medico_1.pdf']
     cuenta = trabajos.una_vez()
     assert {k: cuenta[k] for k in ('esperados', 'alta', 'media', 'baja', 'vacios', 'utiles')} == \
-        {'esperados': 35, 'alta': 7, 'media': 5, 'baja': 2, 'vacios': 21, 'utiles': 86}  # 12 de 14 datos salieron seguros.
+        {'esperados': 14, 'alta': 6, 'media': 4, 'baja': 2, 'vacios': 2, 'utiles': 83}  # 10 de 12 datos salieron seguros.
     assert not (tmp_path / 'trabajos' / str(trabajo)).exists()  # Los archivos del trabajo ya no hacen falta.
     assert trabajos.una_vez() is None
     assert datos_de(base) == {
         ('alumno', 'lugar_nacimiento', 'TOLUCA, MÉXICO'): ('media', 'vigente'),
         ('madre', 'nombre', 'ROSA HERNANDEZ DIAZ'): ('alta', 'vigente'),
         ('padre', 'nombre', 'PEDRO GARCIA RUIZ'): ('baja', 'por_confirmar'),
-        ('salud', 'tipo_sangre', 'O+'): ('media', 'vigente'),
         ('salud', 'alergia', 'PENICILINA'): ('media', 'vigente'),
         ('salud', 'alergia', 'POLVO'): ('media', 'vigente'),
-        ('salud', 'peso', '22.5'): ('baja', 'por_confirmar'),
-        ('salud', 'apto', 'sí'): ('alta', 'vigente'),
-        ('salud', 'fecha_certificado', '2026-09-02'): ('media', 'vigente'),
-    }
+        ('salud', 'medicamento', 'SALBUTAMOL'): ('baja', 'por_confirmar'),
+    }  # Ni peso ni tipo de sangre: no son de lo que se saca.
     # El nombre, la CURP y la fecha ya estaban en la lista oficial: el acta los confirma y no se repiten.
     assert not any(c == 'alumno' and k in ('curp', 'nombres', 'fecha_nacimiento') for c, k, _ in datos_de(base))
     estado = trabajos.estado()
-    assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 86 and estado['por_confirmar'] == 2
+    assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 83 and estado['por_confirmar'] == 2
     # Solo números en el resumen (nada de nombres).
     assert set(base._uno('SELECT resumen FROM sidp.trabajo WHERE id = %s', (trabajo,))) == \
         {'esperados', 'alta', 'media', 'baja', 'vacios', 'segundos_vision', 'modelo', 'utiles'}
@@ -311,29 +308,31 @@ def test_una_persona_confirma_corrige_o_agrega_y_la_lectura_no_pisa_lo_confirmad
     trabajos.encargar(pedido_de_juan())
     trabajos.una_vez()
     dudosos = {d['campo']: d for d in base.por_confirmar()}
-    assert set(dudosos) == {'nombre', 'peso'} and dudosos['nombre']['curp'] == CURP_JUAN and dudosos['nombre']['grado'] == 1
+    assert set(dudosos) == {'nombre', 'medicamento'} and dudosos['nombre']['curp'] == CURP_JUAN and dudosos['nombre']['grado'] == 1
     base.confirmar_dato(dudosos['nombre']['id'], '', 'secretaria')  # Estaba bien.
-    base.confirmar_dato(dudosos['peso']['id'], '23.5', 'secretaria')  # Lo corrige viendo la hoja.
+    base.confirmar_dato(dudosos['medicamento']['id'], 'SALBUTAMOL INHALADO', 'secretaria')  # Lo corrige viendo la hoja.
+    with pytest.raises(base_cerebro.ErrorBase):  # Lo que no pide el gobierno ni necesita la escuela no se guarda.
+        base.agregar_dato(CURP_JUAN, 'salud', 'peso', '23', 'secretaria')
     base.agregar_dato(CURP_JUAN, 'contacto', 'Teléfono', '7221234567', 'secretaria', {'de': 'madre'})
     base.agregar_dato(CURP_JUAN, 'contacto', 'telefono', '7227654321', 'secretaria', {'de': 'padre'})
     datos = datos_de(base)
     assert datos[('padre', 'nombre', 'PEDRO GARCIA RUIZ')] == ('confirmado', 'vigente')
-    assert datos[('salud', 'peso', '23.5')] == ('confirmado', 'vigente') and ('salud', 'peso', '22.5') not in datos
+    assert datos[('salud', 'medicamento', 'SALBUTAMOL INHALADO')] == ('confirmado', 'vigente') and ('salud', 'medicamento', 'SALBUTAMOL') not in datos
     assert datos[('contacto', 'telefono', '7221234567')] == datos[('contacto', 'telefono', '7227654321')] == ('confirmado', 'vigente')
     assert not base.por_confirmar()
     # Se vuelve a escanear: lo confirmado no cambia y la lectura distinta queda por confirmar.
-    VISTO['Certificado médico']['tipo_sangre'] = ('A positivo', True)
-    base.confirmar_dato(base._uno("SELECT id FROM sidp.dato WHERE campo = 'tipo_sangre' AND estado = 'vigente'"), '', 'secretaria')
+    VISTO['Acta de nacimiento']['lugar_nacimiento'] = ('Metepec, México', True)
+    base.confirmar_dato(base._uno("SELECT id FROM sidp.dato WHERE campo = 'lugar_nacimiento' AND estado = 'vigente'"), '', 'secretaria')
     try:
         trabajos.encargar(pedido_de_juan())
         trabajos.una_vez()
     finally:
-        VISTO['Certificado médico']['tipo_sangre'] = ('O positivo', True)
+        VISTO['Acta de nacimiento']['lugar_nacimiento'] = ('Toluca, México', True)
     datos = datos_de(base)
-    assert datos[('salud', 'tipo_sangre', 'O+')] == ('confirmado', 'vigente')
-    assert datos[('salud', 'tipo_sangre', 'A+')] == ('media', 'por_confirmar')
-    assert datos[('salud', 'peso', '23.5')] == ('confirmado', 'vigente')
-    assert ('salud', 'peso', '22.5') not in datos  # Ya se corrigió una vez: no se vuelve a preguntar.
+    assert datos[('alumno', 'lugar_nacimiento', 'TOLUCA, MÉXICO')] == ('confirmado', 'vigente')
+    assert datos[('alumno', 'lugar_nacimiento', 'METEPEC, MÉXICO')] == ('media', 'por_confirmar')
+    assert datos[('salud', 'medicamento', 'SALBUTAMOL INHALADO')] == ('confirmado', 'vigente')
+    assert ('salud', 'medicamento', 'SALBUTAMOL') not in datos  # Ya se corrigió una vez: no se vuelve a preguntar.
     with pytest.raises(Exception):
         base._consulta('DELETE FROM sidp.dato')  # En la base no se borra nada a mano.
 
@@ -388,9 +387,9 @@ def test_del_escaneo_al_expediente_del_alumno_en_el_panel(base, modelo_que_ve, t
         # El servidor ya le encargó el expediente a la PC 4: no quedó nada pendiente de mandar.
         estado = pedir(url, '/api/trabajos', cabeceras=token)[1]
         assert estado['trabajos'] == {'pendiente': 1} and estado['pendientes_de_enviar'] == 0, estado
-        assert trabajos.una_vez()['esperados'] == 35  # 10 del acta y 25 del certificado médico.
+        assert trabajos.una_vez()['esperados'] == 14  # 10 del acta y 4 del certificado médico (solo lo necesario).
         estado = pedir(url, '/api/trabajos', cabeceras=token)[1]
-        assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 86
+        assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 83
         codigo, expediente = pedir(url, f'/api/alumno?curp={CURP_JUAN}', cabeceras=token)
         assert codigo == 200, expediente
         assert expediente['alumno']['nombres'] == 'JUAN' and expediente['alumno']['grado'] == 1
@@ -405,7 +404,7 @@ def test_del_escaneo_al_expediente_del_alumno_en_el_panel(base, modelo_que_ve, t
         assert pedir(url, '/api/pdf?ruta=../sistema/plataforma_prueba.db', cabeceras=token)[0] == 400
         # Lo dudoso se confirma desde el panel.
         dudosos = pedir(url, '/api/por_confirmar', cabeceras=token)[1]['datos']
-        assert {d['campo'] for d in dudosos} == {'nombre', 'peso'}
+        assert {d['campo'] for d in dudosos} == {'nombre', 'medicamento'}
         assert pedir(url, '/api/dato/confirmar', {'id': dudosos[0]['id'], 'valor': ''}, token)[0] == 200
         assert pedir(url, '/api/dato/agregar', {'curp': CURP_JUAN, 'categoria': 'contacto', 'campo': 'telefono', 'valor': '7221234567',
                                                 'de': 'madre'}, token)[0] == 200

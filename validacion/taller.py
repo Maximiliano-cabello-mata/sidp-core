@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 
 from validacion import campos as campos_mod
-from validacion import comparador, extraer, lector, modelo, vision
+from validacion import comparador, estandar, extraer, lector, modelo, vision
 
 MAXIMO_HOJAS = 3  # Por documento, al modelo que ve (las demás hojas casi nunca traen datos nuevos).
 INTENTOS = 3
@@ -147,27 +147,12 @@ def de_procesos(tipo, texto, qr, hoy, metodo_texto='texto'):
             salida['nombre_tutor'] = (nombre, metodo)
         if tutor.get('curp'):
             salida['curp_tutor'] = (tutor['curp'], metodo)
-    if tipo == 'ine_tutor':  # La INE impresa: el domicilio va abajo de "DOMICILIO" y la vigencia junto a "VIGENCIA".
+    if tipo == 'ine_tutor':  # La INE impresa: el domicilio va abajo de "DOMICILIO".
         renglones = [r.strip() for r in str(texto or '').upper().splitlines() if r.strip()]
         for i, renglon in enumerate(renglones):
             if renglon == 'DOMICILIO' and i + 1 < len(renglones):
                 siguientes = [r for r in renglones[i + 1:i + 4] if not re.match(r'CLAVE|CURP|FECHA|SECCI|VIGENCIA|A[ÑN]O', r)]
                 salida['domicilio_ine'] = (' '.join(siguientes[:2]), metodo)
-            if m := re.search(r'VIGENCIA\s*:?\s*(\d{4}\s*-\s*\d{4}|\d{4})', renglon):
-                salida['vigencia_ine'] = (re.sub(r'\s+', '', m[1]), metodo)
-    if tipo == 'comprobante':
-        if fecha := (propuesta.get('extraidos') or {}).get('comprobante_fecha'):
-            salida['fecha_comprobante'] = (fecha, metodo)
-    if tipo == 'certificado_medico':  # "se encuentra sano y apto ... a 02 de septiembre de 2026"
-        mayusculas = str(texto or '').upper()
-        if re.search(r'\bNO\s+(?:ES\s+|SE\s+ENCUENTRA\s+)?APT[OA]\b', mayusculas):
-            salida['apto'] = ('no', metodo)
-        elif re.search(r'\b(?:SAN[OA]|APT[OA])\b', mayusculas):
-            salida['apto'] = ('sí', metodo)
-        for renglon in reversed(mayusculas.splitlines()):
-            if fecha := campos_mod.fecha(renglon, hoy):
-                salida['fecha_certificado'] = (fecha, metodo)
-                break
     return {k: v for k, v in salida.items() if v[0]}
 
 
@@ -254,6 +239,12 @@ def combinar(campos, procesos, vistos, identidad, hoy):
     return salida
 
 
+def del_estandar(c):
+    """Solo se leen los campos del estándar (y el grado de la boleta, que dice a qué año pertenece cada dato)."""
+    return c['clave'] == 'grado_cursado' or (c['categoria'] == 'alumno' and c['campo'] in campos_mod.IDENTIDAD) \
+        or estandar.permitido(c['categoria'], c['campo'])
+
+
 class Taller:
     def __init__(self, base, carpeta=None, url=modelo.URL, hoy=None, con_vision=True):
         self.base = base
@@ -276,8 +267,9 @@ class Taller:
             raise LookupError('El alumno no está en la base de la PC 4 (falta mandar la lista de alumnos).')
         documentos = []
         for d in pedido.get('documentos') or []:
+            lista = campos_mod.revisar_campos(d['campos']) if d.get('campos') else campos_mod.FABRICA.get(d.get('tipo'), [])
             documentos.append({'archivo': Path(d['archivo']).name, 'tipo': d.get('tipo') or 'otro', 'nombre': d.get('nombre') or d.get('tipo'),
-                               'campos': campos_mod.revisar_campos(d['campos']) if d.get('campos') else campos_mod.FABRICA.get(d.get('tipo'), [])})
+                               'campos': [c for c in lista if del_estandar(c)]})
         if not documentos:
             raise ValueError('El trabajo no trae documentos')
         trabajo = self.base._uno('INSERT INTO sidp.trabajo (alumno_id, expediente, documentos) VALUES (%s, %s, CAST(%s AS jsonb)) RETURNING id',
@@ -334,7 +326,7 @@ class Taller:
             cuenta['vacios'] += len([c for c in documento['campos'] if c['clave'] not in llenos])
             for r in resultado:
                 cuenta[r['confianza'] if r['confianza'] in cuenta else 'alta'] += 1
-                if r.get('confirma_lista') or r.get('nada'):
+                if r.get('confirma_lista') or r.get('nada') or not del_estandar(r):
                     continue
                 for valor in r['valores']:
                     self.base._uno('SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)',

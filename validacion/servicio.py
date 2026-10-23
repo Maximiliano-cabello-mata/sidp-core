@@ -15,7 +15,8 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from validacion import archivero, campos as campos_mod, cerebro_red, comparador, expediente, extraer, hoja, lector, libro_grados, modelo, prueba, renapo, respaldo
+from validacion import archivero, campos as campos_mod, cerebro_red, codigo_barras, comparador, documentos, expediente, extraer, hoja, lector
+from validacion import libro_grados, modelo, prueba, renapo, respaldo
 from validacion.grupos import ErrorGrupo, Grupos, ciclo_de
 from validacion import plantillas as plantillas_mod
 
@@ -941,6 +942,84 @@ class Bandeja:
 
     def dato_confirmar(self, datos):
         return self._pc4('/dato/confirmar', datos)
+
+    def dato_varios(self, datos, quien):
+        return self._pc4('/dato/varios', {'datos': list(datos.get('datos') or []), 'persona': quien})
+
+    # --- Documentos oficiales (validacion/documentos.py): los arma la PC 4; si no contesta, salen de aquí ---
+
+    def documentos_lista(self, escuela):
+        datos = {'escuela': {'completa': escuela['completa'], 'faltan': escuela['faltan']}, 'documentos': documentos.catalogo(), 'faltan': []}
+        try:
+            datos.update({k: v for k, v in self._pc4('/documentos', espera=60).items() if k in ('faltan', 'ciclo', 'alumnos')})
+        except ErrorBandeja as error:
+            datos['aviso'] = (f'{error} Mientras, los documentos salen con las listas de grupo de aquí, sin lo que sacó el escaneo '
+                              '(salud, repetidores, becas).')
+        return datos
+
+    def _grupo_de(self, grupo_id):
+        grupo = self._con_grupos(lambda: self.grupos.alumnos(grupo_id))
+        return grupo['grupo']['grado'], grupo['grupo']['letra'], grupo['alumnos']
+
+    def documento_preparar(self, pedido):
+        """De qué grupo o alumno es el documento y, por si la PC 4 no contesta, los alumnos de las listas de aquí."""
+        preparado = {'clave': pedido.get('clave'), 'formato': pedido.get('formato'), 'grado': None, 'letra': None, 'curp': None}
+        if pedido.get('grupo_id'):
+            preparado['grado'], preparado['letra'], alumnos = self._grupo_de(pedido['grupo_id'])
+            if pedido.get('alumno_id'):
+                preparado['curp'] = next((a['curp'] for a in alumnos if str(a['id']) == str(pedido['alumno_id'])), None)
+                if not preparado['curp']:
+                    raise ErrorBandeja('Ese alumno no tiene CURP en la lista: agrégala en «Alumnos y grupos».')
+        _, ciclo = self._con_grupos(self.grupos.ciclo)
+        preparado['ciclo'] = ciclo
+        preparado['registros'] = documentos.de_lista(self._con_grupos(self.grupos.exportar_alumnos)[1:], ciclo, self.hoy)
+        return preparado
+
+    def documento_generar(self, preparado, escuela):
+        """(nombre, contenido, tipo) del documento: de la PC 4 con todos los datos o, si no contesta, de las listas de aquí."""
+        lugar = {k: preparado[k] for k in ('grado', 'letra', 'curp')}
+        if self.cerebro:
+            pedido = {'clave': preparado['clave'], 'formato': preparado['formato'], 'escuela': escuela, **lugar}
+            try:
+                r = cerebro_red.pedir_a_cerebro(*self.cerebro, '/documento', pedido, 180)
+                return r['nombre'], base64.b64decode(r['contenido']), r['tipo']
+            except cerebro_red.ErrorCerebro as error:
+                if error.code != 503:  # 503: la PC 4 sin base de datos; sale con lo de aquí.
+                    raise ErrorBandeja(f'La PC 4 dice: {error}')
+            except OSError:
+                pass  # La PC 4 no contesta: sale con lo de aquí.
+        try:
+            return documentos.generar(preparado['clave'], preparado['formato'], preparado['registros'], escuela, preparado['ciclo'],
+                                      self.hoy, **lugar)
+        except documentos.ErrorDocumento as error:
+            raise ErrorBandeja(str(error))
+
+    def documentos_completar(self, grupo_id):
+        """Los alumnos de un grupo con lo del 911 que pone la escuela (repite, beca, lengua...), para completarlo."""
+        from urllib.parse import urlencode
+        grado, letra, _ = self._grupo_de(grupo_id)
+        return self._pc4('/registros?' + urlencode({'grado': grado, 'letra': letra}), espera=60)
+
+    # --- Biblioteca (validacion/biblioteca.py): vive en la base de la PC 4 ---
+
+    def biblioteca(self):
+        return self._pc4('/biblioteca')
+
+    def biblioteca_identificar(self, archivos, quien):
+        fotos = [{'nombre': nombre, 'contenido': base64.b64encode(contenido).decode()} for nombre, contenido in archivos[:3]]
+        if not fotos:
+            raise ErrorBandeja('Pon al menos una foto del libro.')
+        return self._pc4('/biblioteca/identificar', {'fotos': fotos, 'actor': quien}, espera=330)
+
+    def biblioteca_hacer(self, accion, datos, quien):
+        return self._pc4(f'/biblioteca/{accion}', {**datos, 'actor': quien})
+
+    def biblioteca_etiquetas(self, codigos, escuela):
+        from urllib.parse import quote
+        etiquetas = self._pc4('/biblioteca/etiquetas?codigos=' + quote(','.join(codigos[:300])))['etiquetas']
+        pagina = codigo_barras.hoja_etiquetas(etiquetas, **({'escuela': escuela} if escuela else {}))
+        return pagina.replace('Etiquetas de inventario', 'Etiquetas de la biblioteca').replace(
+            'Pégalas en un lugar que no se raspe.', 'Pégalas en la contraportada, arriba a la derecha, sin tapar el código de barras.')
 
     def dato_agregar(self, datos):
         return self._pc4('/dato/agregar', datos)

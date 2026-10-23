@@ -1,19 +1,18 @@
-"""Lo que se cuenta de cada alumno con los datos que sacó el escaneo: salud, domicilio, boletas y lugar de nacimiento.
+"""Lo que se cuenta de cada alumno con los datos del estándar (validacion/estandar.py): lo que pide el 911, salud
+mínima, domicilio y boletas.
 
-Lo usan el análisis de la PC 4 (pandas) y el Excel por grado del servidor, para que los dos cuenten igual. Son reglas
-fijas y las tablas de la OMS, sin IA. De dónde salen las categorías: docs/investigacion/estudios_sep_salud.md.
+Lo usan el análisis de la PC 4 (pandas), el Excel por grado del servidor y el motor de documentos, para que todos
+cuenten igual. Son reglas fijas, sin IA.
 
-- Estado nutricional: IMC para la edad de la OMS 2007 (validacion/oms.py), como la estrategia "Vive saludable, vive
-  feliz" de la SEP. Si no hay peso y talla, lo que escribió el médico.
 - Discapacidad y condiciones: los tipos fijos que pide el cuestionario 911.3.
 - Edad para el 911: años cumplidos al 1 de septiembre del ciclo.
 - Lugar de nacimiento: la entidad que trae la CURP (posiciones 12 y 13; NE es nacido en el extranjero).
+- Repite el grado, de dónde viene, beca, lengua indígena y afromexicano: los pone la escuela (911.3).
 """
 import datetime
 import re
 import unicodedata
 
-from validacion import oms
 
 ENTIDADES = {
     'AS': 'Aguascalientes', 'BC': 'Baja California', 'BS': 'Baja California Sur', 'CC': 'Campeche', 'CL': 'Coahuila',
@@ -35,11 +34,6 @@ DISCAPACIDAD_911 = (
     ('TDAH', r'TDAH|DEFICIT DE ATENCION|HIPERACTIV'), ('Aptitudes sobresalientes', r'SOBRESALIENTE|ALTAS CAPACIDADES|SUPERDOTA'),
 )
 OTRAS_CONDICIONES = 'Otras condiciones'
-NUTRICION = ('Delgadez severa', 'Delgadez', 'Peso normal', 'Sobrepeso', 'Obesidad')
-VISTA = ('Normal', 'Usa lentes', 'Necesita valoración')
-BUCAL = ('Sana', 'Necesita dentista')
-VACUNAS = ('Completas', 'Incompletas')
-SANGRE = ('O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-')
 FORMATIVOS = (('lenguajes', 'Lenguajes'), ('saberes', 'Saberes y pensamiento científico'), ('etica', 'Ética, naturaleza y sociedades'),
               ('humano', 'De lo humano y lo comunitario'))
 PROMEDIO_BAJO = 7.0  # Debajo de 7 el alumno necesita apoyo; debajo de 6 no acredita.
@@ -99,13 +93,6 @@ def columna_911(edad):
     return EDADES_911[0] if edad < 6 else EDADES_911[-1] if edad >= 15 else str(edad)
 
 
-def sangre(texto):
-    valor = normal(texto).replace(' ', '').replace('POSITIVO', '+').replace('NEGATIVO', '-').replace('RH', '')
-    hallado = re.search(r'(AB|A|B|O|0)([+-])', valor)
-    if not hallado:
-        return None
-    tipo = ('O' if hallado[1] == '0' else hallado[1]) + hallado[2]
-    return tipo if tipo in SANGRE else None
 
 
 def discapacidades(discapacidad, padecimientos=()):
@@ -122,51 +109,12 @@ def discapacidades(discapacidad, padecimientos=()):
     return tipos
 
 
-def vista(agudeza, lentes):
-    if normal(lentes) in ('SI', 'S'):
-        return 'Usa lentes'
-    texto = normal(agudeza)
-    if not texto:
-        return None
-    snellen = [int(x) for x in re.findall(r'20 ?/ ?(\d{2,3})', texto)]
-    if re.search(r'(?<!SIN )(?<!NO USA )(LENTES|ANTEOJOS|GAFAS)', texto):
-        return 'Usa lentes'
-    if snellen:
-        return 'Normal' if max(snellen) <= 25 else 'Necesita valoración'
-    if re.search(r'MIOP|ASTIGM|HIPERMET|DISMINU|BAJA|DEFICI|ESTRABISM|VALORA|OFTALM|OPTOM|ALTERAD', texto):
-        return 'Necesita valoración'
-    if re.search(r'NORMAL|BUEN|ADECUAD|SIN ALTERA', texto):
-        return 'Normal'
-    return None
 
 
-def bucal(texto):
-    texto = normal(texto)
-    if not texto:
-        return None
-    if re.search(r'(?<!SIN )(?<!NO )CARIES|CARIAD|GINGIVI|SARRO|MALOCLU|TRATAMIENTO|DENTISTA|ODONTOLOG|CURACION', texto):
-        return 'Necesita dentista'
-    if re.search(r'SANA|BUEN|NORMAL|ADECUAD|SIN CARIES|NO CARIES|SIN ALTERA', texto):
-        return 'Sana'
-    return None
 
 
-def vacunas(texto):
-    texto = normal(texto)
-    if re.search(r'INCOMPLET|FALTA|PENDIENTE|ATRASAD', texto):
-        return 'Incompletas'
-    if re.search(r'COMPLET|AL CORRIENTE|AL DIA', texto):
-        return 'Completas'
-    return None
 
 
-def nutricion_del_medico(texto):
-    texto = normal(texto)
-    for clase, patron in (('Obesidad', r'OBES'), ('Sobrepeso', r'SOBREPESO'), ('Delgadez', r'DESNUTRI|BAJO (DE )?PESO|DELGAD|PESO BAJO'),
-                          ('Peso normal', r'NORMAL|ADECUAD|EUTROF|BUEN')):
-        if re.search(patron, texto):
-            return clase
-    return None
 
 
 def municipio(texto):
@@ -181,6 +129,20 @@ def colonia(texto):
     texto = normal(texto)
     texto = re.sub(r'^(COLONIA|COL|FRACCIONAMIENTO|FRACC|BARRIO|BO|LOCALIDAD|PUEBLO|UNIDAD HABITACIONAL|U ?H)( DE)? ', '', texto)
     return texto or None
+
+
+PROCEDENCIAS = ('misma', 'otra_edomex', 'otra_entidad', 'otro_pais')
+BECAS = ('ninguna', 'federal', 'estatal', 'municipal', 'fundacion', 'escuela', 'particular', 'otro')
+
+
+def si_no(texto):
+    valor = normal(texto)
+    return 'sí' if valor in ('SI', 'S', 'X') else 'no' if valor in ('NO', 'N') else None
+
+
+def clave(texto, permitidas):
+    valor = normal(texto).lower().replace(' ', '_')
+    return valor if valor in permitidas else None
 
 
 def valores_de(datos, categoria, campo):
@@ -220,11 +182,6 @@ def de_alumno(datos, grado, sexo=None, nacimiento=None, curp=None, ciclo=None, h
     alergias = lista(valores_de(datos, 'salud', 'alergia'))
     padecimientos = lista(valores_de(datos, 'salud', 'padecimiento'))
     medicamentos = lista(valores_de(datos, 'salud', 'medicamento'))
-    peso, talla = numero(_uno(datos, 'salud', 'peso')), numero(_uno(datos, 'salud', 'talla'))
-    medido = fecha(_uno(datos, 'salud', 'fecha_certificado'))
-    medido = medido if medido and medido <= hoy and (not nacimiento or medido > nacimiento) else hoy
-    oms_ = oms.estado_nutricional(peso, talla, sexo, nacimiento, medido) if sexo in ('H', 'M') else None
-    nutricion, fuente = (oms_['clase'], 'OMS') if oms_ and oms_['clase'] else (nutricion_del_medico(_uno(datos, 'salud', 'estado_nutricional')), 'médico')
     promedios, formativos = {}, {}
     for d in (datos or {}).get('escolar', []):
         hallado = re.fullmatch(r'([a-z]+)_([1-6])', d.get('campo') or '')
@@ -248,15 +205,11 @@ def de_alumno(datos, grado, sexo=None, nacimiento=None, curp=None, ciclo=None, h
         'entidad': ENTIDADES.get(entidad) if entidad else None,
         'nacido': None if not entidad or entidad not in ENTIDADES else 'Estado de México' if entidad == ENTIDAD_ESCUELA
         else 'Otro país' if entidad == 'NE' else 'Otra entidad',
-        'tipo_sangre': sangre(_uno(datos, 'salud', 'tipo_sangre')), 'alergias': alergias, 'padecimientos': padecimientos,
-        'medicamentos': medicamentos, 'discapacidades': discapacidades(valores_de(datos, 'salud', 'discapacidad'), padecimientos),
-        'peso': peso, 'talla': talla, 'imc': oms_['imc'] if oms_ else oms.imc(peso, talla), 'z_imc': oms_['z'] if oms_ else None,
-        'nutricion': nutricion, 'nutricion_segun': fuente if nutricion else None,
-        'vista': vista(_uno(datos, 'salud', 'agudeza_visual'), _uno(datos, 'salud', 'usa_lentes')),
-        'bucal': bucal(_uno(datos, 'salud', 'salud_bucal')), 'vacunas': vacunas(_uno(datos, 'salud', 'vacunas')),
-        'audicion': _uno(datos, 'salud', 'audicion'), 'educacion_fisica': _uno(datos, 'salud', 'educacion_fisica') or _uno(datos, 'salud', 'apto'),
-        'recomendaciones': _uno(datos, 'salud', 'recomendaciones'), 'cirugias': lista(valores_de(datos, 'salud', 'cirugia')),
-        'otros_salud': valores_de(datos, 'salud', 'otro_dato'),
+        'alergias': alergias, 'padecimientos': padecimientos, 'medicamentos': medicamentos,
+        'discapacidades': discapacidades(valores_de(datos, 'salud', 'discapacidad'), padecimientos),
+        'repite': si_no(_uno(datos, 'escolar', 'repite_grado')), 'procedencia': clave(_uno(datos, 'escolar', 'procedencia'), PROCEDENCIAS),
+        'beca': clave(_uno(datos, 'escolar', 'beca'), BECAS), 'lengua_indigena': si_no(_uno(datos, 'alumno', 'lengua_indigena')),
+        'lengua': _uno(datos, 'alumno', 'lengua'), 'afro': si_no(_uno(datos, 'alumno', 'afrodescendiente')),
         'municipio': municipio(_del_domicilio(datos, 'municipio')), 'colonia': colonia(_del_domicilio(datos, 'colonia')),
         'cp': cp.group() if cp else None,
         'promedios': promedios, 'ultimo_promedio': promedios.get(ultimo), 'formativos': formativos.get(ultimo, {}),

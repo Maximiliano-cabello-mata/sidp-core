@@ -1015,6 +1015,8 @@ BEGIN
     END LOOP;
     DELETE FROM sidp.inscripcion WHERE alumno_id = id_alumno;
     DELETE FROM sidp.alumno_tutor WHERE alumno_id = id_alumno;
+    -- Sus préstamos de la biblioteca se quedan (son de los libros), sin el alumno.
+    UPDATE sidp.biblio_prestamo SET alumno_id = NULL, lector = coalesce(lector, 'Alumno borrado') WHERE alumno_id = id_alumno;
     DELETE FROM sidp.alumno WHERE id = id_alumno;
     PERFORM set_config('sidp.borrando', '', true);
 END $$;
@@ -1031,3 +1033,259 @@ CREATE INDEX IF NOT EXISTS documento_alumno_tipo ON sidp.documento (alumno_id, t
 CREATE INDEX IF NOT EXISTS lectura_recibida ON sidp.lectura (recibida);
 
 INSERT INTO sidp.meta (clave, valor) VALUES ('version', '3') ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor;
+
+-- ============================================================ Biblioteca escolar (validacion/biblioteca.py)
+
+-- Un título es la obra (se cataloga una vez); un ejemplar es cada libro físico, con su etiqueta LIB-000123.
+-- Se prestan ejemplares, nunca títulos. Un libro repetido se reconoce por su ISBN o por el parecido del título.
+CREATE SEQUENCE IF NOT EXISTS sidp.biblio_folio;
+
+CREATE TABLE IF NOT EXISTS sidp.biblio_titulo (
+    id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    titulo       text NOT NULL CHECK (btrim(titulo) <> ''),
+    autor        text,
+    editorial    text,
+    anio         smallint CHECK (anio BETWEEN 1800 AND 2100),
+    serie        text,             -- Libros del Rincón: Al sol solito, Pasos de luna, Astrolabio, Espejo de Urania
+    tipo         text NOT NULL DEFAULT 'libro' CHECK (tipo IN ('libro', 'libro_texto', 'consulta', 'revista', 'otro')),
+    paginas      smallint CHECK (paginas > 0),
+    origen       text NOT NULL CHECK (origen IN ('codigo_barras', 'open_library', 'visto', 'base', 'manual')),
+    estado       text NOT NULL DEFAULT 'confirmado' CHECK (estado IN ('por_confirmar', 'confirmado')),
+    actor        text NOT NULL,
+    creado       timestamptz NOT NULL DEFAULT now(),
+    actualizado  timestamptz NOT NULL DEFAULT now(),
+    version      integer NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS biblio_titulo_busqueda ON sidp.biblio_titulo USING gin (sidp.normalizar(titulo) gin_trgm_ops);
+
+-- El mismo ISBN nunca apunta a dos títulos (la coedición SEP puede traer dos ISBN para el mismo título).
+CREATE TABLE IF NOT EXISTS sidp.biblio_isbn (
+    isbn       text PRIMARY KEY CHECK (isbn ~ '^97[89][0-9]{10}$'),
+    titulo_id  bigint NOT NULL REFERENCES sidp.biblio_titulo (id),
+    creado     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sidp.biblio_ejemplar (
+    id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    codigo       text NOT NULL UNIQUE CHECK (codigo ~ '^LIB-[0-9]{6}$'),
+    titulo_id    bigint NOT NULL REFERENCES sidp.biblio_titulo (id),
+    numero       smallint NOT NULL CHECK (numero >= 1),       -- ejemplar 1, 2, 3... del mismo título
+    situacion    text NOT NULL DEFAULT 'disponible' CHECK (situacion IN ('disponible', 'prestado', 'en_reparacion', 'extraviado', 'baja')),
+    prestable    boolean NOT NULL DEFAULT true,               -- false: diccionarios y enciclopedias, solo en la biblioteca
+    ubicacion    text,
+    motivo_baja  text,
+    creado       timestamptz NOT NULL DEFAULT now(),
+    actualizado  timestamptz NOT NULL DEFAULT now(),
+    version      integer NOT NULL DEFAULT 1,
+    UNIQUE (titulo_id, numero),
+    CHECK (situacion <> 'baja' OR btrim(coalesce(motivo_baja, '')) <> '')
+);
+
+-- Cuántos días y cuántos libros a la vez (sin multas: es una escuela primaria).
+CREATE TABLE IF NOT EXISTS sidp.biblio_regla (
+    tipo_lector  text PRIMARY KEY CHECK (tipo_lector IN ('alumno', 'personal')),
+    dias         smallint NOT NULL CHECK (dias BETWEEN 1 AND 120),
+    maximo       smallint NOT NULL CHECK (maximo BETWEEN 1 AND 60)
+);
+INSERT INTO sidp.biblio_regla VALUES ('alumno', 7, 2), ('personal', 14, 5) ON CONFLICT (tipo_lector) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS sidp.biblio_prestamo (
+    id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    ejemplar_id  bigint NOT NULL REFERENCES sidp.biblio_ejemplar (id),
+    alumno_id    bigint REFERENCES sidp.alumno (id),
+    lector       text,                                        -- personal de la escuela (o el alumno ya borrado)
+    grupo_id     bigint REFERENCES sidp.grupo (id),           -- el grupo del alumno el día del préstamo
+    salida       timestamptz NOT NULL DEFAULT now(),
+    vence        date NOT NULL,
+    cierre       timestamptz,
+    estado_regreso text CHECK (estado_regreso IN ('bueno', 'regular', 'malo')),
+    presto       text NOT NULL,
+    recibio      text,
+    actualizado  timestamptz NOT NULL DEFAULT now(),
+    version      integer NOT NULL DEFAULT 1,
+    CHECK (alumno_id IS NOT NULL OR btrim(coalesce(lector, '')) <> '')
+);
+CREATE UNIQUE INDEX IF NOT EXISTS biblio_prestamo_abierto ON sidp.biblio_prestamo (ejemplar_id) WHERE cierre IS NULL;
+CREATE INDEX IF NOT EXISTS biblio_prestamo_alumno ON sidp.biblio_prestamo (alumno_id, cierre);
+
+-- Lo que contestó Open Library por ISBN: no se pregunta dos veces y sirve sin internet.
+CREATE TABLE IF NOT EXISTS sidp.biblio_consulta (
+    isbn        text PRIMARY KEY CHECK (isbn ~ '^97[89][0-9]{10}$'),
+    encontrado  boolean NOT NULL,
+    respuesta   jsonb,
+    consultado  timestamptz NOT NULL DEFAULT now()
+);
+
+DO $$
+DECLARE
+    tabla text;
+BEGIN
+    FOREACH tabla IN ARRAY ARRAY['biblio_titulo', 'biblio_isbn', 'biblio_ejemplar', 'biblio_regla', 'biblio_prestamo'] LOOP
+        EXECUTE format('CREATE OR REPLACE TRIGGER no_borrar BEFORE DELETE ON sidp.%I FOR EACH ROW EXECUTE FUNCTION sidp.no_borrar()', tabla);
+        EXECUTE format('CREATE OR REPLACE TRIGGER no_vaciar BEFORE TRUNCATE ON sidp.%I FOR EACH STATEMENT EXECUTE FUNCTION sidp.no_borrar()', tabla);
+    END LOOP;
+    FOREACH tabla IN ARRAY ARRAY['biblio_titulo', 'biblio_ejemplar', 'biblio_prestamo'] LOOP
+        EXECUTE format('CREATE OR REPLACE TRIGGER subir_version BEFORE UPDATE ON sidp.%I FOR EACH ROW EXECUTE FUNCTION sidp.subir_version()', tabla);
+        EXECUTE format('CREATE OR REPLACE TRIGGER anotar_cambio AFTER INSERT OR UPDATE ON sidp.%I FOR EACH ROW EXECUTE FUNCTION sidp.anotar_cambio()', tabla);
+    END LOOP;
+END $$;
+
+-- ISBN-13 con dígito verificador correcto, o NULL. Acepta ISBN-10 (lo pasa a 13), guiones y espacios.
+CREATE OR REPLACE FUNCTION sidp.isbn13(texto text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE AS $$
+DECLARE
+    d text := upper(regexp_replace(coalesce(texto, ''), '[^0-9Xx]', '', 'g'));
+    suma integer := 0;
+BEGIN
+    IF d ~ '^[0-9]{9}[0-9X]$' THEN
+        FOR i IN 1..10 LOOP
+            suma := suma + (CASE WHEN substr(d, i, 1) = 'X' THEN 10 ELSE substr(d, i, 1)::integer END) * (11 - i);
+        END LOOP;
+        IF suma % 11 <> 0 THEN
+            RETURN NULL;
+        END IF;
+        d := '978' || left(d, 9);
+        suma := 0;
+        FOR i IN 1..12 LOOP
+            suma := suma + substr(d, i, 1)::integer * CASE WHEN i % 2 = 0 THEN 3 ELSE 1 END;
+        END LOOP;
+        RETURN d || ((10 - suma % 10) % 10)::text;
+    END IF;
+    IF d !~ '^97[89][0-9]{10}$' THEN
+        RETURN NULL;
+    END IF;
+    FOR i IN 1..12 LOOP
+        suma := suma + substr(d, i, 1)::integer * CASE WHEN i % 2 = 0 THEN 3 ELSE 1 END;
+    END LOOP;
+    RETURN CASE WHEN ((10 - suma % 10) % 10)::text = right(d, 1) THEN d END;
+END $$;
+
+-- Lo que escribió el lector de código de barras: con el teclado latinoamericano el guion llega como apóstrofo
+-- (LIB'000123) y con Bloq Mayús llega en minúsculas; las dos formas valen.
+CREATE OR REPLACE FUNCTION sidp.biblio_codigo(texto text) RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+    SELECT regexp_replace(regexp_replace(upper(coalesce(texto, '')), '[^A-Z0-9]', '', 'g'), '^([A-Z]{3})([0-9]{6})$', '\1-\2')
+$$;
+
+-- Títulos que se parecen a lo leído, para no dar de alta dos veces el mismo libro.
+CREATE OR REPLACE FUNCTION sidp.biblio_parecidos(titulo_leido text, autor_leido text DEFAULT NULL, minimo real DEFAULT 0.45)
+RETURNS TABLE (titulo_id bigint, titulo text, autor text, ejemplares bigint, parecido real)
+LANGUAGE sql STABLE AS $$
+    SELECT t.id, t.titulo, t.autor,
+           (SELECT count(*) FROM sidp.biblio_ejemplar e WHERE e.titulo_id = t.id AND e.situacion <> 'baja'),
+           round((0.75 * similarity(sidp.normalizar(t.titulo), sidp.normalizar(titulo_leido))
+                  + 0.25 * CASE WHEN coalesce(autor_leido, '') = '' OR coalesce(t.autor, '') = '' THEN 0.75
+                                ELSE similarity(sidp.normalizar(t.autor), sidp.normalizar(autor_leido)) END)::numeric, 2)::real
+    FROM sidp.biblio_titulo t
+    WHERE similarity(sidp.normalizar(t.titulo), sidp.normalizar(titulo_leido)) >= minimo
+    ORDER BY 5 DESC
+    LIMIT 5
+$$;
+
+-- Ejemplares nuevos de un título, con sus etiquetas (LIB-000001...). Dos altas a la vez no repiten el número.
+CREATE OR REPLACE FUNCTION sidp.biblio_ejemplares_alta(v_titulo bigint, cuantos integer, donde text, quien text)
+RETURNS text[]
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_numero smallint;
+    v_prestable boolean;
+    salida text[] := '{}';
+    v_codigo text;
+BEGIN
+    IF cuantos NOT BETWEEN 1 AND 200 THEN
+        RAISE EXCEPTION 'Se registran de 1 a 200 ejemplares a la vez';
+    END IF;
+    PERFORM set_config('sidp.actor', quien, true);
+    SELECT tipo <> 'consulta' INTO v_prestable FROM sidp.biblio_titulo WHERE id = v_titulo FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No existe ese libro';
+    END IF;
+    SELECT coalesce(max(numero), 0) INTO v_numero FROM sidp.biblio_ejemplar WHERE titulo_id = v_titulo;
+    FOR i IN 1..cuantos LOOP
+        v_codigo := 'LIB-' || lpad(nextval('sidp.biblio_folio')::text, 6, '0');
+        INSERT INTO sidp.biblio_ejemplar (codigo, titulo_id, numero, prestable, ubicacion)
+        VALUES (v_codigo, v_titulo, v_numero + i, v_prestable, nullif(btrim(donde), ''));
+        salida := salida || v_codigo;
+    END LOOP;
+    RETURN salida;
+END $$;
+
+CREATE OR REPLACE FUNCTION sidp.biblio_prestar(codigo_ejemplar text, curp_alumno text, quien text)
+RETURNS jsonb
+LANGUAGE plpgsql AS $$
+DECLARE
+    e sidp.biblio_ejemplar;
+    v_alumno bigint;
+    v_grupo bigint;
+    r sidp.biblio_regla;
+    abiertos integer;
+BEGIN
+    PERFORM set_config('sidp.actor', quien, true);
+    SELECT * INTO e FROM sidp.biblio_ejemplar WHERE codigo = sidp.biblio_codigo(codigo_ejemplar) FOR UPDATE;
+    IF e.id IS NULL THEN
+        RAISE EXCEPTION 'No hay ningún libro con la etiqueta %', codigo_ejemplar;
+    END IF;
+    IF NOT e.prestable THEN
+        RAISE EXCEPTION 'Ese libro es de consulta: se lee en la biblioteca y no se presta';
+    END IF;
+    IF e.situacion <> 'disponible' THEN
+        RAISE EXCEPTION 'Ese libro no está en el estante: está %', replace(e.situacion, '_', ' ');
+    END IF;
+    SELECT a.id, i.grupo_id INTO v_alumno, v_grupo FROM sidp.alumno a
+    LEFT JOIN sidp.v_inscripcion_actual i ON i.alumno_id = a.id WHERE a.curp = upper(btrim(curp_alumno));
+    IF v_alumno IS NULL THEN
+        RAISE EXCEPTION 'No está ese alumno en la lista de la escuela';
+    END IF;
+    SELECT * INTO r FROM sidp.biblio_regla WHERE tipo_lector = 'alumno';
+    SELECT count(*) INTO abiertos FROM sidp.biblio_prestamo WHERE alumno_id = v_alumno AND cierre IS NULL;
+    IF abiertos >= r.maximo THEN
+        RAISE EXCEPTION 'Ya tiene % libro(s) prestado(s); el máximo es %. Primero que regrese uno.', abiertos, r.maximo;
+    END IF;
+    INSERT INTO sidp.biblio_prestamo (ejemplar_id, alumno_id, grupo_id, vence, presto)
+    VALUES (e.id, v_alumno, v_grupo, current_date + r.dias, quien);
+    UPDATE sidp.biblio_ejemplar SET situacion = 'prestado' WHERE id = e.id;
+    RETURN jsonb_build_object('vence', current_date + r.dias, 'codigo', e.codigo,
+                              'titulo', (SELECT titulo FROM sidp.biblio_titulo WHERE id = e.titulo_id));
+END $$;
+
+CREATE OR REPLACE FUNCTION sidp.biblio_devolver(codigo_ejemplar text, estado text, quien text)
+RETURNS jsonb
+LANGUAGE plpgsql AS $$
+DECLARE
+    p sidp.biblio_prestamo;
+BEGIN
+    PERFORM set_config('sidp.actor', quien, true);
+    SELECT pr.* INTO p FROM sidp.biblio_prestamo pr JOIN sidp.biblio_ejemplar e ON e.id = pr.ejemplar_id
+    WHERE e.codigo = sidp.biblio_codigo(codigo_ejemplar) AND pr.cierre IS NULL FOR UPDATE OF pr;
+    IF p.id IS NULL THEN
+        RAISE EXCEPTION 'El libro % no estaba prestado', codigo_ejemplar;
+    END IF;
+    UPDATE sidp.biblio_prestamo SET cierre = now(), estado_regreso = nullif(estado, ''), recibio = quien WHERE id = p.id;
+    UPDATE sidp.biblio_ejemplar SET situacion = CASE WHEN estado = 'malo' THEN 'en_reparacion' ELSE 'disponible' END WHERE id = p.ejemplar_id;
+    RETURN jsonb_build_object(
+        'titulo', (SELECT t.titulo FROM sidp.biblio_ejemplar e JOIN sidp.biblio_titulo t ON t.id = e.titulo_id WHERE e.id = p.ejemplar_id),
+        'lector', coalesce((SELECT nombres || ' ' || primer_apellido FROM sidp.alumno WHERE id = p.alumno_id), p.lector),
+        'atraso', greatest(current_date - p.vence, 0));
+END $$;
+
+CREATE OR REPLACE VIEW sidp.v_biblio_titulos AS
+SELECT t.id, t.titulo, t.autor, t.editorial, t.anio, t.serie, t.tipo, t.estado,
+       count(e.id) FILTER (WHERE e.situacion <> 'baja') AS ejemplares,
+       count(e.id) FILTER (WHERE e.situacion = 'disponible') AS disponibles,
+       string_agg(DISTINCT e.ubicacion, ', ') AS ubicacion,
+       coalesce(array_agg(e.codigo ORDER BY e.numero) FILTER (WHERE e.situacion <> 'baja'), '{}') AS codigos,
+       (SELECT string_agg(i.isbn, ', ') FROM sidp.biblio_isbn i WHERE i.titulo_id = t.id) AS isbns
+FROM sidp.biblio_titulo t
+LEFT JOIN sidp.biblio_ejemplar e ON e.titulo_id = t.id
+GROUP BY t.id;
+
+CREATE OR REPLACE VIEW sidp.v_biblio_prestamos AS
+SELECT p.id, e.codigo, t.titulo, a.curp, coalesce(a.nombres || ' ' || a.primer_apellido, p.lector) AS lector,
+       CASE WHEN g.id IS NOT NULL THEN g.grado || '° ' || g.letra END AS grupo, p.salida, p.vence,
+       greatest(current_date - p.vence, 0) AS atraso
+FROM sidp.biblio_prestamo p
+JOIN sidp.biblio_ejemplar e ON e.id = p.ejemplar_id
+JOIN sidp.biblio_titulo t ON t.id = e.titulo_id
+LEFT JOIN sidp.alumno a ON a.id = p.alumno_id
+LEFT JOIN sidp.grupo g ON g.id = p.grupo_id
+WHERE p.cierre IS NULL;

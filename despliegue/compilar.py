@@ -3,6 +3,7 @@
     python despliegue/compilar.py --tipo servidor         # SIDP-Servidor.exe (ADR-029)
     python despliegue/compilar.py --tipo equipo           # SIDP-Equipo.exe
     python despliegue/compilar.py --tipo validador        # SIDP-Validador.exe (entorno de pruebas de validación)
+    python despliegue/compilar.py --tipo biblioteca       # SIDP-Biblioteca.exe (cámara y lector de la biblioteca)
     python despliegue/compilar.py                         # sidp.exe genérico (papel automático)
     python despliegue/compilar.py --paquete C:\\ProgramData\\SIDP\\instalacion.json
 
@@ -39,6 +40,7 @@ TIPOS = {  # tipo: (nombre del ejecutable, punto de entrada)
     'generico': ('sidp', '__main__.py'),
     'validador': ('SIDP-Validador', 'entrada_validador.py'),
     'escritorio': ('SIDP', 'entrada_escritorio.py'),  # El que se instala en el servidor (despliegue/instalador.iss).
+    'biblioteca': ('SIDP-Biblioteca', 'entrada_biblioteca.py'),  # La computadora de la biblioteca: solo pasa al servidor.
 }
 # Archivos que el validador lee en tiempo de ejecución: pantallas y el diseño de la base.
 DATOS_VALIDADOR = [('validacion/interfaz', 'validacion/interfaz'), ('database/diseno_integral.sql', 'database')]
@@ -75,13 +77,15 @@ def main():
     compilacion.write_text(f'compilado {datetime.date.today().isoformat()} ({version_git()})', encoding='utf-8')
     version = trabajo / 'version.txt'
     version.write_text(os.environ.get('SIDP_VERSION', '0.0.0'), encoding='utf-8')
-    ventana = '--windowed' if args.tipo == 'escritorio' else '--console'  # El instalado no abre consola.
+    ventana = '--windowed' if args.tipo in ('escritorio', 'biblioteca') else '--console'  # Estos no abren consola.
     comando = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', ventana,
                '--name', args.nombre, '--paths', str(RAIZ), '--distpath', args.destino,
                '--workpath', str(trabajo / 'build'), '--specpath', str(trabajo)]
     if args.tipo in ('validador', 'escritorio'):  # Sin servidor web externo; numpy (de opencv) necesita unittest.
         comando += [f'--exclude-module={m}' for m in EXCLUIDOS if m != 'unittest']
         comando += [arg for origen, destino in DATOS_VALIDADOR for arg in ('--add-data', f'{RAIZ / origen}{os.pathsep}{destino}')]
+    elif args.tipo == 'biblioteca':  # Solo la biblioteca estándar: las pantallas vienen del servidor.
+        comando += [f'--exclude-module={m}' for m in EXCLUIDOS]
     else:
         comando += [f'--hidden-import={m}' for m in OCULTOS] + [f'--exclude-module={m}' for m in EXCLUIDOS]
     comando += ['--add-data', f'{compilacion}{os.pathsep}.', '--add-data', f'{version}{os.pathsep}.']

@@ -27,7 +27,10 @@ CREATE TABLE escuela (
   turno TEXT NOT NULL CHECK (turno IN ('matutino','vespertino','tiempo_completo')),
   zona_escolar TEXT,
   domicilio TEXT,
-  version INTEGER NOT NULL DEFAULT 1
+  version INTEGER NOT NULL DEFAULT 1,
+  municipio TEXT,                                              -- lo que llevan las constancias y el 911
+  director TEXT,
+  subdirector TEXT
 ) STRICT;
 
 CREATE TABLE ciclo (
