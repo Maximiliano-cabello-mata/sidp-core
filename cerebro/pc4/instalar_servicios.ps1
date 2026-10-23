@@ -3,16 +3,20 @@
 # Servicios de la PC 4:
 #   - PostgreSQL (la base de datos): ya es un servicio de Windows; aquí solo se asegura que arranque solo.
 #   - Ollama (los modelos de IA): tarea programada "SIDP-Ollama", solo en 127.0.0.1.
-#   - El cerebro (puerto 8771): tarea programada "SIDP-Cerebro". Espera a PostgreSQL y, si se cae, vuelve a
-#     arrancar a los 10 segundos.
-# Las tareas corren con la cuenta de este usuario aunque nadie haya iniciado sesión (S4U: no guarda la
-# contraseña). Los registros quedan en C:\SIDP-datos\registros; la clave del cerebro no se escribe en ellos.
+#   - El cerebro (puerto 8771): tarea programada "SIDP-Cerebro". Espera a PostgreSQL y, si no la encuentra o se
+#     cae, vuelve a arrancar a los 10 segundos: nunca se queda trabajando sin base.
+#   - El vigía: tarea "SIDP-Vigia" (cuenta del sistema) que al encender y cada 2 minutos revisa que los tres
+#     contesten y levanta al que no (cerebro/pc4/vigia.ps1). Anota en C:\SIDP-datos\registros\vigia.log.
+# Ollama y el cerebro corren con la cuenta de este usuario aunque nadie haya iniciado sesión (S4U: no guarda la
+# contraseña). Si Windows no deja arrancar así (vigia.log lo dice), -ComoSistema los corre con la cuenta del sistema.
+# Los registros quedan en C:\SIDP-datos\registros; la clave del cerebro no se escribe en ellos.
 #
-# Se corre UNA vez, en PowerShell como administrador, desde la carpeta del repositorio:
+# Se corre en PowerShell como administrador, desde la carpeta del repositorio:
 #   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
+#   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -ComoSistema
 # Para quitarlo todo y volver a como estaba:
 #   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -Quitar
-param([switch]$Quitar)
+param([switch]$Quitar, [switch]$ComoSistema)
 $ErrorActionPreference = 'Stop'
 
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -28,9 +32,10 @@ $registros = Join-Path $datos 'registros'
 $inicio = [Environment]::GetFolderPath('Startup')
 $guardados = Join-Path $servicios 'accesos_de_inicio_guardados'
 $tareas = 'SIDP-Ollama', 'SIDP-Cerebro'
+$vigia = 'SIDP-Vigia'
 
 if ($Quitar) {
-    foreach ($tarea in $tareas) {
+    foreach ($tarea in @($tareas) + $vigia) {
         if (Get-ScheduledTask -TaskName $tarea -ErrorAction SilentlyContinue) {
             Stop-ScheduledTask -TaskName $tarea -ErrorAction SilentlyContinue
             Unregister-ScheduledTask -TaskName $tarea -Confirm:$false
@@ -127,7 +132,7 @@ if (Test-Path $archivoAjustes) {
 $lanzadores = @{
     'SIDP-Ollama'  = @{ Nombre = 'ollama'; Programa = $ollama; Argumentos = 'serve'; Carpeta = $servicios; Retraso = 'PT0S' }
     'SIDP-Cerebro' = @{ Nombre = 'cerebro'; Programa = $python; Carpeta = $repo; Retraso = 'PT30S'
-                        Argumentos = "-m validacion.cerebro_red --clave `"$clave`" --base `"$base`" --esperar-base 180 --sin-mostrar-clave" }
+                        Argumentos = "-m validacion.cerebro_red --clave `"$clave`" --base `"$base`" --esperar-base 120 --exigir-base --sin-mostrar-clave" }
 }
 foreach ($tarea in $tareas) {
     $l = $lanzadores[$tarea]
@@ -144,7 +149,8 @@ foreach ($tarea in $tareas) {
     $accion = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argumentos -WorkingDirectory $l.Carpeta
     $disparo = New-ScheduledTaskTrigger -AtStartup
     $disparo.Delay = $l.Retraso
-    $quien = New-ScheduledTaskPrincipal -UserId $usuario -LogonType S4U -RunLevel Limited
+    if ($ComoSistema) { $quien = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest }
+    else { $quien = New-ScheduledTaskPrincipal -UserId $usuario -LogonType S4U -RunLevel Limited }
     $ajustes = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
         -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
     if (Get-ScheduledTask -TaskName $tarea -ErrorAction SilentlyContinue) {
@@ -153,8 +159,25 @@ foreach ($tarea in $tareas) {
     }
     Register-ScheduledTask -TaskName $tarea -Action $accion -Trigger $disparo -Principal $quien -Settings $ajustes `
         -Description 'SIDP: arranca al encender la PC 4 (cerebro/pc4/instalar_servicios.ps1)' | Out-Null
-    Write-Host "Tarea $tarea lista."
+    Write-Host "Tarea $tarea lista$(if ($ComoSistema) { ' (cuenta del sistema)' })."
 }
+
+# 3b. El vigía: con la cuenta del sistema, al encender y luego cada 2 minutos, sin fin.
+Copy-Item (Join-Path $PSScriptRoot 'vigia.ps1') (Join-Path $servicios 'vigia.ps1') -Force
+$argumentos = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$servicios\vigia.ps1`" -ArchivoClave `"$clave`""
+$accion = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argumentos -WorkingDirectory $servicios
+$cada = (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 2)).Repetition
+$alEncender = New-ScheduledTaskTrigger -AtStartup
+$alEncender.Delay = 'PT2M'
+$alEncender.Repetition = $cada
+$desdeYa = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 2)
+$quien = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+$ajustes = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -MultipleInstances IgnoreNew
+if (Get-ScheduledTask -TaskName $vigia -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $vigia -Confirm:$false }
+Register-ScheduledTask -TaskName $vigia -Action $accion -Trigger $alEncender, $desdeYa -Principal $quien -Settings $ajustes `
+    -Description 'SIDP: revisa cada 2 minutos que Ollama, PostgreSQL y el cerebro contesten (cerebro/pc4/vigia.ps1)' | Out-Null
+Write-Host "Tarea $vigia lista (revisa cada 2 minutos; anota en $registros\vigia.log)."
 
 # 4. PostgreSQL arranca solo (ya es servicio; se asegura).
 Get-Service -Name 'postgresql*' | ForEach-Object {

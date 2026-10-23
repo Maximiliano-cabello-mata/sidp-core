@@ -732,3 +732,34 @@ No borres nada, no cambies la base y no toques archivos fuera de `resultados/`.
 4. Escribe `cerebro\laboratorio\resultados\2026-10-16_tarea016.md` con lo del paso 1 (cambia cualquier nombre o CURP
    por `[dato]`; sin IP ni claves), la salida del paso 3 y la de `cerebro\pc4\estado_servicios.ps1`. Súbelo solo a
    él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).
+
+## Tarea 017: que el cerebro trabaje solo desde que se enciende la PC 4 (2026-10-23)
+
+**Qué pasa.** Maximiliano dice que al encender la PC 4 el cerebro no funciona y hay que arrancarlo a mano. Cambió
+el código de la PC 4:
+
+- El cerebro ya no se queda contestando sin base: si PostgreSQL no está lista, sale y su lanzador lo vuelve a
+  intentar a los 10 segundos (`--exigir-base`).
+- Hay una tarea nueva, **SIDP-Vigia** (cuenta del sistema), que al encender y cada 2 minutos revisa que Ollama,
+  PostgreSQL y el cerebro contesten y levanta al que no. Anota en `C:\SIDP-datos\registros\vigia.log` a qué hora
+  se encendió la PC, cuántos minutos tardó el cerebro en quedar listo y qué tuvo que levantar.
+
+No borres nada, no cambies la base y no toques archivos fuera de `resultados/`.
+
+1. Actualiza la rama y vuelve a instalar los servicios (PowerShell como administrador):
+   ```
+   git pull origin claude/project-thread-vp6ab8
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1
+   ```
+2. Pídele a Maximiliano que reinicie la PC 4 y que **no abra nada** al encender: ni sesión de trabajo, ni Ollama, ni
+   el cerebro. Cuando pasen 6 minutos, ya puede entrar y pedirte que sigas.
+3. Corre `powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1` y copia todo
+   `C:\SIDP-datos\registros\vigia.log`.
+4. Si `vigia.log` dice que el cerebro quedó listo, terminaste. Si dice que tuvo que arrancar las tareas, o el
+   resultado de SIDP-Cerebro o SIDP-Ollama no es `0x0` ni `0x41301`, corre
+   `powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -ComoSistema` (corre los dos con la
+   cuenta del sistema) y repite los pasos 2 y 3. Con la cuenta del sistema, revisa también que el cerebro encuentre
+   sus paquetes (`pandas`, `pg8000`): si el registro del cerebro dice `ModuleNotFoundError`, instálalos para todos
+   los usuarios con `python -m pip install -r validacion\requisitos.txt` desde PowerShell como administrador.
+5. Escribe `cerebro\laboratorio\resultados\2026-10-23_tarea017.md` con la salida de los pasos 3 y 4 (sin IP, claves,
+   nombres ni CURP). Súbelo solo a él, como siempre (`git add` de ese archivo, `commit`, `pull --rebase`, `push`).

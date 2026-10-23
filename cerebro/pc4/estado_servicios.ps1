@@ -3,15 +3,16 @@
 # No imprime la clave del cerebro ni la dirección de la base.
 $puertos = @{ 5432 = 'PostgreSQL'; 11434 = 'Ollama'; 8771 = 'Cerebro' }
 
-foreach ($tarea in 'SIDP-Ollama', 'SIDP-Cerebro') {
+foreach ($tarea in 'SIDP-Ollama', 'SIDP-Cerebro', 'SIDP-Vigia') {
     $t = Get-ScheduledTask -TaskName $tarea -ErrorAction SilentlyContinue
     if ($t) {
         $info = Get-ScheduledTaskInfo -TaskName $tarea
-        Write-Host "Tarea $tarea : $($t.State) (último arranque $($info.LastRunTime))"
+        Write-Host "Tarea $tarea : $($t.State) (último arranque $($info.LastRunTime), resultado $('0x{0:X}' -f $info.LastTaskResult), cuenta $($t.Principal.UserId))"
     } else {
         Write-Host "Tarea $tarea : NO EXISTE (corre instalar_servicios.ps1)"
     }
 }
+Write-Host "La PC se encendió: $((Get-CimInstance Win32_OperatingSystem).LastBootUpTime)"
 Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Servicio $($_.Name): $($_.Status), arranque $($_.StartType)" }
 
 foreach ($puerto in $puertos.Keys | Sort-Object) {
@@ -49,7 +50,7 @@ try {
     Write-Host "Cerebro: responde. Base: $base"
 } catch { Write-Host "Cerebro no respondió: $($_.Exception.Message)" }
 
-foreach ($nombre in 'ollama', 'cerebro') {
+foreach ($nombre in 'vigia', 'ollama', 'cerebro') {
     foreach ($fin in '.ciclo.log', '.log', '.error.log') {
         $registro = "C:\SIDP-datos\registros\$nombre$fin"
         if (Test-Path $registro) {

@@ -4,7 +4,9 @@ Guarda los expedientes (archivos sin sobrescribir y datos en SQLite con las 39 t
 manda cada uno al cerebro de la PC 4 para que lo valide por IP y muestra el panel donde una
 persona autoriza o rechaza. También sirve la página de padres a la red local.
 
-- Panel del administrador: http://127.0.0.1:8770/ (solo desde esta PC).
+- Panel del administrador: http://127.0.0.1:8770/ en esta PC, sin contraseña.
+- Desde las otras computadoras de la escuela: http://IP-de-esta-PC:8770/ con el usuario y la contraseña que
+  Dirección crea en Ajustes > Cuentas. Así lo que se escanea en cualquier PC se guarda aquí, en el servidor.
 - Página de padres: http://IP-de-esta-PC:8770/padres (cualquier equipo de la red).
 - El cerebro lee lo guardado para el análisis: GET /api/cerebro/datos con su clave.
 
@@ -27,6 +29,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from validacion import cerebro_red, codigo_barras, prueba
+from validacion.cuentas import Cuentas, ErrorCuenta, PERMISOS
 from validacion.registro import Registro
 from validacion.servicio import Bandeja, ErrorBandeja
 
@@ -36,6 +39,26 @@ PUERTO = 8770
 MAXIMO_ENVIO = 100 * 1024 * 1024
 ESTATICOS = {'/estilo.css': 'estilo.css', '/motor.js': 'motor.js'}
 LOCALES = ('127.0.0.1', '::1')
+# Desde otra PC, cada ruta pide un permiso del rol (validacion/cuentas.py). Gana el primer prefijo que coincide;
+# None es cualquier cuenta; lo que no está aquí es solo de Dirección, y SOLO_ESTA_PC solo se usa en el servidor mismo.
+PERMISO_RUTA = (
+    ('/api/yo', None),
+    ('/api/renapo', 'renapo'), ('/api/curps', 'renapo'), ('/api/estado', 'expedientes'), ('/api/buscar_alumno', 'expedientes'),
+    ('/api/trabajos', 'expedientes'), ('/api/escaneo', 'documentos'), ('/api/expediente', 'documentos'), ('/api/archivo', 'documentos'),
+    ('/api/pdf', 'documentos'), ('/api/dato', 'documentos'), ('/api/por_confirmar', 'documentos'), ('/api/plantillas', 'documentos'),
+    ('/api/alumno/', 'decidir'), ('/api/alumno', 'documentos'), ('/api/decidir', 'decidir'), ('/api/revisar_todo', 'decidir'),
+    ('/api/grupo', 'grupos'), ('/api/listas', 'grupos'), ('/api/inventario', 'grupos'), ('/api/etiquetas', 'grupos'),
+    ('/api/analisis', 'ver_grupos'), ('/api/exportar', 'ver_grupos'), ('/api/cuentas', 'personal'),
+)
+SOLO_ESTA_PC = ('/api/configuracion', '/api/cerebro/buscar', '/api/base', '/api/respaldo')
+LOCAL = {'id': None, 'usuario': 'servidor', 'rol': 'direccion', 'rol_texto': 'Dirección', 'nombre': 'Esta PC (servidor)', 'local': True}
+
+
+def permiso_de(ruta):
+    for prefijo, permiso in PERMISO_RUTA:
+        if ruta.startswith(prefijo):
+            return permiso
+    return 'ajustes'
 
 
 def carpeta_por_omision():
@@ -55,6 +78,7 @@ class Aplicacion:
         self.candado = threading.Lock()
         self.bandeja = Bandeja(self.carpeta, hoy, usar_modelo=usar_modelo, registro=Registro(self.carpeta / 'plataforma_prueba.db'),
                                expedientes=expedientes)
+        self.cuentas = Cuentas(self.bandeja.registro.db)  # Quién entra desde las otras PC de la escuela.
         self.archivo_configuracion = self.carpeta / 'configuracion.json'
         self.configuracion = {}
         if self.archivo_configuracion.exists():
@@ -88,13 +112,22 @@ class Aplicacion:
                  'extraidos': r.get('extraidos', {}), 'documentos': r.get('documentos', {}), 'decision': decisiones.get(i)}
                 for i, r in self.bandeja.resultados.items()]
 
-    def pagina(self, nombre):
-        config = {'modo': 'local', 'token': self.token if nombre == 'panel.html' else ''}
+    def pagina(self, nombre, local=True):
+        if nombre == 'panel.html' and not local:  # Otra PC: el panel pide usuario y contraseña.
+            config = {'modo': 'red', 'token': ''}
+        else:
+            config = {'modo': 'local', 'token': self.token if nombre == 'panel.html' else ''}
         texto = (INTERFAZ / nombre).read_text(encoding='utf-8')
         return texto.replace('/*SIDP_CONFIG*/', f'window.SIDP = {json.dumps(config)};').encode()
 
     def direccion_padres(self):
         return f'http://{cerebro_red.ip_local()}:{self.puerto}/padres'
+
+    def direccion_red(self):
+        return f'http://{cerebro_red.ip_local()}:{self.puerto}/'
+
+    def cuentas_estado(self):
+        return {'cuentas': self.cuentas.lista(), 'direccion': self.direccion_red()}
 
 
 def respaldar_seguido(app, cada=3600, primera=120):
@@ -139,12 +172,26 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
             return self.client_address[0] in LOCALES
 
         def _admin(self, consulta=None):
-            """El panel solo se usa desde esta PC y con el token que se le dio al abrirlo."""
+            """En esta PC, el token que se le dio al panel al abrirlo; desde otra PC, una sesión con el permiso de la ruta."""
             token = self.headers.get('X-SIDP-Token') or (consulta or {}).get('t', [''])[0]
+            ruta = urlparse(self.path).path
             if self._local() and secrets.compare_digest(token, app.token):
+                self.usuario = LOCAL
                 return True
-            self._enviar(403, {'error': 'El panel solo se abre en la PC del administrador'})
-            return False
+            with app.candado:
+                usuario = app.cuentas.sesion(token)
+            if not usuario and self._local():
+                self._enviar(403, {'error': 'El panel de esta PC necesita el token que se le dio al abrirlo'})
+                return False
+            if not usuario:
+                self._enviar(401, {'error': 'Tu sesión terminó. Vuelve a entrar con tu usuario y contraseña.', 'entrar': True})
+                return False
+            permiso = permiso_de(ruta)
+            if ruta in SOLO_ESTA_PC or (permiso and permiso not in PERMISOS.get(usuario['rol'], set())):
+                self._enviar(403, {'error': 'Tu cuenta no puede hacer esto. Pídeselo a Dirección.'})
+                return False
+            self.usuario = usuario
+            return True
 
         def _cerebro(self):
             clave = app.configuracion.get('cerebro_clave', '')
@@ -166,9 +213,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
             consulta = parse_qs(url.query)
             try:
                 if url.path in ('/', '/index.html', '/panel.html'):
-                    if not self._local():
-                        return self._enviar(403, b'El panel solo se abre en la PC del administrador. Padres: /padres', 'text/plain; charset=utf-8')
-                    return self._enviar(200, app.pagina('panel.html'), 'text/html; charset=utf-8')
+                    return self._enviar(200, app.pagina('panel.html', self._local()), 'text/html; charset=utf-8')
                 if url.path in ('/padres', '/padres.html'):
                     return self._enviar(200, app.pagina('padres.html'), 'text/html; charset=utf-8')
                 if url.path == '/api/hola':  # Para saber si SIDP ya está abierto en esta PC; no dice nada más.
@@ -188,6 +233,11 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                 if not url.path.startswith('/api/') or not self._admin(consulta):
                     return self._enviar(404, {'error': 'no existe'}) if not url.path.startswith('/api/') else None
                 # Lo que vive en la PC 4 no detiene el panel mientras responde (el análisis con IA tarda).
+                if url.path == '/api/yo':
+                    return self._enviar(200, self.usuario)
+                if url.path == '/api/cuentas':
+                    with app.candado:
+                        return self._enviar(200, app.cuentas_estado())
                 if url.path == '/api/inventario':
                     return self._enviar(200, app.bandeja.inventario())
                 if url.path == '/api/analisis_pc4':
@@ -270,6 +320,15 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                     else:
                         self._enviar(403, {'error': 'no permitido'})
                     return
+                if url.path == '/api/entrar':  # Desde otra PC: usuario y contraseña de Ajustes > Cuentas.
+                    datos = json.loads(self._cuerpo() or b'{}')
+                    with app.candado:
+                        token = app.cuentas.entrar(datos.get('usuario', ''), datos.get('contrasena', ''))
+                        return self._enviar(200, {'token': token, 'usuario': app.cuentas.sesion(token)})
+                if url.path == '/api/salir':
+                    with app.candado:
+                        app.cuentas.salir(self.headers.get('X-SIDP-Token', ''))
+                    return self._enviar(200, {'ok': True})
                 if not self._admin():
                     return
                 if url.path == '/api/cerebro/buscar':  # Plan de emergencia: encontrar a la PC 4 aunque haya cambiado de IP.
@@ -317,13 +376,20 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                     return self._enviar(200, app.bandeja.inventario_cambiar(datos))
                 if url.path == '/api/respaldo':
                     return self._enviar(200, app.bandeja.respaldar())
+                quien = 'administrador' if self.usuario.get('local') else self.usuario['nombre']
                 with app.candado:
+                    if url.path == '/api/cuentas/crear':
+                        app.cuentas.crear(datos, actor=self.usuario['id'] or 'servidor')
+                        return self._enviar(200, app.cuentas_estado())
+                    if url.path == '/api/cuentas/estado':
+                        app.cuentas.cambiar_estado(datos.get('id', ''), bool(datos.get('activo')), self.usuario['id'] or 'servidor')
+                        return self._enviar(200, app.cuentas_estado())
                     if url.path == '/api/revisar_todo':
                         return self._enviar(200, app.bandeja.revisar_todo())
                     if url.path == '/api/decidir':
-                        return self._enviar(200, app.bandeja.decidir(datos.get('id', ''), datos.get('decision', ''), datos.get('motivo', '')))
+                        return self._enviar(200, app.bandeja.decidir(datos.get('id', ''), datos.get('decision', ''), datos.get('motivo', ''), quien))
                     if url.path == '/api/escaneo/guardar':
-                        return self._enviar(200, app.bandeja.escaneo_guardar(datos.get('lote', ''), datos))
+                        return self._enviar(200, app.bandeja.escaneo_guardar(datos.get('lote', ''), datos, quien))
                     if url.path == '/api/escaneo/descartar':
                         return self._enviar(200, app.bandeja.escaneo_descartar(datos.get('lote', '')))
                     if url.path == '/api/listas/guardar':
@@ -342,6 +408,8 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                         problema = app.configurar(datos.get('cerebro_url'), datos.get('cerebro_clave'))
                         return self._enviar(200, app.estado_configuracion(problema))
                 self._enviar(404, {'error': 'no existe'})
+            except ErrorCuenta as error:
+                self._enviar(400, {'error': str(error)})
             except (ErrorBandeja, ValueError) as error:
                 self._enviar(400, {'error': str(error)})
 

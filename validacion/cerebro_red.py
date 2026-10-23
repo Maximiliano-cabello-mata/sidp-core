@@ -445,6 +445,9 @@ def main(argumentos=None):
     # clave no se escribe en el registro, que se queda en el disco.
     parser.add_argument('--esperar-base', type=int, default=0, help='segundos que espera a PostgreSQL al arrancar')
     parser.add_argument('--sin-mostrar-clave', action='store_true')
+    # Como servicio: sin base no arranca (sale con 3) y su lanzador lo vuelve a intentar; así nunca se queda
+    # contestando sin base hasta que alguien lo reinicie a mano.
+    parser.add_argument('--exigir-base', action='store_true', help='si PostgreSQL no contesta, salir en vez de seguir sin base')
     parser.add_argument('--actualizaciones', type=Path, default=actualizar.carpeta_pc4(),
                         help='dónde guarda la PC 4 las versiones de SIDP.exe que toma el servidor')
     args = parser.parse_args(argumentos)
@@ -454,6 +457,9 @@ def main(argumentos=None):
     while base is None and time.monotonic() < limite:
         time.sleep(5)
         base, problema = base_cerebro.abrir(args.base)
+    if base is None and args.exigir_base:
+        print(f'Sin base de datos ({problema}): salgo para que el lanzador lo vuelva a intentar.', flush=True)
+        return 3
     taller = taller_mod.arrancar(base, url=args.ollama) if base else None  # Saca los datos de lo escaneado, en fila.
     estudio = None
     if base:  # El estudio de la IA se rehace solo cuando hay datos nuevos y el taller no está leyendo.
