@@ -196,7 +196,7 @@ PROFR.(A) {{DOCENTE_NOMBRE_COMPLETO}}         PROFR. {{DIRECTOR_NOMBRE}}
 
 ---
 
-## 5. Constancia Laboral para Personal Docente / Administrativo (`OFICIO NUEVO NO. DELFINO PANDO.docx`)
+## 5. Constancia Laboral para Personal Docente / Administrativo (`OFICIO NUEVO NO. [ESCUELA].docx`)
 
 ```text
 OFICIO No. {{FOLIO_OFICIO}}/{{CICLO_ESCOLAR}}
@@ -276,4 +276,120 @@ PERIODO: {{PERIODO_TRIMESTRAL}} — CICLO ESCOLAR {{CICLO_ESCOLAR}}
 DIRECTOR ESCOLAR
 ____________________________________
 PROFR. {{DIRECTOR_NOMBRE}}
+```
+
+---
+
+## 8. Evaluación Diagnóstica Grupal y Psicopedagógica (`EVALUACIÓN DIAGNÓSTICA GRUPAL 1° A .. 6° A.docx`)
+
+Este documento cualitativo y psicopedagógico se elabora al inicio del ciclo escolar combinando los resultados de la **Entrevista Sociofamiliar a Padres (Google Forms)**, el **Examen Diagnóstico por Campos Formativos**, los **EIA**, las pruebas **DHBA/SISAT** y el **Test de Estilos de Aprendizaje (VAK)**:
+
+```text
+ESCUELA PRIMARIA "{{ESCUELA_NOMBRE}}" | C.C.T.: {{CCT}}
+EVALUACIÓN DIAGNÓSTICA INTEGRAL DE GRUPO — CICLO ESCOLAR {{CICLO_ESCOLAR}}
+GRADO Y GRUPO: {{GRADO_GRUPO}} | DOCENTE TITULAR: PROFR.(A) {{DOCENTE_NOMBRE_COMPLETO}}
+MATRÍCULA TOTAL: {{MATRICULA_TOTAL}} (MUJERES: {{TOTAL_M}} | HOMBRES: {{TOTAL_H}})
+
+1. CONTEXTO FAMILIAR Y SOCIOCULTURAL (Generado desde Cuestionario Sociofamiliar de Padres):
+   - Estructura familiar predominante: {{PCT_FAM_NUCLEAR}}% nuclear, {{PCT_FAM_EXTENSA}}% extensa, {{PCT_FAM_MONOPARENTAL}}% monoparental.
+   - Nivel de escolaridad predominante de padres/tutores: {{ESCOLARIDAD_PREDOMINANTE}}.
+   - Ocupación principal: {{OCUPACION_PREDOMINANTE}}.
+   - Vivienda y conectividad: {{PCT_INTERNET}}% cuenta con internet fijo/datos móviles; problemáticas comunitarias detectadas: {{PROBLEMAS_COMUNIDAD}}.
+
+2. CARACTERÍSTICAS DE DESARROLLO COGNITIVO, SOCIOEMOCIONAL Y FÍSICO:
+   - Rango de edad: {{EDAD_MIN}} a {{EDAD_MAX}} años (Etapa de desarrollo cognitivo: {{ETAPA_PIAGET}}).
+   - Estilos de aprendizaje del grupo (VAK): Visual {{PCT_VISUAL}}%, Auditivo {{PCT_AUDITIVO}}%, Kinestésico {{PCT_KINESTESICO}}%.
+
+3. HABILIDADES Y CONOCIMIENTOS CURRICULARES POR CAMPO FORMATIVO:
+   - Lenguajes (Promedio Diag: {{PROM_DIAG_LEN}} | Lectura DHBA Esperado: {{PCT_LEC_ESP}}% | Escritura Esperado: {{PCT_ESC_ESP}}%):
+     {{SINTESIS_FORTALEZAS_Y_OPORTUNIDADES_LENGUAJES}}
+   - Saberes y Pensamiento Científico (Promedio Diag: {{PROM_DIAG_SYPC}} | Cálculo Mental Esperado: {{PCT_CALC_ESP}}%):
+     {{SINTESIS_FORTALEZAS_Y_OPORTUNIDADES_SABERES}}
+   - Ética, Naturaleza y Sociedades (Promedio Diag: {{PROM_DIAG_ENS}}):
+     {{SINTESIS_FORTALEZAS_Y_OPORTUNIDADES_ETICA}}
+   - De lo Humano y lo Comunitario (Promedio Diag: {{PROM_DIAG_HYC}}):
+     {{SINTESIS_FORTALEZAS_Y_OPORTUNIDADES_HUMANO}}
+
+4. FORMAS DE TRABAJO Y METODOLOGÍAS SOCIOCRÍTICAS SUGERIDAS (NEM):
+   - Aprendizaje Basado en Proyectos Comunitarios (ABPC), STEAM, Aprendizaje Basado en Problemas (ABP) y Aprendizaje Servicio (AS).
+
+5. ALUMNOS QUE ENFRENTAN BARRERAS PARA EL APRENDIZAJE Y LA PARTICIPACIÓN (BAP):
+   - Total detectados: {{TOTAL_BAP}} ({{LISTADO_CONDICIONES_BAP}}).
+
+6. SITUACIONES INDIVIDUALES DE ATENCIÓN PRIORITARIA (REZAGO O VULNERABILIDAD):
+   - Alumnos en riesgo (< 6.0 o Requiere Apoyo en DHBA/EIA): {{LISTADO_ALUMNOS_RIESGO}}.
+
+7. RECOMENDACIONES E INTERVENCIÓN PEDAGÓGICA (VINCULACIÓN CON PROGRAMA ANALÍTICO):
+   - {{ACUERDOS_INTERVENCION_DOCENTE}}
+
+8. TABLA PSICOPEDAGÓGICA INDIVIDUAL DEL GRUPO:
+| N/P | NOMBRE DEL ALUMNO | ESTILO APRENDIZAJE | NIVEL DESARROLLO COGNITIVO | FORTALEZAS | DEBILIDADES | CANAL PERCEPCIÓN | INTELIGENCIA MÚLTIPLE |
+|-----|-------------------|--------------------|----------------------------|------------|-------------|------------------|-----------------------|
+| 1   | {{ALUMNO_NOMBRE}} | {{ESTILO_VAK}}     | {{NIVEL_COGNITIVO}}        | {{FORT}}   | {{DEBIL}}   | {{CANAL_VAK}}    | {{INTELIGENCIA_MULT}} |
+```
+
+---
+
+## 9. Ficha Descriptiva de Grupo e Individual de Cierre de Ciclo (`ficha descriptiva de alumnos y grupo.docx`)
+
+```text
+FICHA DESCRIPTIVA GRUPAL — CICLO ESCOLAR {{CICLO_ESCOLAR}}
+ESCUELA PRIMARIA "{{ESCUELA_NOMBRE}}" | C.C.T.: {{CCT}} | GRADO Y GRUPO: {{GRADO_GRUPO}}
+
+ESTADÍSTICA DEL GRUPO AL CIERRE DEL CICLO:
+| TOTAL DE ALUMNOS | MUJERES | HOMBRES | PROMEDIO < 7.0 (REZAGO) | PROMEDIO 7.0 A 8.5 | PROMEDIO 8.6 A 10.0 |
+|------------------|---------|---------|-------------------------|--------------------|---------------------|
+| {{TOTAL_GPO}}    | {{M}}   | {{H}}   | {{CONTEO_MENOR_7}}      | {{CONTEO_7_A_85}}  | {{CONTEO_86_A_10}}  |
+
+| FORTALEZAS DEL GRUPO | ÁREAS DE OPORTUNIDAD DEL GRUPO | RECOMENDACIONES PARA EL SIGUIENTE CICLO ESCOLAR |
+|----------------------|--------------------------------|-------------------------------------------------|
+| {{FORTALEZAS_GPO}}   | {{OPORTUNIDADES_GPO}}          | {{RECOMENDACIONES_PROXIMO_DOCENTE}}             |
+
+---
+FICHA DESCRIPTIVA INDIVIDUAL DEL ALUMNO(A)
+NOMBRE DEL ALUMNO(A): {{ALUMNO_NOMBRE_COMPLETO}} | CURP: {{ALUMNO_CURP}}
+GRADO Y GRUPO: {{GRADO_GRUPO}} | PROMEDIO FINAL ANUAL: {{PROMEDIO_ANUAL}} | INASISTENCIAS: {{FALTAS_ANUALES}}
+NIVEL DHBA/SISAT: Lectura: {{NIVEL_LEC}} | Escritura: {{NIVEL_ESC}} | Cálculo Mental: {{NIVEL_CALC}}
+
+- FORTALEZAS CONSOLIDADAS EN LOS 4 CAMPOS FORMATIVOS: {{FORTALEZAS_INDIVIDUALES}}
+- ÁREAS DE OPORTUNIDAD / CONTENIDOS Y PDA PENDIENTES DE CONSOLIDAR: {{AREAS_OPORTUNIDAD_INDIVIDUALES}}
+- RECOMENDACIONES PARA EL DOCENTE DEL SIGUIENTE GRADO: {{RECOMENDACIONES_DOCENTE}}
+- RECOMENDACIONES PARA LA FAMILIA: {{RECOMENDACIONES_FAMILIA}}
+```
+
+---
+
+## 10. Planilla de Seguimiento de Ausentismo y Rezago (`PLANILLA DE SEGUIMIENTO_FORMATO.docx`)
+
+```text
+PLANILLA DE SEGUIMIENTO A ALUMNOS CON INASISTENCIA REITERADA O RIESGO DE REZAGO
+ESCUELA: "{{ESCUELA_NOMBRE}}" ({{CCT}}) | GRADO Y GRUPO: {{GRADO_GRUPO}} | MES: {{MES_SEGUIMIENTO}}
+
+| Nombre y Apellido | Observaciones sobre la Inasistencia / Rezago | Estrategia de Comunicación | Responsable | Resultado del Contacto | Estrategia de Acompañamiento Pedagógico | Registro de Avances |
+|-------------------|----------------------------------------------|----------------------------|-------------|------------------------|-----------------------------------------|---------------------|
+| {{ALUMNO_NOMBRE}} | {{MOTIVO_FALTAS_O_REZAGO}}                   | {{LLAMADA_CITATORIO_VIS}}  | {{DOCENTE}} | {{COMPROMISO_PADRES}}  | {{CUADERNILLO_TUTORIA_AJUSTES}}         | {{AVANCE_LOGRADO}}  |
+```
+
+---
+
+## 11. Formato Anexo 5 — Promedio de Grupo para Estímulo PROEEB (`Anexo 5 PROEEB.docx`)
+
+```text
+ANEXO 5 — CONSTANCIA DE PROMEDIO DE APROVECHAMIENTO ESCOLAR (PROEEB)
+C.C.T.: {{CCT}} | ESCUELA: "{{ESCUELA_NOMBRE}}" | ZONA: {{ZONA}} | SECTOR: {{SECTOR}}
+CICLO ESCOLAR EVALUADO: {{CICLO_ESCOLAR}}
+
+DATOS DEL DOCENTE SOLICITANTE:
+- NOMBRE COMPLETO: PROFR.(A) {{DOCENTE_NOMBRE_COMPLETO}}
+- R.F.C.: {{DOCENTE_RFC}} | CURP: {{DOCENTE_CURP}}
+- CLAVE(S) PRESUPUESTAL(ES): {{DOCENTE_CLAVES_PRESUPUESTALES}}
+- GRADO Y GRUPO ATENDIDO EN EL CICLO ESCOLAR: {{GRADO_GRUPO}}
+- MATRÍCULA FINAL EVALUADA EN PLATAFORMA SINCE: {{MATRICULA_FINAL_GRUPO}} ALUMNOS
+- PROMEDIO GENERAL DE APROVECHAMIENTO DEL GRUPO (ESCALA 0.00 A 10.00 A DOS DECIMALES): **{{PROMEDIO_PROEEB_2_DECIMALES}}**
+
+Se valida que el promedio asentado coincide fielmente con el reporte oficial del Sistema de Control Escolar (SINCE).
+
+VALIDA DIRECTOR ESCOLAR                       CERTIFICA SUPERVISOR ESCOLAR ZONA {{ZONA}}
+_________________________________             _________________________________
+PROFR. {{DIRECTOR_NOMBRE}}                    MTRO. {{SUPERVISOR_NOMBRE}}
 ```

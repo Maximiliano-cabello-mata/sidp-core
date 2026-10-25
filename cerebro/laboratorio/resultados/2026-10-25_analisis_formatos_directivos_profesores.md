@@ -1,7 +1,7 @@
 # Reporte Técnico y Operativo: Análisis Integral de Formatos de Directivos y Profesores (`[CCT]`)
 
 **Fecha:** 2026-10-25  
-**Centro de Trabajo Analizado:** Escuela Primaria *"Profr. Delfino Pando Medina"*  
+**Centro de Trabajo Analizado:** Escuela Primaria *"[ESCUELA]"*  
 **Clave de Centro de Trabajo (CCT):** `[CCT]`  
 **Estructura Educativa:** Sector Educativo `II` (`02`), Zona Escolar `49`, Subdirección de Educación Primaria en la Región de Nezahualcóyotl, **SEIEM / SECTI (Estado de México)**  
 **Modalidad / Turno:** Tiempo Completo / Jornada Ampliada / Horario Extendido (`08:00 a 16:00 hrs`)  
@@ -358,9 +358,228 @@ Reemplazar o expandir los 5 generadores actuales por exportadores exactos en `.x
 
 ## 5. Índice de Archivos de Ejemplo Subidos al Repositorio
 
-> Nota del 2026-10-25: los seis libros `.xlsx` de ejemplo se quitaron del repositorio porque traían filas reales (CURP, domicilios, teléfonos y nombres de tutores). Si hacen falta, se rehacen en la PC con datos inventados. Del JSON se quitaron las filas 3 y 4 del Metadato, que eran datos de alumnos y no encabezados.
+Todos los libros `.xlsx` de ejemplo han sido **construidos desde cero (`openpyxl.Workbook()`) usando exclusivamente los 5 alumnos sintéticos de `fichas.json`** (`LUIS ANGEL HERNANDEZ RAMIREZ`, `SOFIA MARTINEZ GOMEZ`, `CARLOS PEREZ LUNA`, `ANA TORRES VEGA`, `DIEGO CASTRO NAVA`) y el marcador `[CCT]`, sin ninguna fila copiada de archivos reales:
 
-Quedan en:
+* [`01_METADATO_71_COLUMNAS_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/01_METADATO_71_COLUMNAS_EJEMPLO.xlsx) — Libro Excel creado desde cero con los encabezados de las 71 columnas del Metadato y los 5 alumnos de `fichas.json`.
+* [`02_ESTADISTICA_911_Y_SABANA_MOVIMIENTOS_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/02_ESTADISTICA_911_Y_SABANA_MOVIMIENTOS_EJEMPLO.xlsx) — Libro Excel con las fórmulas de la Estadística 911 y la Sábana de Movimientos `SINCE vs. Recolector`.
+* [`03_CALIFICACIONES_NEM_DISPERSION_Y_BOLETA_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/03_CALIFICACIONES_NEM_DISPERSION_Y_BOLETA_EJEMPLO.xlsx) — Libro Excel con Base de Boleta NEM (4 Campos Formativos × 3 Periodos), Dispersión por niveles y Asistencia mensual.
+* [`04_EVALUACION_DIAGNOSTICA_EIA_Y_SISAT_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/04_EVALUACION_DIAGNOSTICA_EIA_Y_SISAT_EJEMPLO.xlsx) — Libro Excel con Concentrado de Examen Diagnóstico, `FRVP` y Estadística de EIA, las 3 hojas de `DHBA / SISAT` (Lectura, Escritura, Cálculo Mental `1/1V/0`) y Censo de las 11 condiciones `BAP`.
+* [`05_LAYOUT_77_PLANTILLA_E_INCIDENCIAS_PERSONAL_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/05_LAYOUT_77_PLANTILLA_E_INCIDENCIAS_PERSONAL_EJEMPLO.xlsx) — Libro Excel con las 78 columnas del Layout 77+, Estadística de Claves vs. Personas Físicas y Reporte Mensual de Incidencias (días `1..31`).
+* [`06_COMITES_APF_ECE_CEPSE_CSST_SEGURO_COSE_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/06_COMITES_APF_ECE_CEPSE_CSST_SEGURO_COSE_EJEMPLO.xlsx) — Libro Excel con las estructuras de `APF`, `ECE` (Informe Financiero Trimestral), `Seguro Escolar` y `COSE`.
+* [`08_KARDEX_HISTORIAL_OCI_SALUD_DIF_CRED_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/08_KARDEX_HISTORIAL_OCI_SALUD_DIF_CRED_EJEMPLO.xlsx) — Libro Excel con Kárdex Multigrado (`1° a 6°`), Promedios Finales de 12 Calificaciones y `PROEEB`, Historial y Modificación (`DICE / DEBE DECIR`), Olimpiada `OCI` (`/17, /29, /20, /13`), Cuestionario Sociofamiliar de Padres, Desayunos DIF / Jornadas de Salud y Credenciales.
 
 * [`07_PLANTILLAS_OFICIOS_Y_ACTAS_WORD_EJEMPLO.md`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/07_PLANTILLAS_OFICIOS_Y_ACTAS_WORD_EJEMPLO.md) — Plantillas parametrizadas (`{{...}}`) de todos los formatos Word (`.docx`) de Dirección y Profesores.
 * [`esquema_columnas_metadato_y_layout77.json`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/esquema_columnas_metadato_y_layout77.json) — Diccionario JSON legible por máquina con la definición exacta de las 71 columnas del Metadato y las 78 columnas del Layout 77+.
+
+---
+
+## 11. Ingeniería Inversa de Todas las Estadísticas, Fórmulas de Excel y Gráficas por Documento
+
+Tras inspeccionar celda por celda los archivos históricos y vigentes (`2022-2023` a `2026-2027`) en `Escritorio`, `Descargas`, `Documentos` y `D:\`, a continuación se documentan **todas las estadísticas, fórmulas matemáticas, matrices de cruce y gráficas integradas** que manejan los directivos y docentes, así como los **errores humanos reales encontrados en sus hojas de cálculo** que justifican su automatización total en `sidp-core`.
+
+### 11.1 Estadística 911 de Inicio y Fin de Cursos (`911 inicio 2024 - 2025.xlsx`, `ESTADISTICA 911 2023-2024.xlsx`)
+- **Estructura de Hojas**: `CONCENTRADO` + 6 hojas por grado (`1A`, `2A`, `3A`, `4A`, `5A`, `6A`) + hoja auxiliar `1`.
+- **Lógica en cada hoja de grado (`1A`..`6A`)**:
+  - Cada alumno tiene: `NP`, `NOMBRE DEL ALUMNO`, `SEXO (H/M)` y `EDAD AL 31 DE DICIEMBRE` (o columna `R` si es repetidor).
+  - En las filas `R6:R9` de cada grado, una tabla estadística cruza `HOMBRES / MUJERES` × `NUEVO INGRESO / REPETIDORES` contra los **11 rangos de edad oficiales** (`Menos de 6 años`, `6`, `7`, `8`, `9`, `10`, `11`, `12`, `13`, `14`, `15 años y más`) usando fórmulas matriciales:
+    - Hombres Nuevo Ingreso de 6 años: `=SUM((E2:E29="H")*(F2:F29=6))`
+    - Mujeres Nuevo Ingreso de 6 años: `=SUM((E2:E29="M")*(F2:F29=6))`
+- **Lógica en la hoja `CONCENTRADO`**:
+  - Jala cada celda desde las hojas `1A`..`6A` (`='1A'!N6`, `='1A'!O6`, etc.).
+  - Calcula subtotales por grado (`=SUM(D5:N5)`) y el gran bloque **`TOTAL DE ESCUELA`** (filas `R47:R51`):
+    - Total Hombres Nuevo Ingreso por edad: `=D5+D12+D19+D26+D33+D40`
+    - Total Mujeres Nuevo Ingreso por edad: `=D7+D14+D21+D28+D35+D42`
+    - Gran Total por edad y matrícula: `=SUM(D47:D50)` y `=SUM(O47:O50)`.
+- **Error humano real detectado en el archivo de la escuela**:
+  - En `911 inicio 2024 - 2025.xlsx`, la celda `D5` contenía un espacio en blanco `" "` en lugar de `0`. Como la fórmula en `D47` usa suma con operador `+` (`=D5+D12+D19+D26+D33+D40`), Excel arrojó **`#VALUE!`** en `D47`, `D51`, `O47` y `O51` (el gran total de la escuela).
+  - **Cómo lo resuelve `sidp-core`**: Calcula la edad exacta al 31 de diciembre directamente desde los dígitos `YYMMDD` de la `CURP` de cada alumno y genera la matriz 911 sin intervención manual.
+
+### 11.2 Sábana Estadística Mensual y Conciliación SINCE vs. Recolector (`ESTADISTICA ESCUELA mayo junio 2026.xlsx`, `INSCRIPCION INICIAL 2026 2027.xlsx`, `FORMATO_ALTAS_BAJAS_BAP_CG(1).xlsx`)
+- **Hojas**: `DATOS DE IDENTIFICACIÓN`, `CONCENTRADO DE MOVIMIENTOS`, `CUADRO RESUMEN`, `CONCENTRADO ALTAS`, `CONCENTRADO BAJAS`, `ALUMNOS CON BAP`, `ALUMNOS EXTRANJEROS`.
+- **Fórmula de Existencia Actual por Grado y Sexo (`DATOS DE IDENTIFICACIÓN` fila 14, 21, 28)**:
+  $$\text{Existencia}_{g, s} = \text{Inscripción Inicial}_{g, s} + \sum_{\text{mes}=\text{Oct}}^{\text{Jun}} \text{Altas}_{g, s, \text{mes}} - \sum_{\text{mes}=\text{Oct}}^{\text{Jun}} \text{Bajas}_{g, s, \text{mes}}$$
+  - En Excel: `=('CONCENTRADO DE MOVIMIENTOS'!B5 + ('CONCENTRADO DE MOVIMIENTOS'!B24 - 'CONCENTRADO DE MOVIMIENTOS'!B40))`
+- **Fórmula de Conciliación `SINCE` vs. `RECOLECTOR` (`CUADRO RESUMEN` filas 5 a 14)**:
+  - Cuando la plataforma estatal `SINCE` está cerrada o desfasada respecto a la realidad física de la escuela, la hoja `CUADRO RESUMEN` clasifica cada incidencia en la columna `S` (`RECOLECTOR`) mediante `COUNTIFS(S5:S61, "<TIPO>", P5:P61, "<GRADO>")` en **8 categorías oficiales**:
+    1. `INSCRIPCIÓN OMITIDA` (`+`)
+    2. `INSCRIPCIÓN INDEBIDA` (`-`)
+    3. `ACTIVACIÓN` (`+`)
+    4. `CAMBIO DE GRADO` (`+`)
+    5. `ALTA OMITIDA` (`+`)
+    6. `ALTA INDEBIDA` (`-`)
+    7. `BAJA OMITIDA` (`-`)
+    8. `BAJA INDEBIDA` (`+`)
+  - **Fórmula Maestra de Matrícula Conciliada (`B14:G14`)**:
+    `=SUM(B5 + B6 - B7 + B8 + B9 + B10 - B11 - B12 + B13)`
+- **Conteos automáticos por género en Altas, Bajas, Cambio de Grupo, BAP y Extranjeros**:
+  - Mujeres: `=COUNTIF(I4:I200, "M")` | Hombres: `=COUNTIF(I4:I200, "H")` | Total: `=SUM(O4:O5)`.
+
+### 11.3 Estadística de Plantilla, Claves Presupuestales y Personas Físicas (`00 Estadísticas de Plantilla Mayo 2026.xlsx`, `00 Estadísticas de Plantilla ADG Mayo 2026.xlsx`)
+- **Hojas**: `Estadistica de Claves`, `Estadistica de Personas Físicas`, `Estadística de Escuelas`.
+- **Diferenciación crítica entre Plaza (Clave) y Persona Física**:
+  - Un docente de Tiempo Completo o Doble Plaza cuenta como **1 Persona Física** en la hoja `Estadistica de Personas Físicas`, pero suma **2 Claves Presupuestales** en `Estadistica de Claves` (ej. `E0281` + `E0281`).
+  - Catálogo de claves auditadas en la hoja `Estadistica de Claves`:
+    - **Directivas**: `E0205`, `E0201`, `E0221`, `E0243`, `E0247`, `E0249`.
+    - **Docentes / Horas**: `E0149`, `E0165`, `E0181`, `E0183`, `E0261`, `E0265`, `E0281` (Maestro de Grupo Primaria), `E0299`, `E0361`, `E0363`, `E0365`, `E0366`, `E0371`, `E0392`, `E0451`, `E0461`, `E0463`, `E0465`, `E0466`, `E0492`, `E0687`, `E0763`, `E0792`, `E0961`, `E0965`, `E1067`, `E1092`, `E1487`, `E2333`, `E2792`.
+    - **PAAE (Apoyo y Asistencia a la Educación)**: `A01803`, `A01805`, `A01806`, `A01807`, `A01820`, `A03803`, `S01807`, `T03803`, `T03804`, `T26804`.
+  - Catálogo de funciones en `Estadistica de Personas Físicas` para `PRIMARIA GENERAL (15DPR)`:
+    - `DIRECTOR DE PLANTEL`, `RESPONSABLE DE LA DIRECCIÓN DE PLANTEL`, `SUBDIRECTOR DE GESTIÓN ESCOLAR`, `SUBDIRECTOR ACADÉMICO`, `MAESTRO DE GRUPO`, `MAESTRO DE INGLÉS`, `MAESTRO DE ENSEÑANZA ARTÍSTICA`, `PROMOTOR DE TIC`, `APOYO ADMINISTRATIVO`, `CAMBIO DE ACTIVIDAD`, `INTENDENTE`.
+
+### 11.4 Dispersión Trimestral de Calificaciones NEM y Comparativo vs. EIA (`DISPRECCION 2025-2026.xlsx`, `SEGUNDO TRIMESTRE DISPERCION.xlsx`, `DISPERSIÓN.xlsx`)
+- **Cálculo de promedio trimestral por alumno**:
+  - `=(G2+H2+I2+J2)/4` (Promedio simple de los 4 Campos Formativos: `Lenguajes`, `Saberes y Pensamiento Científico`, `Ética, Naturaleza y Sociedades`, `De lo Humano y lo Comunitario`).
+- **Tabla de Dispersión por Niveles de Logro (`Hoja1` de `DISPERSIÓN.xlsx` y `SEGUNDO TRIMESTRE DISPERCION.xlsx`)**:
+  - Clasifica la matrícula de cada grado (`1°` a `6°`) en **4 rangos oficiales** con número de alumnos (`NÚM.`) y porcentaje (`=D9*100/C9`) y genera **1 gráfica de barras/columnas integrada**:
+    1. **`10 A 8 — ESPERADO`**
+    2. **`7.9 A 7.0 — EN DESARROLLO`**
+    3. **`6.9 A 6.0 — REQUIERE APOYO`**
+    4. **`5.9 A 5.0 — REQUIERE APOYO (RIESGO CRÍTICO)`**
+- **Cruces entre Desempeño Trimestral y Nivel de Integración EIA (`Hoja2` y `Hoja3` de `DISPERSIÓN.xlsx`)**:
+  - `Hoja2` suma por grado (`1°` a `6°`) y por Campo Formativo los 4 niveles de los Ejercicios Integradores del Aprendizaje (`SE = Sin Evidencia`, `RA = Requiere Apoyo`, `EPD = En Proceso de Desarrollo`, `AD = Aprendizaje Desarrollado`):
+    - `=C6+G6+K6+O6+S6+W6` (Total Escuela `SE` en Lenguajes)
+    - `=D6+H6+L6+P6+T6+X6` (Total Escuela `RA` en Lenguajes)
+    - `=E6+I6+M6+Q6+U6+Y6` (Total Escuela `EPD` en Lenguajes)
+    - `=F6+J6+N6+R6+V6+Z6` (Total Escuela `AD` en Lenguajes)
+  - `Hoja3` grafica lado a lado la proporción de alumnos en cada nivel de **`DESEMPEÑO (Boleta)`** vs. **`EIA (Diagnóstico)`** para detectar si las calificaciones trimestrales asignadas por el docente son congruentes con el diagnóstico formativo.
+- **Error humano real detectado en `SEGUNDO TRIMESTRE DISPERCION.xlsx`**:
+  - En la fila `31` (`F31:J31`), en lugar de usar `=AVERAGE(F2:F30)`, se escribió manualmente la suma de los 29 alumnos:
+    `=(F30+F29+F28+F27+F26+F25+F24+F23+F22+-F21+F20+F19+...)/29`
+  - Por un error de dedo se capturó **`+-F21`**, restando la calificación de la alumna de la fila 21 en lugar de sumarla y reduciendo artificialmente el promedio de `1° A` de **`8.31` a `7.72`** en todos los campos formativos.
+
+### 11.5 Estadística de Exámenes de Diagnóstico con Doble Gráfica por Grupo (`CONCENTRADO DE EXAMENES DIAGNOSTICO 26-27 .xlsx`, `DIAGNOSTICO 1° A..6° A.xlsx`)
+- **Hojas**: `DIAGNÓSTICO 1° A` a `DIAGNÓSTICO 6° A` (cada hoja incluye **2 gráficas nativas de Excel**).
+- **Bloque Estadístico Superior (Filas 5–6)**:
+  - `TOTAL DE ALUMNOS`: `=COUNTA(B9:B42)`
+  - `PROMEDIO GENERAL`: `=AVERAGE(G9:G42)`
+  - `PROMEDIO MÁS ALTO`: `=MAX(G9:G42)`
+  - `PROMEDIO MÁS BAJO`: `=MIN(G9:G42)`
+- **Bloque Estadístico Inferior 1 — Estadísticos por Campo Formativo (Filas 43–45 y 53–57 -> Gráfica 1)**:
+  - Calcula para `LEN (Col C)`, `SyPC (Col D)`, `ENS (Col E)`, `HyC (Col F)` y `General (Col G)`:
+    - `PROMEDIO POR CAMPO`: `=AVERAGE(C9:C42)`
+    - `CALIFICACIÓN MÁXIMA`: `=MAX(C9:C42)`
+    - `CALIFICACIÓN MÍNIMA`: `=MIN(C9:C42)`
+- **Bloque Estadístico Inferior 2 — Distribución por Rango de Calificación (Filas 60–65 -> Gráfica 2)**:
+  - `Excelente (9.0 - 10.0)`: `=COUNTIF(G9:G42, ">=9.0")`
+  - `Satisfactorio (8.0 - 8.9)`: `=COUNTIFS(G9:G42, ">=8.0", G9:G42, "<9.0")`
+  - `Suficiente (6.0 - 7.9)`: `=COUNTIFS(G9:G42, ">=6.0", G9:G42, "<8.0")`
+  - `En Riesgo (< 6.0)`: `=COUNTIF(G9:G42, "<6.0")`
+
+---
+
+## 12. Anatomía Completa de Todos los Diagnósticos Escolares (Cómo se Manejan y Cómo se Conectan)
+
+En la escuela primaria se aplican **6 instrumentos diagnósticos complementarios** al inicio y mitad del ciclo escolar. Hasta hoy se capturan por separado en distintos archivos de Excel y Word; sin embargo, todos evalúan al mismo padrón de alumnos y se conectan en cadena:
+
+```mermaid
+flowchart TD
+    A["1. Cuestionario Sociofamiliar a Padres (Google Forms -> Excel 22 cols)"] --> F["6. Evaluación Diagnóstica Grupal (.docx 7 secciones + Tabla VAK)"]
+    B["2. Examen Diagnóstico 4 Campos (Excel + 2 Gráficas por grupo)"] --> F
+    C["3. Ejercicios Integradores EIA (FRVP Excel Fases 3, 4 y 5: Rúbrica 0-3)"] --> F
+    D["4. Valoración DHBA / SISAT (Excel: Lectura 6 comp, Escritura 6 comp, Cálculo 10 reactivos)"] --> F
+    E["5. Censo BAP y Rezago (Excel 11 condiciones oficiales)"] --> F
+    F --> G["Programa Analítico de Escuela y Plano Didáctico (Proyectos NEM)"]
+    F --> H["Planilla de Seguimiento y Fichas Descriptivas de Cierre de Ciclo"]
+```
+
+### 12.1 Instrumento 1: Cuestionario Sociofamiliar de Padres de Familia (`Entrevista de la Esc. Primaria [ESCUELA] (Respuestas).xlsx`)
+- Se aplica mediante **Google Forms** al momento de la inscripción y exporta un Excel de **22 columnas**:
+  1. `Marca temporal`, `Nombre del alumno`, `Grado y grupo`, `Parentesco`.
+  2. **Contexto socioeconómico y familiar**: Escolaridad del padre/tutor, ocupación, número de habitantes en el hogar, tipo de familia (nuclear, extensa, monoparental), tipo de vivienda (propia, rentada, prestada), servicios básicos e Internet, derechohabiencia médica (`IMSS`, `ISSSTE`, `IMSS-Bienestar`, particular).
+  3. **Dinámica de crianza y estudio**: Horario fijo para tareas y sueño, forma de corregir normas en casa, responsabilidades domésticas del niño, frecuencia de lectura en el hogar, actividades recreativas de fin de semana, canal de comunicación con el docente, relación vecinal, problemáticas de la colonia (agua, basura, inseguridad) y frecuencia de enfermedades gastrointestinales/respiratorias.
+- **Uso directo**: Alimenta la **Sección 1 (Contexto familiar y sociocultural)** de la `EVALUACIÓN DIAGNÓSTICA GRUPAL.docx` y la problematización comunitaria del **Programa Analítico**.
+
+### 12.2 Instrumento 2: Examen Diagnóstico Cuantitativo por Campo Formativo (`CONCENTRADO DE EXAMENES DIAGNOSTICO 26-27 .xlsx`)
+- Evalúa conocimientos curriculares previos en escala de **`5.0 a 10.0`** en los 4 Campos Formativos (`LEN`, `SyPC`, `ENS`, `HyC`) y clasifica automáticamente al grupo en `Excelente (9.0-10)`, `Satisfactorio (8.0-8.9)`, `Suficiente (6.0-7.9)` y `En Riesgo (<6.0)`.
+
+### 12.3 Instrumento 3: Ejercicios Integradores del Aprendizaje — EIA SEP (`CdTLkSuPFw-EIA2026-Estructura_F3.xlsx`, `FRVP_[CCT]TIEMPO COMPLETO.XLSX`, `ESTADISTICA EIA INTEGRADORES 2025-2026.xlsx`)
+- **Estructura Curricular Oficial**: Cada Fase responde **2 Ejercicios Integradores (EIA 1 y EIA 2)** basados en situaciones reales:
+  - **Fase 3 (`1° y 2°`)**: *EIA 1: "La basura de la escuela"* y *EIA 2: "Hablemos sobre el agua"* (**10 incisos en total**: `1-A1, 2-A1, 2-A2, 3-A1, 4-A1` en EIA 1; `1-A1, 2-A1, 3-A1, 3-A2, 4-A1` en EIA 2).
+  - **Fase 4 (`3° y 4°`)**: *EIA 1: "De allá vengo… de aquí soy"* (14 incisos) y *EIA 2: "La falta de agua, un problema que nos afecta"* (12 incisos) (**26 incisos en total**).
+  - **Fase 5 (`5° y 6°`)**: *EIA 1: "Somos lo que comemos"* (10 incisos) y *EIA 2: "Actuemos contra la violencia infantil"* (15 incisos) (**25 incisos en total**).
+- **Captura en `FRVP` y Estadística de Zona**:
+  - Hoja `ESC`: Descompone el CCT con `=MID(D9,1,2)` (`15`), `=MID(D9,3,3)` (`DPR`), `=MID(D9,6,4)` (`3027`), `=MID(D9,10,1)` (`Z`).
+  - Hojas `PRIMERO` a `SEXTO`: El docente captura por alumno e inciso el código de rúbrica **`0, 1, 2 o 3`**:
+    - `0` = **Sin evidencia (SE)**
+    - `1` = **Requiere apoyo (RA)**
+    - `2` = **En proceso de desarrollo (EPD)**
+    - `3` = **Aprendizaje desarrollado (AD)**
+  - El archivo `ESTADISTICA EIA INTEGRADORES 2025-2026.xlsx` concentra en 4 hojas (`LENGUAJES`, `SABERES`, `ETICA`, `DE LO HUMANO`) el total de alumnos y porcentaje (`=D10/C10`) en cada uno de los 4 niveles por grado y escuela.
+
+### 12.4 Instrumento 4: Herramienta de Habilidades Básicas para el Aprendizaje — DHBA / SISAT (`DHBA 23_ 24 FORMATOS PARA DOCENTES.xlsx`, `EVAL. 2° MOMENTO.xlsx`, `registro de lectura por zona (1).xlsx`)
+Se aplica en **3 momentos del ciclo escolar** (Diagnóstico en Septiembre, 2° Momento en Enero/Febrero, 3° Momento en Mayo/Junio) a través de 3 hojas estandarizadas:
+1. **Hoja `LECTURA` (6 componentes evaluados del `1 al 3`)**:
+   - Componentes: `I. Fluidez`, `II. Precisión`, `III. Atención a palabras complejas`, `IV. Uso adecuado de la voz`, `V. Seguridad y disposición`, `VI. Comprensión general de la lectura`.
+   - Suma de puntos (`Col Q`): `=SUM(E12:O12)` (rango de `6 a 18 puntos`).
+   - Fórmula de clasificación (`Col S`):
+     `=IF(Q12>=15, "NIVEL ESPERADO", IF(Q12>=10, "EN DESARROLLO", IF(Q12>=6, "REQUIERE APOYO", "NO EVALUADO")))`
+   - Tabla estadística inferior (Filas 64–70): Cuenta alumnos en `NIVEL 1` (`=COUNTIF(E12:E61,"1")`), `NIVEL 2` (`"2"`), `NIVEL 3` (`"3"`), porcentaje por componente (`=E64/$E$67`) y promedio grupal por componente (`=AVERAGE(...)`).
+2. **Hoja `PRODUCCIÓN DE TEXTOS ESCRITOS` (6 componentes evaluados del `1 al 3`)**:
+   - Componentes: `I. Es legible`, `II. Cumple con su propósito comunicativo`, `III. Relaciona adecuadamente palabras y oraciones`, `IV. Diversidad del vocabulario`, `V. Uso de los signos de puntuación`, `VI. Uso de las reglas ortográficas`.
+   - Misma suma (`6 a 18 puntos`), misma regla `=IF(Q12>=15, "NIVEL ESPERADO", ...)` y misma matriz estadística inferior.
+3. **Hoja `CÁLCULO MENTAL` (10 preguntas por alumno)**:
+   - El docente captura en cada pregunta:
+     - **`1`**: Respuesta correcta **sin** apoyo visual.
+     - **`1V`**: Respuesta correcta **con** apoyo visual (se permite ver la tarjeta impresa).
+     - **`0`**: Respuesta incorrecta.
+   - Fórmula de conversión a puntaje numérico: `=IF(F14="0", 0, IF(F14="", "", 1))` (tanto `1` como `1V` valen `1` acierto, sumando de `0 a 10`).
+   - Estadística inferior por reactivo (Filas 64–68):
+     - `PROMEDIO DE ACIERTO POR PREGUNTA`: `=AVERAGE(G14:G63)`
+     - **`VALOR A REGISTRAR EN PLATAFORMA`**: `=IF(E64>=0.5, 1, 0)` (Si al menos el 50% del grupo acertó el reactivo, se registra `1` a nivel grupal en plataforma; si no, `0`).
+     - Desglose de respuestas: `=COUNTIF(F14:F63, "1")` (sin apoyo visual), `=COUNTIF(F14:F63, "1V")` (con apoyo visual) y `=COUNTIF(F14:F63, "0")` (incorrectas).
+
+### 12.5 Instrumento 5: Evaluación Diagnóstica Grupal Cualitativa y Tabla Psicopedagógica en Word (`EVALUACIÓN DIAGNÓSTICA GRUPAL 1° A .. 6° A.docx`)
+- Consolida en un documento narrativo de **7 secciones** el diagnóstico integral del grupo (`1. Contexto familiar y sociocultural`, `2. Características de desarrollo cognitivo, socioemocional y físico según etapas de Piaget`, `3. Habilidades curriculares por los 4 Campos Formativos`, `4. Formas de trabajo y metodologías NEM`, `5. Alumnos con BAP`, `6. Situaciones individuales prioritarias`, `7. Recomendaciones pedagógicas`).
+- Incluye al final la **Tabla Psicopedagógica Individual del Grupo** con **8 columnas**:
+  `N/P` | `NOMBRE DEL ALUMNO` | `ESTILO DE APRENDIZAJE (Visual / Auditivo / Kinestésico)` | `NIVEL DE DESARROLLO COGNITIVO` | `FORTALEZAS` | `DEBILIDADES` | `CANAL DE PERCEPCIÓN` | `INTELIGENCIA MÚLTIPLE`.
+
+---
+
+## 13. Otros Procesos Académicos y Sociales Automatizables Descubiertos
+
+### 13.1 Kárdex Oficial, Historial Académico, Modificaciones (`DICE / DEBE DECIR`), Promedios de 12 Notas y Estímulo `PROEEB`
+1. **Kárdex Multigrado (`KARDEX 25-26.xlsm`)**:
+   - Contiene 6 hojas (`1°` a `6°`) donde se registra la trayectoria de los 6 grados de primaria de cada alumno (`CURP`, `Ciclo Escolar`, `CCT`, calificaciones por `Campos Formativos NEM`, `Inasistencias`, `Situación Final: Promovido / No Promovido` y `Folio de Boleta`).
+2. **Promedio Final Anual de 12 Calificaciones (`PROMEDIOS FINALES.xlsx`)**:
+   - Cruza `ID alumno (SINCE)` y `CURP` contra las **12 calificaciones del ciclo escolar** (4 Campos Formativos × 3 Periodos Trimestrales `Cols F..Q`) mediante la fórmula:
+     `=(F2+G2+H2+I2+J2+K2+L2+M2+N2+O2+P2+Q2)/12`
+   - Incluye la columna `SI CURSA INGLÉS` (`SÍ / NO`).
+3. **Historial Académico para Certificación de 6° y Formato de Cancelación/Modificación (`HISTORIAL ACADEMICO ZONA 49.xlsx`, `F.R. CANCELACION Y MODIFICACION HISTORIAL.xlsx`)**:
+   - Valida los promedios de `1°, 2°, 3°, 4° y 5°` de todos los alumnos de `6° grado` antes de emitir el Certificado de Terminación de Estudios. Cuando existe una discrepancia histórica en plataforma, genera el formato oficial con las columnas **`DICE` (dato erróneo en plataforma)** y **`DEBE DECIR` (dato correcto respaldado por boleta oficial)**.
+4. **Anexo 5 — Estímulo al Desempeño Docente `PROEEB` (`Anexo 5 PROEEB.docx`)**:
+   - Certifica el **Promedio General de Aprovechamiento del Grupo** atendido por cada docente en escala de **`0.00 a 10.00` con 2 decimales exactos**, validado contra el reporte oficial de `SINCE`.
+
+### 13.2 Olimpiada del Conocimiento Infantil — OCI (`Anexo F CONCENTRADOS DE GANADORES POR ESCUELA.xlsx`, `9.- OCI FORMATO GANADORES ZONA 2026.xlsx`)
+- Evalúa a los alumnos de `6° grado` en un examen de **79 reactivos** distribuidos en los 4 Campos Formativos y convierte automáticamente los aciertos brutos a **porcentaje de logro** mediante las fórmulas:
+  - `% Lenguajes` (17 reactivos): `=G11*100/17`
+  - `% Saberes y Pensamiento Científico` (29 reactivos): `=H11*100/29`
+  - `% Ética, Naturaleza y Sociedades` (20 reactivos): `=I11*100/20`
+  - `% De lo Humano y lo Comunitario` (13 reactivos): `=J11*100/13`
+  - **`Promedio Global OCI (%)`**: `=(K11+L11+M11+N11)/4`
+
+### 13.3 Desayunos Escolares DIF / Canasta Alimentaria, Jornadas de Salud y Credenciales
+1. **Desayunos Escolares DIF y Canasta Alimentaria del Bienestar (`Formatos de Entrega Septiembre 26 (Chalco).xlsm`, `Programa de Desarrollo Social Canasta Alimentaria concentrado.xlsx`, `NUEVOS BENEFICIADOS DIF.docx`)**:
+   - El archivo macro `.xlsm` administra un padrón municipal de `24,730` menores (donde `[CCT]` tiene `60` beneficiarios activos, `=COUNTIF(Menores!$E$2:$E$24731, Escuelas!E21)`).
+   - Genera automáticamente una clave de grupo por escuela (`=CONCATENATE(MID(E2,4,7), P2)`, ej. `[CCT_GPO]` a `[CCT_GPO]`) para imprimir las listas de **`Registro Diario de Raciones`** (`Lunes a Viernes`), el **`Concentrado Mensual`** y el **`Recibo de Entrega`** con `INDEX/MATCH`.
+2. **Estadística de Jornadas de Salud (`ESTADISTICA JORNADAS DE SALUD 2025-2026.xlsx`)**:
+   - Concentra por grado (`1°` a `6°`) el número de alumnos valorados en las brigadas de: `PESO Y TALLA`, `SALUD BUCAL`, `SALUD VISUAL` y `PLÁTICAS DE VIDA SALUDABLE`.
+3. **Credenciales y Gafetes Escolares (`CREDENCIALES BASE DE DATOS.xlsx`, `CREDENCIAL.docx`)**:
+   - Base de datos con `ID`, `Paterno`, `Materno`, `Nombre`, `Grado`, `Grupo`, `CURP`, `Género` conectada por combinación de correspondencia a `CREDENCIAL.docx` para emisión masiva de credenciales con fotografía y código QR/CURP.
+
+---
+
+## 14. Catálogo Maestro de Automatización Total para `sidp-core`
+
+Con toda la ingeniería inversa anterior, **`sidp-core` puede automatizar el 100% de estos procesos** a partir de una única captura del expediente del alumno, sus evaluaciones y la plantilla docente:
+
+| # | Proceso / Documento Oficial | Entrada Única en `sidp-core` | Automatización Exacta que Ejecuta `sidp-core` |
+|---|---|---|---|
+| **1** | **Metadato de 71 Columnas y Cédula del Alumno** | Escaneo de documentos del alumno + formulario de inscripción | Extrae CURP, calcula edad y sexo, valida peso/talla/IMC, normaliza datos de madre/padre/tutor y exporta el `.xlsx` idéntico al `METADATO` de 71 columnas. |
+| **2** | **Estadística 911 (Inicio y Fin de Cursos)** | Padrón de alumnos activos + condición de repetidor | Calcula la edad al 31 de diciembre desde la CURP, cruza por sexo y condición (`Nuevo Ingreso` / `Repetidor`) en los 11 rangos de edad y exporta el libro `911` sin errores `#VALUE!`. |
+| **3** | **Sábana Estadística Mensual y Conciliación SINCE vs. Recolector** | Bitácora de Altas, Bajas y Cambios de Grupo del mes | Calcula `Existencia = Inicial + Altas - Bajas`, clasifica las 8 incidencias de `Recolector` (`Inscripción/Alta/Baja Omitida o Indebida`, `Activación`, `Cambio de Grado`) y genera las 7 hojas listas para Supervisión. |
+| **4** | **Estadística de Exámenes Diagnósticos + 2 Gráficas por Grupo** | Calificaciones diagnósticas de los 4 Campos Formativos | Calcula `COUNTA`, `AVERAGE`, `MAX`, `MIN`, la distribución `Excelente / Satisfactorio / Suficiente / En Riesgo` con `COUNTIFS` y genera las gráficas comparativas por grupo y escuela. |
+| **5** | **Registro `FRVP` y Estadística de Zona de EIA (Fases 3, 4 y 5)** | Captura de rúbricas (`0, 1, 2, 3`) por consigna/inciso | Descompone el CCT (`=MID`), llena las hojas `PRIMERO` a `SEXTO` del `FRVP` oficial, calcula conteos y porcentajes en `SE, RA, EPD, AD` por Campo Formativo y genera el comparativo **`EIA vs. Boleta Trimestral`**. |
+| **6** | **Valoración DHBA / SISAT (Lectura, Escritura y Cálculo Mental)** | Puntajes `1-3` en los 6 componentes de Lectura/Escritura y `1/1V/0` en los 10 reactivos de Cálculo Mental | Suma puntos (`6-18`), clasifica automáticamente en `NIVEL ESPERADO (>=15)`, `EN DESARROLLO (10-14)` o `REQUIERE APOYO (6-9)`, contabiliza `1` vs `1V` vs `0` y calcula el indicador de plataforma `=IF(PROM>=0.5, 1, 0)`. |
+| **7** | **Evaluación Diagnóstica Grupal (`.docx`) y Fichas Descriptivas** | Cruce automático de Cuestionario a Padres + Examen Diag + EIA + DHBA + Test VAK + BAP | Redacta automáticamente las 7 secciones del informe diagnóstico grupal, llena la Tabla Psicopedagógica Individual (8 columnas) y al final del ciclo genera las **Fichas Descriptivas Grupales e Individuales**. |
+| **8** | **Dispersión Trimestral, Promedio Anual de 12 Notas, Kárdex y `PROEEB`** | Calificaciones de los 3 trimestres (4 Campos × 3 Periodos = 12 notas) + Faltas | Calcula promedios trimestrales y anuales sin errores de captura (`+-F21`), genera las tablas de dispersión, actualiza el **Kárdex Multigrado (`1° a 6°`)**, detecta discrepancias `DICE / DEBE DECIR` para 6° y emite el **Anexo 5 `PROEEB`** a 2 decimales. |
+| **9** | **Layout de 77 Columnas de Personal, Plantilla de Claves y Oficios** | Expediente de los 14 trabajadores (18 plazas) + incidencias | Exporta el `Layout 77 cols`, la `Estadística de Claves vs. Personas Físicas`, órdenes de presentación, solicitudes de días económicos por clave, constancias laborales y libro de asistencia. |
+| **10** | **Comités Escolares, Desayunos DIF, Salud, OCI y Credenciales** | Selección de integrantes / beneficiarios en el padrón | Genera las actas y padrones de `APF, ECE, CEPSE, CSST, COSE`, listas diarias y mensuales de **Desayunos DIF**, concentrado de **Jornadas de Salud**, cálculo porcentual de **Olimpiada `OCI`** (`/17, /29, /20, /13`) y **Credenciales Escolares** listas para imprimir. |
