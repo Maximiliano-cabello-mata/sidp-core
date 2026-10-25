@@ -26,8 +26,9 @@ from validacion import comparador, estandar, extraer, lector, modelo, vision
 
 MAXIMO_HOJAS = 3  # Por documento, al modelo que ve (las demás hojas casi nunca traen datos nuevos).
 INTENTOS = 3
-# Con 1 lectura y esquema plano tarda ~33 s por hoja en la PC 4; con 2 lecturas (~45 s) compara orden normal e inverso.
-LECTURAS = int(os.environ.get('SIDP_LECTURAS_VISION') or 1)
+# Con 2 lecturas compara orden normal e inverso: en la Tarea 021 (12 hojas inventadas, letra clara y fea) dio 86 % bien
+# contra 80 % con una sola, y ningún dato mal marcado como seguro.
+LECTURAS = int(os.environ.get('SIDP_LECTURAS_VISION') or 2)
 TIPOS_SEGUROS_1 = ('fecha', 'sangre', 'si_no', 'numero')
 TIPOS_SEGUROS_2 = TIPOS_SEGUROS_1 + ('telefono', 'cp')
 

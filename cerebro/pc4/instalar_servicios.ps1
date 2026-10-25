@@ -133,7 +133,7 @@ if (Test-Path $archivoAjustes) {
     $porOmision = @(@(
         "`$env:SIDP_MODELO_VISION = 'qwen2.5vl:3b'",
         "`$env:SIDP_LADO_VISION = '960'",
-        "`$env:SIDP_LECTURAS_VISION = '1'",
+        "`$env:SIDP_LECTURAS_VISION = '2'",
         "`$env:OLLAMA_FLASH_ATTENTION = '1'",
         "`$env:OLLAMA_KEEP_ALIVE = '$(if ($MismaPC) { '30m' } else { '24h' })'"
     ) + @($deMismaPC | Where-Object { $MismaPC }) | Where-Object { $yaPuestos -notcontains ($_ -split '=')[0].Trim() })
@@ -142,7 +142,7 @@ if (Test-Path $archivoAjustes) {
         '# Después de cambiar algo, reinicia la PC 4 (o vuelve a correr instalar_servicios.ps1).',
         '#   SIDP_MODELO_VISION: el modelo que ve (python -m validacion.vision modelos dice cuáles hay).',
         '#   SIDP_LADO_VISION: píxeles de la hoja para el modelo (menos = más rápido, pero la letra chica se pierde).',
-        '#   SIDP_LECTURAS_VISION: 1 (aceptado); 2 = lee cada hoja dos veces y lo que no coincide queda por confirmar (más lento).',
+        '#   SIDP_LECTURAS_VISION: 2 = lee cada hoja dos veces y lo que no coincide queda por confirmar (86 % en la Tarea 021); 1 = una vez (80 %).',
         '#   SIDP_RESPALDO y SIDP_RESPALDOS: carpetas del respaldo del servidor y de la copia diaria de la base (por omisión en C:\SIDP-datos).',
         '#   Servidor que también es cerebro (-MismaPC): SIDP_CEREBRO_ANFITRION, SIDP_PRIORIDAD, OLLAMA_MAX_LOADED_MODELS, SIDP_SIN_PADDLE.',
         '#   OLLAMA_HOST y OLLAMA_MODELS no van aquí: los pone el lanzador (Ollama solo en 127.0.0.1).'

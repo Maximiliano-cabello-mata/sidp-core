@@ -1122,3 +1122,49 @@ como ejemplo, y la clave de la escuela tampoco va en el mensaje del commit.**
    git push origin claude/project-thread-vp6ab8
    ```
    Al final avísale a Maximiliano que ya se subió.
+
+## Tarea 022: leer cada hoja dos veces (2026-10-25)
+
+**Para el agente del servidor.** En la Tarea 021 la lectura doble (`--lecturas 2`) dio 86 % bien, contra 80 % con una
+sola lectura y 72 % con la imagen más grande, y ningún dato salió mal marcado como seguro. Maximiliano quiere pasar del
+80 %, así que el servidor pasa a leer cada hoja dos veces. Aquí se cambia **una sola línea** de `ajustes.ps1`, con
+respaldo antes; no se borra nada. Las reglas de [LEEME.md](LEEME.md) siguen igual.
+
+1. Trae el código nuevo:
+   ```
+   cd C:\SIDP-cerebro\sidp-core
+   git pull
+   ```
+2. Respalda `ajustes.ps1` y cambia solo la línea de las lecturas (si el archivo está en otra carpeta, usa esa):
+   ```
+   $a = 'C:\SIDP-datos\servicios\ajustes.ps1'
+   Copy-Item $a "$a.antes-022"
+   (Get-Content $a) -replace "SIDP_LECTURAS_VISION = '1'", "SIDP_LECTURAS_VISION = '2'" | Set-Content -Encoding UTF8 $a
+   Select-String -Path $a -Pattern 'SIDP_LECTURAS_VISION'
+   ```
+   La última línea debe mostrar `'2'`. Si algo sale mal, regresa el respaldo con `Copy-Item "$a.antes-022" $a -Force`.
+3. Reinicia los servicios para que el cerebro use el código y el ajuste nuevos. En la 021 este paso falló porque la
+   consola no era de administrador: **pídele a Maximiliano** que abra PowerShell con clic derecho > «Ejecutar como
+   administrador» y corre ahí (agrega `-ComoSistema` si la 019 lo usó):
+   ```
+   cd C:\SIDP-cerebro\sidp-core
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -MismaPC
+   ```
+4. Confirma el resultado con hojas inventadas nuevas. Corre primero la lectura doble, con el modelo recién arrancado,
+   porque en la 021 fue la última y salió más rápida que la sencilla, y así se ve su tiempo real:
+   ```
+   python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos_022 --cuantas 6 --semilla 22
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_022 --modelo qwen2.5vl:3b --lecturas 2 --lado 960 --etiqueta doble
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_022 --modelo qwen2.5vl:3b --lecturas 1 --lado 960 --etiqueta sencilla
+   ```
+5. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea022.md` con: la línea que mostró `Select-String`, si el
+   paso 3 terminó bien (sí o no, y el mensaje si falló) y los dos `resumen_lectura_*.md` completos. **No** subas los
+   `detalle_local_*.csv` ni las hojas. Revisa que no haya CURP, teléfono, nombre ni la clave de la escuela, tampoco en
+   el mensaje del commit. Súbelo solo a él:
+   ```
+   git add cerebro/laboratorio/resultados/AAAA-MM-DD_tarea022.md
+   git commit -m "laboratorio: resultado de la tarea 022"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+   Al final avísale a Maximiliano que ya se subió.
