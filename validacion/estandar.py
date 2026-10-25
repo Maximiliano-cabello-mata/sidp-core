@@ -116,8 +116,11 @@ def registro(alumno, datos, ciclo=None, hoy=None):
         'fecha_nacimiento': nacimiento, 'sexo_curp': alumno.get('sexo') or '', 'letra': alumno.get('letra') or '',
         'grupo': f'{int(alumno["grado"])}° {alumno.get("letra") or ""}'.strip() if alumno.get('grado') else 'Sin grupo',
         'tutor': uno('tutor', 'nombre') or uno('madre', 'nombre') or uno('padre', 'nombre'),
+        'parentesco': (PARENTESCO.get(uno('tutor', 'parentesco'), uno('tutor', 'parentesco')) if uno('tutor', 'nombre')
+                       else 'Madre' if uno('madre', 'nombre') else 'Padre' if uno('padre', 'nombre') else None),
         'tutor_curp': uno('tutor', 'curp') or uno('madre', 'curp') or uno('padre', 'curp'),
         'telefono': telefonos[-1] if telefonos else None, 'emergencia': uno('contacto', 'nombre_emergencia'),
+        'correo': (indicadores.valores_de(datos, 'contacto', 'correo') or [None])[-1],
         'domicilio': uno('domicilio', 'domicilio'),
     }
 

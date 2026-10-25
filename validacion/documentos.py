@@ -1,4 +1,5 @@
-"""El motor de documentos de la escuela: el 911, constancias de inscripción y listas de grupo, en Excel, Word y PDF.
+"""El motor de documentos de la escuela: el 911, constancias, listas de grupo y los formatos de la supervisión
+(validacion/formatos_oficiales.py), en Excel, Word y PDF.
 
 Vive en la PC 4: el cerebro los arma con la base de todos los alumnos (POST /documento, validacion/cerebro_red.py). Si la
 PC 4 no contesta, el servidor (SIDP.exe) arma los mismos con sus listas de grupo, sin lo que sacó el escaneo. Solo usa
@@ -15,7 +16,7 @@ import zipfile
 from xml.sax.saxutils import escape
 
 from validacion import escuela as escuela_mod
-from validacion import estandar, indicadores
+from validacion import estandar, formatos_oficiales, indicadores
 
 try:  # Arriba para que PyInstaller lo meta en SIDP.exe.
     from reportlab.lib import colors
@@ -47,6 +48,25 @@ CATALOGO = (
     {'clave': 'emergencia', 'nombre': 'Lo que la maestra debe saber', 'alcance': 'grupo_o_escuela', 'formatos': ['pdf', 'xlsx'],
      'descripcion': 'Por grupo: alergias, padecimientos, medicamentos, discapacidad, tutor, teléfono y contacto de emergencia, '
                     'para tenerlo a la mano en el salón.'},
+    {'clave': 'metadato', 'nombre': 'Base de datos Metadato (71 columnas)', 'boton': 'Bajar el Metadato', 'alcance': 'escuela', 'formatos': ['xlsx'],
+     'descripcion': 'El formato de la supervisión con los datos del alumno (columnas 1 a 40) y del tutor (41 a 71), ya llenos con lo que '
+                    'tiene SIDP. La edad se calcula sola. Lo que quede en blanco se completa antes de entregarlo.'},
+    {'clave': 'base_911', 'nombre': 'Estadística 911: base que se calcula sola', 'boton': 'Bajar la base del 911', 'alcance': 'escuela',
+     'formatos': ['xlsx'],
+     'descripcion': 'La hoja BASE con la CURP de cada alumno: el sexo, la fecha de nacimiento, la edad al 1 de septiembre y los cuadros '
+                    'por grado, sexo y edad salen solos. Si se agrega a un alumno a mano, los totales cambian.'},
+    {'clave': 'condicion', 'nombre': 'Censo de condición y discapacidad', 'alcance': 'escuela', 'formatos': ['xlsx'],
+     'descripcion': 'Una hoja por grado con las columnas de condición y de discapacidad, marcadas con X según el certificado médico y lo '
+                    'que capturó la escuela. Los totales se cuentan solos.'},
+    {'clave': 'calificaciones', 'nombre': 'Concentrado de calificaciones y dispersión', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
+     'descripcion': 'Una hoja por grupo con los alumnos ya puestos. El maestro escribe las calificaciones de los cuatro campos formativos; '
+                    'el promedio, la dispersión por nivel y el concentrado escolar se calculan solos.'},
+    {'clave': 'boleta', 'nombre': 'Base de datos de la boleta', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
+     'descripcion': 'Los cuatro campos formativos y sus observaciones de los tres periodos, con grado, grupo, CURP y nombre de cada alumno '
+                    'ya escritos.'},
+    {'clave': 'asistencias', 'nombre': 'Concentrado de asistencias y faltas', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
+     'descripcion': 'Una hoja por grupo, de septiembre a julio: asistencias, faltas justificadas y sin justificar. Los días del mes y el '
+                    'total del ciclo se suman solos.'},
     {'clave': 'vive_saludable', 'nombre': 'Lista para Vive Saludable', 'boton': 'Bajar la lista de Vive Saludable', 'alcance': 'grupo_o_escuela',
      'formatos': ['xlsx'],
      'descripcion': 'Los alumnos por grupo con CURP, sexo, fecha de nacimiento y edad, para cuando el centro de salud avise de la jornada. '
@@ -151,6 +171,8 @@ def generar(clave, formato, registros, escuela=None, ciclo='', hoy=None, grado=N
     nombre = _archivo(clave, sufijo, hoy.isoformat()) + f'.{formato}'
     if clave == 'vive_saludable':
         return nombre, _excel(vive_saludable(elegidos, escuela, ciclo)), MIME['xlsx']
+    if clave in formatos_oficiales.GENERADORES:
+        return nombre, formatos_oficiales.GENERADORES[clave](elegidos, escuela, ciclo, hoy), MIME['xlsx']
     hojas = listas(elegidos, escuela, ciclo, salud=clave == 'emergencia')
     if formato == 'xlsx':
         return nombre, _excel(hojas), MIME['xlsx']

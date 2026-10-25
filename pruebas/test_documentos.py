@@ -131,7 +131,8 @@ def test_el_panel_arma_documentos_con_las_listas_de_aqui_si_no_esta_la_pc_4(ento
     assert pedir(url, '/api/escuela/guardar', ESCUELA, token)[1]['completa'] is True
     codigo, lista = pedir(url, '/api/documentos', cabeceras=token)
     assert codigo == 200 and lista['escuela']['completa'] and 'PC 4' in lista['aviso']
-    assert {d['clave'] for d in lista['documentos']} == {'911', 'constancia', 'lista', 'emergencia', 'vive_saludable'}
+    assert {d['clave'] for d in lista['documentos']} == {'911', 'constancia', 'lista', 'emergencia', 'vive_saludable', 'metadato', 'base_911',
+                                                       'condicion', 'calificaciones', 'boleta', 'asistencias'}
     grupo = pedir(url, '/api/grupos', cabeceras=token)[1]['grupos'][0]['id']
     alumno = pedir(url, f'/api/grupo?id={grupo}', cabeceras=token)[1]['alumnos'][0]['id']
     solicitud = urllib.request.Request(url + '/api/documentos/generar', json.dumps({'clave': 'constancia', 'formato': 'docx', 'grupo_id': grupo,
