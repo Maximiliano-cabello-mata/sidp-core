@@ -120,6 +120,22 @@ def test_lo_que_lee_solo_el_ocr_o_dos_lecturas_distintas_queda_por_confirmar(mon
     assert salida['telefono']['detalle']['otra_lectura'] == '722 128 4567'
 
 
+def test_la_fecha_de_nacimiento_sale_de_la_curp_y_ninguna_lo_confirma_una_persona():
+    curp = generar.curp('GAHJ200512HMCRRNA')
+    lista = [campos.campo('curp', 'CURP', 'curp', 'alumno'), campos.campo('fecha_nacimiento', 'Fecha de nacimiento', 'fecha', 'alumno'),
+             campos.campo('alergias', 'Alergias', 'lista', 'salud', 'alergia')]
+    # El modelo no leyó la fecha: sale de la CURP, que cuadra su dígito.
+    salida = {r['clave']: r for r in taller.combinar(lista, {'curp': (curp, 'texto')}, {'alergias': {'valor': 'Negadas', 'seguro': False}}, {}, HOY)}
+    assert (salida['fecha_nacimiento']['valor'], salida['fecha_nacimiento']['metodo']) == ('2020-05-12', 'curp')
+    assert salida['fecha_nacimiento']['confianza'] == 'media'
+    # "Negadas" no se guarda como dato y queda por confirmar: si era una alergia mal leída, la ve una persona.
+    assert salida['alergias']['nada'] and salida['alergias']['confianza'] == 'baja'
+    # Si la fecha leída no es la de la CURP, se avisa con las dos.
+    otra = {r['clave']: r for r in taller.combinar(lista, {'curp': (curp, 'texto')}, {'fecha_nacimiento': {'valor': '12-mayo-2019', 'seguro': True}}, {}, HOY)}
+    assert otra['fecha_nacimiento']['confianza'] == 'baja' and otra['fecha_nacimiento']['detalle']['otra_lectura'] == '2020-05-12'
+    assert campos.fecha('14-marzo-2018') == '2018-03-14' and campos.fecha('14 de marzo del 2018') == '2018-03-14'
+
+
 def test_la_medicion_de_letra_a_mano_cuenta_aciertos_sin_sacar_datos(tmp_path, monkeypatch):
     pytest.importorskip('cv2')
     import csv

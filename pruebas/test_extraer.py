@@ -31,6 +31,31 @@ def test_del_acta_y_la_ine_salen_el_alumno_y_la_madre():
     assert propuesta['tutor']['nombres'] == 'MARIA ELENA' and propuesta['tutor']['parentesco'] == 'madre'
 
 
+def test_el_acta_del_tutor_no_se_confunde_con_la_del_alumno():
+    madre = generar.curp('RASE880521MMCMTL0')
+    acta_madre = generar.acta('MARIA ELENA', 'RAMOS', 'SOTO', '21/05/1988', 'MUJER', madre, 'PEDRO RAMOS DIAZ', 'ANA SOTO CRUZ')
+    paginas = extraer.agrupar([{'texto': ACTA}, {'texto': acta_madre}])
+    assert [p['tipo'] for p in paginas] == ['acta_alumno', 'acta_tutor']
+    propuesta = extraer.proponer(paginas)
+    # Antes, las dos actas se leían como del niño: los abuelos salían como sus padres.
+    assert propuesta['alumno']['curp'] == CURP
+    assert propuesta['extraidos']['padres_en_acta'] == {'padre': 'JUAN PEREZ LOPEZ', 'madre': 'MARIA ELENA RAMOS SOTO'}
+    assert propuesta['tutor']['curp'] == madre and propuesta['tutor']['parentesco'] == 'madre'
+
+
+def test_la_edad_del_acta_sale_de_su_fecha_de_nacimiento_de_la_curp_o_de_sus_fechas():
+    import datetime
+    hoy = datetime.date(2026, 10, 25)
+    papa = generar.curp('PELJ850101HMCRPN0')
+    assert extraer.de_adulto('Fecha de nacimiento: 01/01/1985', hoy)
+    assert not extraer.de_adulto('Fecha de nacimiento: 14/03/2018', hoy)
+    # Sin la CURP del niño (el OCR no la leyó) pero con su fecha de nacimiento, sigue siendo del niño.
+    assert not extraer.de_adulto(f'Fecha de nacimiento: 14/03/2018\nPadre: JUAN PEREZ LOPEZ {papa}', hoy)
+    assert extraer.de_adulto(f'Persona registrada {papa}', hoy) and not extraer.de_adulto(f'{CURP} {papa}', hoy)
+    assert extraer.de_adulto('Registro: 3/02/1985  Impresa el 10/01/2025', hoy)
+    assert not extraer.de_adulto('ACTA DE NACIMIENTO sin fechas legibles', hoy)
+
+
 def test_si_la_ine_es_de_otra_persona_se_lee_su_nombre_y_se_avisa():
     ine = 'INSTITUTO NACIONAL ELECTORAL\nCREDENCIAL PARA VOTAR\nNOMBRE\nVARGAS\nLUNA\nRICARDO\nDOMICILIO\nCALLE ROBLE 22'
     propuesta = extraer.proponer(extraer.agrupar([{'texto': ACTA}, {'texto': ine}]))

@@ -204,7 +204,9 @@ def combinar(campos, procesos, vistos, identidad, hoy):
         limpio_p, detalle_p = campos_mod.limpiar(c['tipo'], de_proceso, hoy) if de_proceso else (None, {})
         limpio_v, detalle_v = campos_mod.limpiar(c['tipo'], crudo_visto, hoy) if crudo_visto and not campos_mod.vacio(crudo_visto) else (None, {})
         if c['tipo'] == 'lista' and crudo_visto and campos_mod.vacio(crudo_visto):
-            salida.append({**c, 'valores': [], 'confianza': 'media', 'metodo': 'vision', 'nada': True})
+            # "Ninguna" lo confirma una persona: si el modelo no leyó bien una alergia escrita, no se pierde sin que nadie la vea.
+            nada_seguro = visto.get('seguro') or (de_proceso and campos_mod.vacio(de_proceso))
+            salida.append({**c, 'valores': [], 'confianza': 'media' if nada_seguro else 'baja', 'metodo': 'vision', 'nada': True})
             continue
         if limpio_p and limpio_v:
             iguales = comparador.normalizar(str(limpio_p)) == comparador.normalizar(str(limpio_v))
@@ -236,6 +238,30 @@ def combinar(campos, procesos, vistos, identidad, hoy):
         valores = campos_mod.lista(valor) if c['tipo'] == 'lista' else [valor]
         salida.append({**c, 'valores': valores, 'valor': valor, 'detalle': {**detalle, **({'de': c['de']} if c.get('de') else {})},
                        'confianza': confianza, 'metodo': metodo})
+    return de_la_curp(campos, salida)
+
+
+def de_la_curp(campos, salida):
+    """La fecha de nacimiento sale de la CURP de la misma persona: si no se leyó, se propone; si se leyó otra, se avisa."""
+    for c in campos:
+        if c['tipo'] != 'fecha' or c['campo'] != 'fecha_nacimiento':
+            continue
+        curp = next((r for r in salida if r['tipo'] == 'curp' and r['categoria'] == c['categoria'] and r.get('valor')), None)
+        desglose = comparador.desglose_curp(str(curp['valor'])) if curp else None
+        if not desglose:
+            continue
+        de_curp = desglose['fecha']
+        leido = next((r for r in salida if r['clave'] == c['clave']), None)
+        if leido is None:
+            segura = curp['confianza'] in ('alta', 'confirmado') and desglose['digito_valido']
+            salida.append({**c, 'valores': [de_curp], 'valor': de_curp, 'detalle': {'de_la_curp': curp['valor']},
+                           'confianza': 'media' if segura else 'baja', 'metodo': 'curp'})
+        elif leido.get('confirma_lista'):
+            continue
+        elif str(leido.get('valor')) != de_curp:
+            leido.update(confianza='baja', detalle={**(leido.get('detalle') or {}), 'otra_lectura': de_curp, 'segun_curp': True})
+        elif leido['confianza'] == 'baja':
+            leido['confianza'] = 'media'
     return salida
 
 

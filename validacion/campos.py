@@ -206,7 +206,7 @@ def fecha(texto, hoy=None):
         d, me, a = int(m[1]), ROMANOS.get(m[2]), int(m[3])
         if not me:
             return None
-    elif m := re.search(r'\b(\d{1,2})\s*(?:DE\s*)?([A-Z]{3,10})\.?\s*(?:DE\s*)?(\d{2,4})\b', t):
+    elif m := re.search(r'\b(\d{1,2})[-/.\s]*(?:DE\s*)?([A-Z]{3,10})\.?[-/.\s]*(?:DE\s*)?(\d{2,4})\b', t):  # 14-marzo-2018
         d, me, a = int(m[1]), MESES.get(m[2]) or MESES.get(m[2][:3]), int(m[3])
         if not me:
             return None
@@ -375,7 +375,8 @@ def _palabras_originales(renglon):
 def pregunta(nombre_documento, campos):
     renglones = '\n'.join(f'- {c["clave"]}: {c["etiqueta"]}' for c in campos)
     return (f'Hoja: {nombre_documento}. Copia cada campo tal como está escrito en la hoja, incluida la letra a mano. '
-            'Si el campo no aparece, deja el valor vacío. Si no se entiende bien, escribe lo que más se parezca y pon ? '
+            'Si el campo no aparece, deja el valor vacío. Si el campo dice que no hay nada ("ninguna", "no", "negadas" o una raya), '
+            'escribe NINGUNA. Si no se entiende bien, escribe lo que más se parezca y pon ? '
             f'al final. No inventes datos.\nCampos:\n{renglones}')
 
 

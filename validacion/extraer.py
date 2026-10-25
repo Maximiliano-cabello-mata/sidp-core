@@ -194,7 +194,29 @@ def tipo_de(texto, plantillas=None):
     puntos = {p['clave']: sum(parece(texto, [m]) for m in p['textos']) for p in plantillas
               if p.get('fabrica') and p['clave'] != 'acta_tutor'}
     mejor = max(puntos, key=puntos.get, default=None)
+    if mejor == 'acta_alumno' and de_adulto(texto):
+        return 'acta_tutor'
     return mejor if mejor and puntos[mejor] else None
+
+
+def de_adulto(texto, hoy=None):
+    """True si el acta es de un adulto (la del tutor): las dos actas dicen lo mismo, cambia la edad de la persona registrada.
+
+    Decide, en este orden: la fecha que sigue a "Fecha de nacimiento" (la primera es la de la persona registrada), la CURP
+    más joven (en el acta del niño, las de los padres son mayores) y, sin ninguna de las dos, la fecha más antigua del acta
+    (la de la copia impresa es reciente en las dos). Sin fechas ni CURP, se queda como acta del alumno y la persona lo cambia si hace falta.
+    """
+    hoy = hoy or datetime.date.today()
+    adulto = lambda fecha: (hoy - fecha).days / 365.25 >= 15
+    etiqueta = re.search(r'FECHA\W+DE\W+NACIMIENTO\W*(.{0,40})', mayusculas(texto))
+    nacido = [f for f in fechas(etiqueta[1]) if f <= hoy] if etiqueta else []
+    if nacido:
+        return adulto(nacido[0])
+    nacimientos = [datetime.date.fromisoformat(comparador.desglose_curp(c)['fecha']) for c in curps(texto, exigir_digito=False)]
+    if nacimientos:
+        return adulto(max(nacimientos))
+    pasadas = [f for f in fechas(texto) if f <= hoy]
+    return bool(pasadas) and adulto(min(pasadas))
 
 
 def agrupar(paginas, plantillas=None):
@@ -284,6 +306,14 @@ def proponer(paginas, hoy=None):
         if tutor and (persona.get('curp') and persona['curp'] == tutor.get('curp')
                       or comparador.normalizar(completo(persona)) == comparador.normalizar(completo(tutor))):
             tutor['parentesco'] = parentesco
+    acta_tutor = textos.get('acta_tutor', '')
+    if acta_tutor and not tutor.get('curp'):  # Sin CURP en la INE, la del acta del tutor (la más joven: las otras son de sus padres).
+        propias = sorted(curps(acta_tutor), key=lambda c: comparador.desglose_curp(c)['fecha'], reverse=True)
+        if propias:
+            tutor = {**(_nombre_con_etiquetas(acta_tutor) or {}), **tutor, **_persona(acta_tutor, propias[0])}
+            for parentesco, persona in padres.items():
+                if persona.get('curp') == tutor['curp'] or comparador.normalizar(completo(persona)) == comparador.normalizar(completo(tutor)):
+                    tutor['parentesco'] = parentesco
     if not tutor and padres and not ine:
         parentesco = 'madre' if 'madre' in padres else 'padre'
         tutor = {**padres[parentesco], 'parentesco': parentesco}
