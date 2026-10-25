@@ -1,0 +1,80 @@
+﻿diff --git a/validacion/aplicacion.py b/validacion/aplicacion.py
+index ae3248b..f9a2ff6 100644
+--- a/validacion/aplicacion.py
++++ b/validacion/aplicacion.py
+@@ -38,7 +38,7 @@ from validacion.servicio import Bandeja, ErrorBandeja
+ RAIZ = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))
+ INTERFAZ = RAIZ / 'validacion' / 'interfaz'
+ PUERTO = 8770
+-MAXIMO_ENVIO = 100 * 1024 * 1024
++MAXIMO_ENVIO = 1024 * 1024 * 1024
+ ESTATICOS = {'/estilo.css': 'estilo.css', '/motor.js': 'motor.js'}
+ LOCALES = ('127.0.0.1', '::1')
+ # Desde otra PC, cada ruta pide un permiso del rol (validacion/cuentas.py). Gana el primer prefijo que coincide;
+@@ -212,7 +212,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
+             if largo < 0:
+                 raise ErrorBandeja('Envío no válido')
+             if largo > MAXIMO_ENVIO:
+-                raise ErrorBandeja('El envío es demasiado grande (máximo 100 MB)')
++                raise ErrorBandeja('El envío es demasiado grande (máximo 1 GB)')
+             return self.rfile.read(largo)
+ 
+         def do_GET(self):
+diff --git a/validacion/cerebro_red.py b/validacion/cerebro_red.py
+index e8e4dcf..e94c310 100644
+--- a/validacion/cerebro_red.py
++++ b/validacion/cerebro_red.py
+@@ -41,9 +41,9 @@ from validacion import taller as taller_mod, vision
+ 
+ PUERTO = 8771
+ MAXIMO = 4096  # Una pregunta son dos textos cortos; nada más grande pasa.
+-MAXIMO_EXPEDIENTE = 80 * 1024 * 1024  # Fotos de un expediente completo, en base64.
++MAXIMO_EXPEDIENTE = 800 * 1024 * 1024  # Fotos de un expediente completo, en base64.
+ MAXIMO_PADRON = 4 * 1024 * 1024  # Toda la escuela: unos cientos de alumnos.
+-MAXIMO_RESPALDO = 90 * 1024 * 1024  # Un archivo de respaldo (hasta 60 MB) en base64.
++MAXIMO_RESPALDO = 900 * 1024 * 1024  # Un archivo de respaldo (hasta 60 MB) en base64.
+ MAXIMO_INVENTARIO = 256 * 1024
+ TIPOS = ('nombre', 'domicilio')
+ 
+diff --git a/validacion/respaldo.py b/validacion/respaldo.py
+index b0c3e68..db6449c 100644
+--- a/validacion/respaldo.py
++++ b/validacion/respaldo.py
+@@ -16,7 +16,7 @@ import tempfile
+ import urllib.request
+ from pathlib import Path, PurePosixPath
+ 
+-MAXIMO_ARCHIVO = 60 * 1024 * 1024
++MAXIMO_ARCHIVO = 800 * 1024 * 1024
+ NO_SE_RESPALDA = {'configuracion.json'}  # Trae la clave del cerebro: la PC 4 ya la tiene.
+ # La ventana de SIDP (el perfil de Edge: caché, cookies) se rehace sola y Edge tiene sus archivos bloqueados.
+ CARPETAS_SIN_RESPALDO = {'ventana'}
+diff --git a/validacion/servicio.py b/validacion/servicio.py
+index aa21803..51fdc87 100644
+--- a/validacion/servicio.py
++++ b/validacion/servicio.py
+@@ -39,12 +39,12 @@ BEGIN SELECT RAISE(ABORT, 'Las decisiones no se borran'); END;
+ """
+ LISTO = 'listo para autorizar'
+ EN_PAPEL = 'validado en papel'  # Expedientes que la escuela ya revisó y solo se escanean.
+-MAXIMO_ESCANEO = 60 * 1024 * 1024
++MAXIMO_ESCANEO = 800 * 1024 * 1024
+ MAXIMO_CLASIFICAR = 3  # Hojas no reconocidas por lote que la IA de la PC 4 mira para decir qué documento parecen.
+-MAXIMO_TANDA = 40 * 1024 * 1024  # Lo que se manda al cerebro de una vez (en base64 crece un tercio).
++MAXIMO_TANDA = 150 * 1024 * 1024  # Lo que se manda al cerebro de una vez (en base64 crece un tercio).
+ ESPACIOS = ('acta_alumno', 'certificado_medico', 'boleta', 'ine_tutor', 'acta_tutor', 'comprobante')
+ ACEPTADOS = lector.PDF | lector.IMAGEN
+-MAXIMO_ARCHIVO = 15 * 1024 * 1024
++MAXIMO_ARCHIVO = 200 * 1024 * 1024
+ 
+ 
+ def partir_pdf(contenido):
+@@ -354,7 +354,7 @@ class Bandeja:
+             extension = Path(nombre).suffix.lower()
+             if extension not in ACEPTADOS or not 0 < len(contenido) <= MAXIMO_ESCANEO:
+                 shutil.rmtree(carpeta, ignore_errors=True)
+-                raise ErrorBandeja(f'Archivo no aceptado: {nombre} (PDF o foto, hasta 60 MB)')
++                raise ErrorBandeja(f'Archivo no aceptado: {nombre} (PDF o foto, hasta 800 MB)')
+             partes = partir_pdf(contenido) if extension in lector.PDF else [contenido]
+             for numero, parte in enumerate(partes, 1):
+                 archivo = f'p{len(paginas) + 1:03d}{extension}'
