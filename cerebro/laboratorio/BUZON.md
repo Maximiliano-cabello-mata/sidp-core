@@ -1053,3 +1053,35 @@ git push origin claude/project-thread-vp6ab8
 
 Si al subir se abre una ventana para entrar a GitHub, pídele a Maximiliano que entre con su cuenta. Al final avísale
 que ya se subió y qué le falta a él (el paso 9 o el disco del paso 10).
+
+## Tarea 020: respaldo en el disco D: y prueba de reinicio (2026-10-25)
+
+**Para el agente del servidor** (el mismo de la Tarea 019). La Tarea 019 quedó bien. Faltan dos cosas: que el respaldo
+salga del disco C: mientras llega un disco externo, y comprobar que todo arranca solo después de reiniciar (el
+`vigia.log` de la 019 midió desde que se instalaron los servicios, no desde un reinicio). Las reglas de la Tarea 019
+siguen igual. No borres nada.
+
+1. Revisa si `D:` es otro disco físico o solo otra parte del mismo disco que `C:`:
+   ```
+   Get-Partition -DriveLetter C, D | Select-Object DriveLetter, DiskNumber
+   Get-Disk | Select-Object Number, FriendlyName, BusType, @{n='GB'; e={[math]::Round($_.Size / 1GB)}}
+   ```
+2. **Solo si** `C:` y `D:` tienen distinto `DiskNumber`, manda ahí el respaldo (agrega `-ComoSistema` al último renglón si
+   la 019 lo usó). Si tienen el mismo número, no hagas este paso: un respaldo en el mismo disco no sirve.
+   ```
+   $disco = 'D:'
+   New-Item -ItemType Directory -Force "$disco\SIDP-respaldo\servidor", "$disco\SIDP-respaldo\base" | Out-Null
+   Add-Content -Encoding UTF8 C:\SIDP-datos\servicios\ajustes.ps1 "`$env:SIDP_RESPALDO = '$disco\SIDP-respaldo\servidor'", "`$env:SIDP_RESPALDOS = '$disco\SIDP-respaldo\base'"
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -MismaPC
+   ```
+   El servidor manda su copia cada hora. Después de una hora, comprueba:
+   ```
+   Get-ChildItem "$disco\SIDP-respaldo" -Recurse -File | Measure-Object Length -Sum | Select-Object Count, @{n='MB'; e={[math]::Round($_.Sum / 1MB, 1)}}
+   ```
+3. Cuando Maximiliano diga que nadie usa el servidor, pídele que lo reinicie y que espere 6 minutos antes de pedirte
+   que sigas. Corre `powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1` y copia las últimas 10
+   líneas de `C:\SIDP-datos\registros\vigia.log`. Si el cerebro no quedó listo solo, corre el instalador con
+   `-MismaPC -ComoSistema` y repite este paso.
+4. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea020.md` (con la fecha de hoy) con la salida de los pasos 1 a 3
+   y cualquier error completo, sin IP, claves, nombres ni CURP. Súbelo solo a él, como siempre (`git add` de ese
+   archivo, `commit`, `pull --rebase`, `push`).
