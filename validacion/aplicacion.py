@@ -38,7 +38,7 @@ from validacion.servicio import Bandeja, ErrorBandeja
 RAIZ = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))
 INTERFAZ = RAIZ / 'validacion' / 'interfaz'
 PUERTO = 8770
-MAXIMO_ENVIO = 100 * 1024 * 1024
+MAXIMO_ENVIO = 400 * 1024 * 1024  # Un escaneo de 250 MB llega en base64.
 ESTATICOS = {'/estilo.css': 'estilo.css', '/motor.js': 'motor.js'}
 LOCALES = ('127.0.0.1', '::1')
 # Desde otra PC, cada ruta pide un permiso del rol (validacion/cuentas.py). Gana el primer prefijo que coincide;
@@ -212,7 +212,7 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
             if largo < 0:
                 raise ErrorBandeja('Envío no válido')
             if largo > MAXIMO_ENVIO:
-                raise ErrorBandeja('El envío es demasiado grande (máximo 100 MB)')
+                raise ErrorBandeja('El envío es demasiado grande (máximo 400 MB)')
             return self.rfile.read(largo)
 
         def do_GET(self):

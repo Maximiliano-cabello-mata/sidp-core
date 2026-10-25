@@ -39,7 +39,7 @@ BEGIN SELECT RAISE(ABORT, 'Las decisiones no se borran'); END;
 """
 LISTO = 'listo para autorizar'
 EN_PAPEL = 'validado en papel'  # Expedientes que la escuela ya revisó y solo se escanean.
-MAXIMO_ESCANEO = 60 * 1024 * 1024
+MAXIMO_ESCANEO = 250 * 1024 * 1024  # El PDF de un grupo entero escaneado a color.
 MAXIMO_CLASIFICAR = 3  # Hojas no reconocidas por lote que la IA de la PC 4 mira para decir qué documento parecen.
 MAXIMO_TANDA = 40 * 1024 * 1024  # Lo que se manda al cerebro de una vez (en base64 crece un tercio).
 ESPACIOS = ('acta_alumno', 'certificado_medico', 'boleta', 'ine_tutor', 'acta_tutor', 'comprobante')
@@ -354,7 +354,7 @@ class Bandeja:
             extension = Path(nombre).suffix.lower()
             if extension not in ACEPTADOS or not 0 < len(contenido) <= MAXIMO_ESCANEO:
                 shutil.rmtree(carpeta, ignore_errors=True)
-                raise ErrorBandeja(f'Archivo no aceptado: {nombre} (PDF o foto, hasta 60 MB)')
+                raise ErrorBandeja(f'Archivo no aceptado: {nombre} (PDF o foto, hasta 250 MB)')
             partes = partir_pdf(contenido) if extension in lector.PDF else [contenido]
             for numero, parte in enumerate(partes, 1):
                 archivo = f'p{len(paginas) + 1:03d}{extension}'

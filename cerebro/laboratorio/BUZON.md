@@ -1085,3 +1085,40 @@ siguen igual. No borres nada.
 4. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea020.md` (con la fecha de hoy) con la salida de los pasos 1 a 3
    y cualquier error completo, sin IP, claves, nombres ni CURP. Súbelo solo a él, como siempre (`git add` de ese
    archivo, `commit`, `pull --rebase`, `push`).
+
+## Tarea 021: medir la lectura con el código nuevo (2026-10-25)
+
+**Para el agente del servidor.** Maximiliano quiere que la lectura de las hojas pase del 80 %. En la Tarea 019 dio
+67 %: casi todo lo que faltó fueron campos vacíos (fechas y "ninguna"). El código nuevo toma la fecha de nacimiento de
+la CURP, le pide al modelo escribir NINGUNA en lugar de dejar el campo vacío, entiende fechas como "14-marzo-2018" y ya
+no confunde el acta del tutor con la del alumno. Aquí solo mides: no cambies `ajustes.ps1`. Las reglas de
+[LEEME.md](LEEME.md) siguen igual; fíjate sobre todo en la 2: **ningún archivo real de la escuela se sube, ni copiado
+como ejemplo, y la clave de la escuela tampoco va en el mensaje del commit.**
+
+1. Trae el código nuevo y reinicia los servicios para que el cerebro también lo use (agrega `-ComoSistema` si la 019
+   lo usó):
+   ```
+   cd C:\SIDP-cerebro\sidp-core
+   git pull
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -MismaPC
+   ```
+2. Hojas inventadas nuevas, más que la vez pasada (6 familias = 12 hojas, con letra clara y fea):
+   ```
+   python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos_021 --cuantas 6 --semilla 21
+   ```
+3. Tres mediciones, una tras otra (cada una tarda de 10 a 25 minutos):
+   ```
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_021 --modelo qwen2.5vl:3b --lecturas 1 --lado 960 --etiqueta actual
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_021 --modelo qwen2.5vl:3b --lecturas 1 --lado 1280 --etiqueta lado1280
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_021 --modelo qwen2.5vl:3b --lecturas 2 --lado 960 --etiqueta dos_lecturas
+   ```
+4. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea021.md` (con la fecha de hoy). Pega completos los tres
+   `resumen_lectura_*.md` (solo traen números). **No** subas los `detalle_local_*.csv` ni las hojas. Antes de subir,
+   revisa que el informe no tenga ninguna CURP, teléfono, nombre ni la clave de la escuela. Súbelo solo a él:
+   ```
+   git add cerebro/laboratorio/resultados/AAAA-MM-DD_tarea021.md
+   git commit -m "laboratorio: resultado de la tarea 021"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+   Al final avísale a Maximiliano que ya se subió.
