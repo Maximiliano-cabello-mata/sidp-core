@@ -316,7 +316,7 @@ A continuación se documenta la estructura exacta (hojas, columnas, tipos de dat
 3. **Consejo Escolar de Participación Social en la Educación (`CEPSE`):**
    - `ACTA CONSTITUTIVA DE C.E.P.S.E.xlsx`: Integra padres de familia, docentes y directivo en comités de Protección Civil, Salud, Lectura, Mejoramiento de Infraestructura y Contraloría Social.
 4. **Comisión de Seguridad y Salud en el Trabajo (`CSST` — ISSSTE / SEIEM):**
-   - `5_Neza_CSST_ACTA DE RECORRIDO MARZO PRIMER PERIODO.xlsx`: Hojas `Hoja 1 Anverso`, `Hoja 1 Reverso`, `Hoja 2 Anverso`, `Hoja 2 Reverso`, vinculadas por Clave de Comisión (`1511915097962007` para el CCT). Reporta condiciones de riesgo del inmueble (instalaciones eléctricas, sanitarias, extintores, señalética, humedad/filtraciones).
+   - `5_Neza_CSST_ACTA DE RECORRIDO MARZO PRIMER PERIODO.xlsx`: Hojas `Hoja 1 Anverso`, `Hoja 1 Reverso`, `Hoja 2 Anverso`, `Hoja 2 Reverso`, vinculadas por Clave de Comisión (`[clave de comisión]` para el CCT). Reporta condiciones de riesgo del inmueble (instalaciones eléctricas, sanitarias, extintores, señalética, humedad/filtraciones).
 5. **Seguro Escolar contra Accidentes (`CONCENTRADO SEGURO ESCOLAR.xlsx`):**
    - Hojas `DATOS SE` y `DATOS` (catálogo oficial de hospitales, tipos de lesión y lugares del accidente).
 6. **COSE — Solicitud de Modificaciones de Oferta y Ubicación (`2. Solictud de Modificaciones_.xlsx`):**
@@ -497,7 +497,7 @@ flowchart TD
   - **Fase 4 (`3° y 4°`)**: *EIA 1: "De allá vengo… de aquí soy"* (14 incisos) y *EIA 2: "La falta de agua, un problema que nos afecta"* (12 incisos) (**26 incisos en total**).
   - **Fase 5 (`5° y 6°`)**: *EIA 1: "Somos lo que comemos"* (10 incisos) y *EIA 2: "Actuemos contra la violencia infantil"* (15 incisos) (**25 incisos en total**).
 - **Captura en `FRVP` y Estadística de Zona**:
-  - Hoja `ESC`: Descompone el CCT con `=MID(D9,1,2)` (`15`), `=MID(D9,3,3)` (`DPR`), `=MID(D9,6,4)` (`3027`), `=MID(D9,10,1)` (`Z`).
+  - Hoja `ESC`: Descompone el CCT con `=MID(D9,1,2)` (`15`), `=MID(D9,3,3)` (`DPR`), `=MID(D9,6,4)` (`[número de la escuela]`), `=MID(D9,10,1)` (`[letra de control]`).
   - Hojas `PRIMERO` a `SEXTO`: El docente captura por alumno e inciso el código de rúbrica **`0, 1, 2 o 3`**:
     - `0` = **Sin evidencia (SE)**
     - `1` = **Requiere apoyo (RA)**
