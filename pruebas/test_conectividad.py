@@ -49,11 +49,12 @@ def test_prueba_de_conexion_con_agente_remoto(servidor_tls, tmp_path):
     # "PC2": identidad propia y su propio almacén de pendientes, como en otro equipo.
     token = firma.nuevo_token()
     servicio.crear_directa(preparar(paquete=paquete).bd, 'pc2', 'agente', token)
-    alto = threading.Event()
+    alto, registrado = threading.Event(), threading.Event()
 
     def agente_remoto():
         with red.cliente(url, token, paquete) as cliente, sqlite3.connect(tmp_path / 'pc2.db') as db:
             registrar(cliente)
+            registrado.set()
             while not alto.is_set():
                 ciclo(cliente, db)
                 time.sleep(0.2)
@@ -61,7 +62,8 @@ def test_prueba_de_conexion_con_agente_remoto(servidor_tls, tmp_path):
     hilo = threading.Thread(target=agente_remoto, daemon=True)
     hilo.start()
     try:
-        time.sleep(0.5)
+        # En un runner lento el registro por HTTPS tarda más de medio segundo.
+        assert registrado.wait(20), 'el agente de pc2 no se registró'
         lineas = []
         informe = conectividad.ejecutar(url=url, espera=20, aviso=lineas.append)
         estados = {p['prueba']: p['estado'] for p in informe.pruebas}

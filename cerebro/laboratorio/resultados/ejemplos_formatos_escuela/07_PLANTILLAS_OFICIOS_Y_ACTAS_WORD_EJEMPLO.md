@@ -1,6 +1,6 @@
 # Plantillas Estructuradas de Formatos Word (`.docx`) — Directivos y Profesores (SEIEM / Zona 49)
 
-Este archivo contiene las plantillas textuales y tabulares exactas extraídas de los formatos Word utilizados en la escuela primaria (**CCT `15DPR3027Z`**, Sector `II`, Zona `49`, SEIEM), completamente anonimizadas y parametrizadas con variables `{{...}}` para su automatización directa en `sidp-core`.
+Este archivo contiene las plantillas textuales y tabulares exactas extraídas de los formatos Word utilizados en la escuela primaria (**CCT `[CCT]`**, Sector `II`, Zona `49`, SEIEM), completamente anonimizadas y parametrizadas con variables `{{...}}` para su automatización directa en `sidp-core`.
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "escuela_referencia": {
     "nombre": "ESCUELA PRIMARIA PROFR. DELFINO PANDO MEDINA",
-    "cct": "15DPR3027Z",
+    "cct": "[CCT de la escuela]",
     "sector": "II (02)",
     "zona_escolar": "49",
     "subdireccion": "SUBDIRECCION DE EDUCACION PRIMARIA EN LA REGION DE NEZAHUALCOYOTL (SEIEM)",
@@ -19,429 +19,287 @@
   "metadato_71_columnas": [
     {
       "col": 1,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": 2,
-      "encabezado_fila4": 3
+      "bloque": "ALUMNO"
     },
     {
       "col": 2,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 3,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 4,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 5,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "5245936",
-      "encabezado_fila4": "5408220"
+      "bloque": "ALUMNO"
     },
     {
       "col": 6,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "ALVAREZ",
-      "encabezado_fila4": "ANGELES"
+      "bloque": "ALUMNO"
     },
     {
       "col": 7,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "MENDEZ",
-      "encabezado_fila4": "RUIZ"
+      "bloque": "ALUMNO"
     },
     {
       "col": 8,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "ERIKA DANAE",
-      "encabezado_fila4": "IAN SANTIAGO"
+      "bloque": "ALUMNO"
     },
     {
       "col": 9,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "1",
-      "encabezado_fila4": "1"
+      "bloque": "ALUMNO"
     },
     {
       "col": 10,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "A",
-      "encabezado_fila4": "A"
+      "bloque": "ALUMNO"
     },
     {
       "col": 11,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "AAME200202MMCLNRA7",
-      "encabezado_fila4": "AERI200216HMCNZNA0"
+      "bloque": "ALUMNO"
     },
     {
       "col": 12,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "M",
-      "encabezado_fila4": "H"
+      "bloque": "ALUMNO"
     },
     {
       "col": 13,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "SOLTERO (A)",
-      "encabezado_fila4": "SOLTERO (A)"
+      "bloque": "ALUMNO"
     },
     {
       "col": 14,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "NO TRABAJA",
-      "encabezado_fila4": "NO TRABAJA"
+      "bloque": "ALUMNO"
     },
     {
       "col": 15,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "02/02/2020",
-      "encabezado_fila4": "16/02/2020"
+      "bloque": "ALUMNO"
     },
     {
       "col": 16,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "MEXICO",
-      "encabezado_fila4": "MEXICO"
+      "bloque": "ALUMNO"
     },
     {
       "col": 17,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "ESTADO DE MEXICO",
-      "encabezado_fila4": "ESTADO DE MEXICO"
+      "bloque": "ALUMNO"
     },
     {
       "col": 18,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "ESPAÑOL",
-      "encabezado_fila4": "ESPAÑOL"
+      "bloque": "ALUMNO"
     },
     {
       "col": 19,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 20,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 21,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 22,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "CURP",
-      "encabezado_fila4": "CURP"
+      "bloque": "ALUMNO"
     },
     {
       "col": 23,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "AAME200202MMCLNRA7",
-      "encabezado_fila4": "AERI200216HMCNZNA0"
+      "bloque": "ALUMNO"
     },
     {
       "col": 24,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "NORTE 19",
-      "encabezado_fila4": "XOCHIMILCO"
+      "bloque": "ALUMNO"
     },
     {
       "col": 25,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "ARBOLEDAS",
-      "encabezado_fila4": "ANAHUAC"
+      "bloque": "ALUMNO"
     },
     {
       "col": 26,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "AVENIDA MANUEL AVILA CAMACHO",
-      "encabezado_fila4": "TLAXOCHIMACO"
+      "bloque": "ALUMNO"
     },
     {
       "col": 27,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "MZA 35 LT 9",
-      "encabezado_fila4": "MZA 8 LT 16"
+      "bloque": "ALUMNO"
     },
     {
       "col": 28,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "S/D",
-      "encabezado_fila4": "S/D"
+      "bloque": "ALUMNO"
     },
     {
       "col": 29,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "ENFRENTE HAY UNA TIENDA",
-      "encabezado_fila4": "S/D"
+      "bloque": "ALUMNO"
     },
     {
       "col": 30,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "56605",
-      "encabezado_fila4": "55067"
+      "bloque": "ALUMNO"
     },
     {
       "col": 31,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "AGRARISTA",
-      "encabezado_fila4": "CIUDAD CUAUHTÉMOC SECCIÓN CUITLAHUAC"
+      "bloque": "ALUMNO"
     },
     {
       "col": 32,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "MÉXICO",
-      "encabezado_fila4": "MÉXICO"
+      "bloque": "ALUMNO"
     },
     {
       "col": 33,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "CHALCO",
-      "encabezado_fila4": "ECATEPEC DE MORELOS"
+      "bloque": "ALUMNO"
     },
     {
       "col": 34,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "CHALCO",
-      "encabezado_fila4": "ECATEPEC DE MORELOS"
+      "bloque": "ALUMNO"
     },
     {
       "col": 35,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": "5548814184  ",
-      "encabezado_fila4": "5522669262  "
+      "bloque": "ALUMNO"
     },
     {
       "col": 36,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 37,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 38,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 39,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "ALUMNO"
     },
     {
       "col": 40,
-      "bloque": "ALUMNO",
-      "encabezado_fila3": null,
-      "encabezado_fila4": "MONSERRAT43O@GMAIL.COM"
+      "bloque": "ALUMNO"
     },
     {
       "col": 41,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "MENDEZ",
-      "encabezado_fila4": "ANGELES"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 42,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "AQUINO",
-      "encabezado_fila4": "RUIZ"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 43,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "ERIKA",
-      "encabezado_fila4": "LAURA MONSERRAT"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 44,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "MEAE850901MDFNQR07",
-      "encabezado_fila4": "AERL010304MMCNZRA2"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 45,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "PADRE/MADRE",
-      "encabezado_fila4": "PADRE/MADRE"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 46,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "LICENCIATURA O EQUIVALENTE",
-      "encabezado_fila4": "SECUNDARIA"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 47,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "M",
-      "encabezado_fila4": "M"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 48,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "AMASIATO (UNION LIBRE)",
-      "encabezado_fila4": "SOLTERO (A)"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 49,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "01/09/1985",
-      "encabezado_fila4": "04/03/2001"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 50,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "MEXICO",
-      "encabezado_fila4": "MEXICO"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 51,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "DISTRITO FEDERAL",
-      "encabezado_fila4": "ESTADO DE MEXICO"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 52,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "ESPAÑOL",
-      "encabezado_fila4": "ESPAÑOL"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 53,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "CURP",
-      "encabezado_fila4": "CURP"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 54,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "MEAE850901MDFNQR07",
-      "encabezado_fila4": "AERL010304MMCNZRA2"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 55,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "NORTE 19",
-      "encabezado_fila4": "XOCHIMILCO"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 56,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "ARBOLEDAS",
-      "encabezado_fila4": "ANAHUAC"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 57,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "AVENIDA MANUEL AVILA CAMACHO",
-      "encabezado_fila4": "TLAXOCHIMACO"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 58,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "MZA 35 LT 9",
-      "encabezado_fila4": "MZA 8 LT 16"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 59,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "S/D",
-      "encabezado_fila4": "S/D"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 60,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "ENFRENTE HAY UNA TIENDA",
-      "encabezado_fila4": "S/D"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 61,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "56605",
-      "encabezado_fila4": "55067"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 62,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "AGRARISTA",
-      "encabezado_fila4": "CIUDAD CUAUHTÉMOC SECCIÓN CUITLAHUAC"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 63,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "MÉXICO",
-      "encabezado_fila4": "MÉXICO"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 64,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "CHALCO",
-      "encabezado_fila4": "ECATEPEC DE MORELOS"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 65,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "CHALCO",
-      "encabezado_fila4": "ECATEPEC DE MORELOS"
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 66,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "5548814184  ",
-      "encabezado_fila4": "5522669262  "
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 67,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 68,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 69,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 70,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": null,
-      "encabezado_fila4": null
+      "bloque": "MADRE_PADRE_TUTOR"
     },
     {
       "col": 71,
-      "bloque": "MADRE_PADRE_TUTOR",
-      "encabezado_fila3": "ERIKASMALL_85@YAHOO.COM",
-      "encabezado_fila4": "MONSERRAT430@GMAIL.COM"
+      "bloque": "MADRE_PADRE_TUTOR"
     }
   ],
   "layout_77_plus_78_columnas": [

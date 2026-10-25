@@ -45,7 +45,7 @@ La primera vez que el agente sube desde una PC, configura su nombre y correo de 
 Reglas para el agente:
 
 1. Solo agrega archivos en `cerebro/laboratorio/resultados/`. No cambia ningún otro archivo.
-2. Usa solo los datos de `fichas.json`. Nunca datos ni documentos reales, ni la clave de la escuela.
+2. Usa solo los datos de `fichas.json`. Nunca datos ni documentos reales, ni la clave de la escuela. Un Excel "de ejemplo" copiado de un archivo de la escuela sigue trayendo filas reales: los ejemplos se hacen desde cero con datos inventados. Antes de subir, revisa que no haya ninguna CURP, teléfono, domicilio ni la clave de la escuela (tampoco en el mensaje del commit). El repositorio es público.
 3. Ollama sigue solo en `127.0.0.1`.
 4. No descarga modelos ni instala programas sin permiso de Maximiliano.
 5. Antes de subir, hace `git pull --rebase`. Si algo falla, lo anota en el informe y avisa a Maximiliano.

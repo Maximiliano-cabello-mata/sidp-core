@@ -1,8 +1,8 @@
-# Reporte Técnico y Operativo: Análisis Integral de Formatos de Directivos y Profesores (`15DPR3027Z`)
+# Reporte Técnico y Operativo: Análisis Integral de Formatos de Directivos y Profesores (`[CCT]`)
 
 **Fecha:** 2026-10-25  
 **Centro de Trabajo Analizado:** Escuela Primaria *"Profr. Delfino Pando Medina"*  
-**Clave de Centro de Trabajo (CCT):** `15DPR3027Z`  
+**Clave de Centro de Trabajo (CCT):** `[CCT]`  
 **Estructura Educativa:** Sector Educativo `II` (`02`), Zona Escolar `49`, Subdirección de Educación Primaria en la Región de Nezahualcóyotl, **SEIEM / SECTI (Estado de México)**  
 **Modalidad / Turno:** Tiempo Completo / Jornada Ampliada / Horario Extendido (`08:00 a 16:00 hrs`)  
 **Organización Escolar:** 6 grupos (`1° A`, `2° A`, `3° A`, `4° A`, `5° A`, `6° A`), ~192 alumnos, 10 trabajadores físicos (~18–20 plazas presupuestales por doble plaza).  
@@ -44,7 +44,7 @@ A continuación se documenta la estructura exacta (hojas, columnas, tipos de dat
 
 ### BLOQUE A: CONTROL ESCOLAR Y EXPEDIENTE DE ALUMNOS (DIRECTIVOS Y PROFESORES)
 
-#### A.1. Base de Datos Metadato Oficial (`BASE DE DATOS METADATO - 15DPR3027Z.xlsx`)
+#### A.1. Base de Datos Metadato Oficial (`BASE DE DATOS METADATO - [CCT].xlsx`)
 * **Ejemplar en repo:** [`01_METADATO_71_COLUMNAS_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/01_METADATO_71_COLUMNAS_EJEMPLO.xlsx) y [`esquema_columnas_metadato_y_layout77.json`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/esquema_columnas_metadato_y_layout77.json)
 * **Propósito:** Es la base maestra más completa de la escuela. Consta de **71 columnas exactas** divididas en dos grandes bloques: **Datos del Alumno (Cols 1 a 40)** y **Datos de la Madre, Padre o Tutor (Cols 41 a 71)**.
 * **Estructura de encabezados (Filas 1 a 4):**
@@ -142,7 +142,7 @@ A continuación se documenta la estructura exacta (hojas, columnas, tipos de dat
 #### A.3. Sábana de Inscripción Inicial y Estadística Mensual de Movimientos (`INSCRIPCION INICIAL.xlsx` / `ESTADISTICA ESCUELA mayo junio.xlsx`)
 * **Ejemplar en repo:** [`02_ESTADISTICA_911_Y_SABANA_MOVIMIENTOS_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/02_ESTADISTICA_911_Y_SABANA_MOVIMIENTOS_EJEMPLO.xlsx) (hoja `SABANA_MOVIMIENTOS_SINCE`)
 * **Hojas del libro oficial de Zona 49:**
-  1. `DATOS DE IDENTIFICACIÓN`: Datos del CCT (`15DPR3027Z`), Turno (`Tiempo Completo`), Horario, Matrícula Inicial (`H`, `M`, `Total`) por grado y grupo, número de grupos, docentes frente a grupo, directivos, docentes de Educación Física, Inglés y personal de apoyo.
+  1. `DATOS DE IDENTIFICACIÓN`: Datos del CCT (`[CCT]`), Turno (`Tiempo Completo`), Horario, Matrícula Inicial (`H`, `M`, `Total`) por grado y grupo, número de grupos, docentes frente a grupo, directivos, docentes de Educación Física, Inglés y personal de apoyo.
   2. `CONCENTRADO DE MOVIMIENTOS`: Coteja la matrícula oficial registrada en el sistema estatal **SINCE** contra el **RECOLECTOR** interno de la escuela. Desglosa por cada grado (`1°` a `6°`) y sexo (`H` / `M`) **9 tipos de movimientos administrativos**:
      - `INSCRIPCIÓN OMITIDA`
      - `INSCRIPCIÓN INDEBIDA`
@@ -258,7 +258,7 @@ A continuación se documenta la estructura exacta (hojas, columnas, tipos de dat
 | **1 – 7** | **Datos del CT** | `1: IDENTIFICADOR REGISTRO (No. PROGRESIVO)` \| `2: SUBDIRECCION O DEPARTAMENTO` \| `3: CLAVE DEL CENTRO DE TRABAJO` \| `4: SECTOR` \| `5: ZONA` \| `6: NOMBRE DEL CENTRO DE TRABAJO` \| `7: TURNO CT` |
 | **8 – 13** | **Identidad del Trabajador** | `8: RFC` (13 chars) \| `9: CURP` (18 chars) \| `10: NUMERO DE SEGURIDAD SOCIAL NSS` \| `11: NOMBRE(S) TRABAJADOR` \| `12: PRIMER APELLIDO` \| `13: SEGUNDO APELLIDO` |
 | **14 – 17** | **Escolaridad Profesional** | `14: NIVEL DE ESTUDIOS` (código numérico: `13`=Normal, `22`=Lic. Inc., `23`=Lic. Titulado, `26`=Maestría) \| `15: ESPECIALIDAD` \| `16: DOCUMENTO OBTENIDO` (`4`=Acta/Carta, `5`=Título/Cédula) \| `17: NO. DE CÉDULA PROFESIONAL, TÍTULO O CERTIFICADO` |
-| **18 – 25** | **Antigüedad y Estatus** | `18: QUINCENA DE INGRESO A LA SEP` (`AAAQQ`, ej. `201109`) \| `19: QUINCENA DE INGRESO A LA RAMA` \| `20: QUINCENA DE INGRESO A LA FUNCION` \| `21: QUINCENA DE INGRESO AL CENTRO DE TRABAJO` \| `22: AÑOS COMO DOCENTE` \| `23: AÑOS COMO DIRECTOR` \| `24: ESTATUS DEL TRABAJADOR` (`1`=Activo) \| `25: DOBLE PLAZA EN` (`15DPR3027Z` u otro CCT) |
+| **18 – 25** | **Antigüedad y Estatus** | `18: QUINCENA DE INGRESO A LA SEP` (`AAAQQ`, ej. `201109`) \| `19: QUINCENA DE INGRESO A LA RAMA` \| `20: QUINCENA DE INGRESO A LA FUNCION` \| `21: QUINCENA DE INGRESO AL CENTRO DE TRABAJO` \| `22: AÑOS COMO DOCENTE` \| `23: AÑOS COMO DIRECTOR` \| `24: ESTATUS DEL TRABAJADOR` (`1`=Activo) \| `25: DOBLE PLAZA EN` (`[CCT]` u otro CCT) |
 | **26 – 35** | **Clave Presupuestal y Puesto** | `26: CODIGO DE PAGO` (`07`) \| `27: CLAVE DE UNIDAD` (`15`) \| `28: CLAVE DE SUBUNIDAD` (`03`) \| `29: CLAVE DE CATEGORIA` (`E020100`, `E028100`, `E068900`, `A018030`) \| `30: HORAS` (`00.0`) \| `31: NUMERO DE PLAZA` (6 dígitos) \| `32: TIPO NOMBRAMIENTO` (`10`=Base, `95`=Interino ilimitado, `20`=Interino limitado) \| `33: PUESTO` \| `34: DESCRIPCION DE LA FUNCION DEL PUESTO` \| `35: SEXO (M, H)` |
 | **36 – 47** | **Domicilio y Contacto Personal** | `36: NO. DE DOCUMENTO OFICIAL IFE/INE` \| `37: NACIONALIDAD` \| `38: DOMICILIO: CALLE Y NO.` \| `39: COLONIA` \| `40: CLAVE DEL MUNICIPIO` \| `41: NOMBRE DEL MUNICIPIO` \| `42: NOMBRE DE LA LOCALIDAD` \| `43: CLAVE DE LA ENTIDAD FEDERATIVA` \| `44: CODIGO POSTAL` \| `45: PARENTESCO, NOMBRE DE CONTACTO, TELEFONO` \| `46: TELEFONO CELULAR` \| `47: CORREO ELECTRONICO` |
 | **48 – 52** | **Horario y Carrera** | `48: HORA ENTRADA` \| `49: HORA SALIDA` \| `50: DIAS QUE LABORA` \| `51: CARRERA MAGISTERIAL / NIVEL DE SPD / USICAMM` \| `52: FOLIO FEDERAL-INGRESO` |
@@ -290,7 +290,7 @@ A continuación se documenta la estructura exacta (hojas, columnas, tipos de dat
 
 ---
 
-#### C.3. Reporte Mensual de Incidencias de Personal (`REPORTE DE INCIDENCIASMS SEPTIEMBRE 15DPR3027Z.xlsx`)
+#### C.3. Reporte Mensual de Incidencias de Personal (`REPORTE DE INCIDENCIASMS SEPTIEMBRE [CCT].xlsx`)
 * **Ejemplar en repo:** [`05_LAYOUT_77_PLANTILLA_E_INCIDENCIAS_PERSONAL_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/05_LAYOUT_77_PLANTILLA_E_INCIDENCIAS_PERSONAL_EJEMPLO.xlsx) (hoja `REPORTE_INCIDENCIAS_MENSUAL`)
 * **Estructura (46 columnas):**
   - `No.`, `NOMBRE DEL TRABAJADOR`, `FILIACIÓN (RFC)`, seguidas de **31 columnas para los días del mes (`1` al `31`)** y una sección final de `OBSERVACIONES`.
@@ -320,7 +320,7 @@ A continuación se documenta la estructura exacta (hojas, columnas, tipos de dat
 5. **Seguro Escolar contra Accidentes (`CONCENTRADO SEGURO ESCOLAR.xlsx`):**
    - Hojas `DATOS SE` y `DATOS` (catálogo oficial de hospitales, tipos de lesión y lugares del accidente).
 6. **COSE — Solicitud de Modificaciones de Oferta y Ubicación (`2. Solictud de Modificaciones_.xlsx`):**
-   - Hojas `COORDENADAS` (`Latitud: 19.288537, Longitud: -98.904...`), `OFERTA` (Total de aulas y lugares por aula de `1°` a `6°` grado) y `ESCUELAS CERCANAS` (3 CCT vecinos: `15EPR2130E`, `15EPR4386S`, `15EPR4179K`).
+   - Hojas `COORDENADAS` (`Latitud: 19.288537, Longitud: -98.904...`), `OFERTA` (Total de aulas y lugares por aula de `1°` a `6°` grado) y `ESCUELAS CERCANAS` (3 CCT vecinos: `[CCT]`, `[CCT]`, `[CCT]`).
 
 ---
 
@@ -358,13 +358,9 @@ Reemplazar o expandir los 5 generadores actuales por exportadores exactos en `.x
 
 ## 5. Índice de Archivos de Ejemplo Subidos al Repositorio
 
-Todos los ejemplos estructurados y sanitizados (sin ningún dato personal real, cumpliendo estrictamente las reglas de privacidad de `BUZON.md`) se encuentran en:
+> Nota del 2026-10-25: los seis libros `.xlsx` de ejemplo se quitaron del repositorio porque traían filas reales (CURP, domicilios, teléfonos y nombres de tutores). Si hacen falta, se rehacen en la PC con datos inventados. Del JSON se quitaron las filas 3 y 4 del Metadato, que eran datos de alumnos y no encabezados.
 
-* [`01_METADATO_71_COLUMNAS_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/01_METADATO_71_COLUMNAS_EJEMPLO.xlsx) — Libro Excel con las 71 columnas exactas del Metadato (Alumno `1..40` + Tutor `41..71`).
-* [`02_ESTADISTICA_911_Y_SABANA_MOVIMIENTOS_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/02_ESTADISTICA_911_Y_SABANA_MOVIMIENTOS_EJEMPLO.xlsx) — Libro Excel con las fórmulas exactas de extracción de CURP para 911 (`=MID`, `=DATE`, `=DATEDIF`, `=COUNTIFS`) y la Sábana de Movimientos `SINCE`.
-* [`03_CALIFICACIONES_NEM_DISPERSION_Y_BOLETA_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/03_CALIFICACIONES_NEM_DISPERSION_Y_BOLETA_EJEMPLO.xlsx) — Libro Excel con la Base de Boleta NEM (4 Campos Formativos + Observaciones `P1, P2, P3`), Dispersión por niveles de desempeño, Asistencias mensuales y Censo BAP.
-* [`04_EVALUACION_DIAGNOSTICA_EIA_Y_SISAT_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/04_EVALUACION_DIAGNOSTICA_EIA_Y_SISAT_EJEMPLO.xlsx) — Libro Excel con Evaluación Diagnóstica NEM, rúbrica de Ejercicios Integradores (`EIA Fase 3, 4 y 5`) y Diagnóstico de Lectura (`SISAT`).
-* [`05_LAYOUT_77_PLANTILLA_E_INCIDENCIAS_PERSONAL_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/05_LAYOUT_77_PLANTILLA_E_INCIDENCIAS_PERSONAL_EJEMPLO.xlsx) — Libro Excel con las 78 columnas y 4 filas de encabezado del `LAYOUT 77+`, la `PLANTILLA FÍSICA` vinculada por fórmulas y el `REPORTE MENSUAL DE INCIDENCIAS` (días `1..31`).
-* [`06_COMITES_APF_ECE_CEPSE_CSST_SEGURO_COSE_EJEMPLO.xlsx`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/06_COMITES_APF_ECE_CEPSE_CSST_SEGURO_COSE_EJEMPLO.xlsx) — Libro Excel con las estructuras de `APF`, `ECE` (Informe Trimestral de Ingresos y Egresos), `Seguro Escolar` y `COSE`.
+Quedan en:
+
 * [`07_PLANTILLAS_OFICIOS_Y_ACTAS_WORD_EJEMPLO.md`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/07_PLANTILLAS_OFICIOS_Y_ACTAS_WORD_EJEMPLO.md) — Plantillas parametrizadas (`{{...}}`) de todos los formatos Word (`.docx`) de Dirección y Profesores.
 * [`esquema_columnas_metadato_y_layout77.json`](file:///C:/SIDP-cerebro/sidp-core/cerebro/laboratorio/resultados/ejemplos_formatos_escuela/esquema_columnas_metadato_y_layout77.json) — Diccionario JSON legible por máquina con la definición exacta de las 71 columnas del Metadato y las 78 columnas del Layout 77+.
