@@ -35,39 +35,41 @@ ORDINAL = {1: 'primer', 2: 'segundo', 3: 'tercer', 4: 'cuarto', 5: 'quinto', 6: 
 EN_BLANCO = '________________'
 CUIDADO = 'Tiene datos personales de los alumnos: guárdalo en la escuela, no lo mandes por correo ni lo subas a internet.'
 
+# Las secciones de «Formatos oficiales»: a quién se entrega cada formato. El panel las muestra en el orden del catálogo.
+SUP, MAE, FAM = 'Para la supervisión y la SEP', 'Para los maestros', 'Para las familias y los trámites'
 CATALOGO = (
-    {'clave': '911', 'nombre': 'Estadística 911 de inicio de curso', 'boton': 'Bajar el 911 en Excel', 'alcance': 'escuela', 'formatos': ['xlsx'],
+    {'clave': '911', 'seccion': SUP, 'nombre': 'Estadística 911 de inicio de curso', 'boton': 'Bajar el 911 en Excel', 'alcance': 'escuela', 'formatos': ['xlsx'],
      'descripcion': 'Los cuadros del cuestionario 911.3 ya contados: alumnos por grado, sexo y edad, repetidores, grupos, discapacidad, '
                     'lengua indígena, lugar de nacimiento y becas. Trae una hoja «Revisión» que dice si todo cuadra y otra con los alumnos a los que les falta un dato.'},
-    {'clave': 'constancia', 'nombre': 'Constancia de inscripción', 'boton': 'Hacer constancias', 'alcance': 'alumno', 'formatos': ['docx', 'pdf'],
-     'descripcion': 'Para la beca Rita Cetina, el IMSS o cualquier trámite de los padres. De un alumno o de todo el grupo '
-                    '(una hoja por alumno), lista para firmar y sellar.'},
-    {'clave': 'lista', 'nombre': 'Lista de grupo', 'alcance': 'grupo_o_escuela', 'formatos': ['pdf', 'xlsx', 'docx'],
-     'descripcion': 'Número, nombre, CURP, sexo y edad de cada alumno, con cuántos son hombres y mujeres. '
-                    'De un grupo o de toda la escuela (una hoja por grupo).'},
-    {'clave': 'emergencia', 'nombre': 'Lo que la maestra debe saber', 'alcance': 'grupo_o_escuela', 'formatos': ['pdf', 'xlsx'],
-     'descripcion': 'Por grupo: alergias, padecimientos, medicamentos, discapacidad, tutor, teléfono y contacto de emergencia, '
-                    'para tenerlo a la mano en el salón.'},
-    {'clave': 'metadato', 'nombre': 'Base de datos Metadato (71 columnas)', 'boton': 'Bajar el Metadato', 'alcance': 'escuela', 'formatos': ['xlsx'],
-     'descripcion': 'El formato de la supervisión con los datos del alumno (columnas 1 a 40) y del tutor (41 a 71), ya llenos con lo que '
-                    'tiene SIDP. La edad se calcula sola. Lo que quede en blanco se completa antes de entregarlo.'},
-    {'clave': 'base_911', 'nombre': 'Estadística 911: base que se calcula sola', 'boton': 'Bajar la base del 911', 'alcance': 'escuela',
+    {'clave': 'base_911', 'seccion': SUP, 'nombre': 'Estadística 911: base que se calcula sola', 'boton': 'Bajar la base del 911', 'alcance': 'escuela',
      'formatos': ['xlsx'],
      'descripcion': 'La hoja BASE con la CURP de cada alumno: el sexo, la fecha de nacimiento, la edad al 1 de septiembre y los cuadros '
                     'por grado, sexo y edad salen solos. Si se agrega a un alumno a mano, los totales cambian.'},
-    {'clave': 'condicion', 'nombre': 'Censo de condición y discapacidad', 'alcance': 'escuela', 'formatos': ['xlsx'],
+    {'clave': 'metadato', 'seccion': SUP, 'nombre': 'Base de datos Metadato (71 columnas)', 'boton': 'Bajar el Metadato', 'alcance': 'escuela', 'formatos': ['xlsx'],
+     'descripcion': 'El formato de la supervisión con los datos del alumno (columnas 1 a 40) y del tutor (41 a 71), ya llenos con lo que '
+                    'tiene SIDP. La edad se calcula sola. Lo que quede en blanco se completa antes de entregarlo.'},
+    {'clave': 'condicion', 'seccion': SUP, 'nombre': 'Censo de condición y discapacidad', 'alcance': 'escuela', 'formatos': ['xlsx'],
      'descripcion': 'Una hoja por grado con las columnas de condición y de discapacidad, marcadas con X según el certificado médico y lo '
                     'que capturó la escuela. Los totales se cuentan solos.'},
-    {'clave': 'calificaciones', 'nombre': 'Concentrado de calificaciones y dispersión', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
+    {'clave': 'lista', 'seccion': MAE, 'nombre': 'Lista de grupo', 'alcance': 'grupo_o_escuela', 'formatos': ['pdf', 'xlsx', 'docx'],
+     'descripcion': 'Número, nombre, CURP, sexo y edad de cada alumno, con cuántos son hombres y mujeres. '
+                    'De un grupo o de toda la escuela (una hoja por grupo).'},
+    {'clave': 'emergencia', 'seccion': MAE, 'nombre': 'Ficha de salud y emergencia del grupo', 'alcance': 'grupo_o_escuela', 'formatos': ['pdf', 'xlsx'],
+     'descripcion': 'Por grupo: alergias, padecimientos, medicamentos, discapacidad, tutor, teléfono y contacto de emergencia, '
+                    'para tenerlo a la mano en el salón.'},
+    {'clave': 'calificaciones', 'seccion': MAE, 'nombre': 'Concentrado de calificaciones y dispersión', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
      'descripcion': 'Una hoja por grupo con los alumnos ya puestos. El maestro escribe las calificaciones de los cuatro campos formativos; '
                     'el promedio, la dispersión por nivel y el concentrado escolar se calculan solos.'},
-    {'clave': 'boleta', 'nombre': 'Base de datos de la boleta', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
+    {'clave': 'boleta', 'seccion': MAE, 'nombre': 'Base de datos de la boleta', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
      'descripcion': 'Los cuatro campos formativos y sus observaciones de los tres periodos, con grado, grupo, CURP y nombre de cada alumno '
                     'ya escritos.'},
-    {'clave': 'asistencias', 'nombre': 'Concentrado de asistencias y faltas', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
+    {'clave': 'asistencias', 'seccion': MAE, 'nombre': 'Concentrado de asistencias y faltas', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
      'descripcion': 'Una hoja por grupo, de septiembre a julio: asistencias, faltas justificadas y sin justificar. Los días del mes y el '
                     'total del ciclo se suman solos.'},
-    {'clave': 'vive_saludable', 'nombre': 'Lista para Vive Saludable', 'boton': 'Bajar la lista de Vive Saludable', 'alcance': 'grupo_o_escuela',
+    {'clave': 'constancia', 'seccion': FAM, 'nombre': 'Constancia de inscripción', 'boton': 'Hacer constancias', 'alcance': 'alumno', 'formatos': ['docx', 'pdf'],
+     'descripcion': 'Para la beca Rita Cetina, el IMSS o cualquier trámite de los padres. De un alumno o de todo el grupo '
+                    '(una hoja por alumno), lista para firmar y sellar.'},
+    {'clave': 'vive_saludable', 'seccion': FAM, 'nombre': 'Lista para Vive Saludable', 'boton': 'Bajar la lista de Vive Saludable', 'alcance': 'grupo_o_escuela',
      'formatos': ['xlsx'],
      'descripcion': 'Los alumnos por grupo con CURP, sexo, fecha de nacimiento y edad, para cuando el centro de salud avise de la jornada. '
                     'Las medidas las toma y las guarda el personal de salud.'},
@@ -237,7 +239,7 @@ def listas(registros, escuela, ciclo, salud=False):
             filas = [[i, r['nombre'], ', '.join(r.get('alergias') or []), ', '.join(r.get('padecimientos') or []),
                       ', '.join(r.get('medicamentos') or []), ', '.join(r.get('discapacidades') or []), r.get('tutor') or '',
                       r.get('telefono') or '', r.get('emergencia') or ''] for i, r in enumerate(alumnos, 1)]
-            titulo = f'Lo que la maestra debe saber · Grupo {grupo}'
+            titulo = f'Ficha de salud y emergencia · Grupo {grupo}'
             nota = 'Datos de salud de los alumnos: tenlo a la mano en el salón y no lo compartas.'
             anchos = (5, 26, 16, 16, 15, 15, 20, 11, 18)
         else:
@@ -346,7 +348,7 @@ def revisar_911(registros, escuela, cuadros):
         ['Todos tienen fecha de nacimiento', 'Sí' if not sin['fecha_nacimiento'] else 'No',
          f'{sin["fecha_nacimiento"]} sin fecha: cuentan en «Sin fecha»' if sin['fecha_nacimiento'] else 'Edad al 1 de septiembre'],
         ['Todos tienen «¿Repite el grado?»', 'Sí' if not sin['repite'] else 'No',
-         f'{sin["repite"]} sin el dato: complétalo en «Reportes para la SEP»' if sin['repite'] else 'Completo'],
+         f'{sin["repite"]} sin el dato: complétalo en «Formatos oficiales»' if sin['repite'] else 'Completo'],
         ['Todos tienen el dato de beca', 'Sí' if not sin['beca'] else 'No', f'{sin["beca"]} sin el dato' if sin['beca'] else 'Completo'],
         ['Todos tienen el dato de lengua indígena', 'Sí' if not sin['lengua_indigena'] else 'No',
          f'{sin["lengua_indigena"]} sin el dato' if sin['lengua_indigena'] else 'Completo'],

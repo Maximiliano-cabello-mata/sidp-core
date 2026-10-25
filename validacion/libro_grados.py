@@ -364,7 +364,7 @@ def _hoja_911(libro, alumnos, estilos):
     hoja = libro.create_sheet('911')
     _titulo(hoja, 'Para la estadística 911 (cuestionario 911.3, primaria)',
             'Los números ya contados para capturarlos en f911.sep.gob.mx. La edad es la cumplida al 1 de septiembre. El 911 completo (repetidores, '
-            'becas, lengua indígena, de dónde vienen) sale en «Reportes para la SEP» > Estadística 911.', estilos)
+            'becas, lengua indígena, de dónde vienen) sale en «Formatos oficiales» > Estadística 911.', estilos)
     edades = list(indicadores.EDADES_911)
     renglones = []
     for grado in GRADOS:

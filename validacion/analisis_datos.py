@@ -222,7 +222,7 @@ def hallazgos(r):
         frases.append(f'{k["con_discapacidad"]} alumno(s) con discapacidad o condición para el 911: {_lista_corta(tipos, 6)}.')
     faltan_911 = [f'{x["de"] - x["con"]} sin el dato de «{x["dato"].lower()}»' for x in r.get('para_911', []) if x['de'] - x['con']]
     if faltan_911:
-        frases.append('Para el 911 faltan datos que pone la escuela: ' + ', '.join(faltan_911) + ' (se completan en «Reportes para la SEP»).')
+        frases.append('Para el 911 faltan datos que pone la escuela: ' + ', '.join(faltan_911) + ' (se completan en «Formatos oficiales»).')
     d = r['domicilio']
     if d['municipios']:
         primero, n = d['municipios'][0]

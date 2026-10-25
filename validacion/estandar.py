@@ -167,7 +167,7 @@ def faltan(lista):
     return salida
 
 
-# «Completar datos del 911» (Reportes para la SEP): lo que la escuela anota de cada alumno de un grupo.
+# «Completar datos del 911» (Formatos oficiales): lo que la escuela anota de cada alumno de un grupo.
 # (clave en el registro, clave del diccionario)
 COMPLETAR_911 = (('repite', 'repite_grado'), ('procedencia', 'procedencia'), ('beca', 'beca'), ('lengua_indigena', 'lengua_indigena'),
                  ('lengua', 'lengua'), ('afro', 'afrodescendiente'))

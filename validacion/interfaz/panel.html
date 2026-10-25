@@ -49,13 +49,27 @@
 
     <!-- ============ INICIO ============ -->
     <section class="pestana" data-pestana="inicio">
-      <h1 id="inicio-saludo">Hola</h1>
-      <p class="subtitulo" id="inicio-sub"></p>
-      <h2>¿Qué quieres hacer?</h2>
-      <div class="acciones" id="inicio-acciones"></div>
+      <div class="membrete" id="inicio-membrete">
+        <span class="sello"><span data-icono="escuela"></span></span>
+        <div><div class="institucion" id="inicio-escuela">Escuela Primaria</div><div class="datos-escuela" id="inicio-datos-escuela"></div></div>
+        <div class="fecha" id="inicio-fecha"></div>
+      </div>
+      <div class="encabezado-pantalla">
+        <div><h1>Cómo funciona SIDP</h1>
+          <p class="subtitulo">El trabajo de la escuela en cuatro pasos, en este orden. Cada paso tiene su lugar en el menú de la izquierda.</p></div>
+        <div class="botones-encabezado" id="recorridos">
+          <button class="principal" data-recorrido="direccion"><span data-icono="ayuda"></span> Recorrido guiado</button>
+          <button data-recorrido="maestro">Recorrido para maestros</button>
+        </div>
+      </div>
+      <ol class="manual" id="inicio-manual"></ol>
       <h2>Pendiente hoy</h2>
       <div class="pendientes" id="inicio-alertas"></div>
       <p><button class="enlace oculto" id="inicio-mas"></button></p>
+      <div id="inicio-otras-caja">
+        <h2 style="margin-top:28px">Otras herramientas</h2>
+        <div class="acciones" id="inicio-acciones"></div>
+      </div>
     </section>
 
     <!-- ============ ALUMNOS Y GRUPOS ============ -->
@@ -205,18 +219,18 @@
       </div>
     </section>
 
-    <!-- ============ REPORTES PARA LA SEP: lo que sigue ============ -->
+    <!-- ============ FORMATOS OFICIALES: los documentos que entrega la escuela ============ -->
     <section class="pestana" data-pestana="reportes">
-      <h1>Reportes para la SEP</h1>
+      <h1>Formatos oficiales</h1>
       <div class="segmentos" data-segmentos="sep"></div>
-      <p class="subtitulo">Lo que pide el gobierno durante el año. SIDP lo prepara con los datos de los alumnos; la dirección lo captura en el sistema oficial.</p>
+      <p class="subtitulo">Los formatos que la escuela entrega a la supervisión, a los maestros y a las familias, ya llenos con los datos de los alumnos.
+        Los Excel conservan sus fórmulas: si se corrige un dato, los totales se recalculan solos.</p>
       <div id="rp-mensaje"></div>
-      <h2>Lo que sigue</h2>
+      <div id="rp-documentos"></div>
+      <p class="chico candado" style="margin-top:14px"><span data-icono="candado"></span> Tienen datos personales de los alumnos: se guardan en la escuela; no se mandan por correo ni se suben a internet.</p>
+      <h2 style="margin-top:32px">Calendario de entregas</h2>
       <div class="calendario" id="rp-calendario"></div>
-      <h2 style="margin-top:28px">Documentos oficiales</h2>
-      <p class="chico">Salen en Excel, Word o PDF con los formatos y catálogos del gobierno. Tienen datos personales: no los mandes por correo ni los subas a internet.</p>
-      <div class="documentos-oficiales" id="rp-documentos"></div>
-      <h2 style="margin-top:28px">Datos que faltan para los reportes</h2>
+      <h2 style="margin-top:32px">Datos que faltan para los formatos</h2>
       <div class="alertas" id="rp-faltan"></div>
       <div class="panel oculto" id="rp-completar" style="margin-top:20px">
         <h2>Completar datos del 911</h2>
@@ -228,18 +242,14 @@
       </div>
     </section>
 
-    <!-- ============ REPORTES PARA LA SEP: descargar ============ -->
+    <!-- ============ FORMATOS OFICIALES: lista de alumnos y matrícula ============ -->
     <section class="pestana" data-pestana="analisis">
-      <h1>Reportes para la SEP</h1>
+      <h1>Formatos oficiales</h1>
       <div class="segmentos" data-segmentos="sep"></div>
-      <div class="kpis" id="an-kpis"></div>
       <div class="panel">
-        <h2>Descargar en Excel</h2>
+        <h2>Lista de alumnos y matrícula</h2>
         <p class="chico">Se guardan en la carpeta Descargas de esta computadora. Tienen datos personales: no los mandes por correo ni los subas a internet.</p>
         <div class="documentos-oficiales">
-          <div class="documento-oficial"><div class="que">Excel por grado, con gráficas</div>
-            <div class="chico">Resumen con gráficas, una hoja por grado, el 911 y los datos de cada alumno.</div>
-            <div class="botones"><button class="principal" data-descargar="por_grado" data-formato="xlsx"><span data-icono="descargar"></span> Descargar en Excel</button></div></div>
           <div class="documento-oficial"><div class="que">Lista de alumnos</div>
             <div class="chico">Una hoja por grupo, con CURP, sexo y fecha de nacimiento.</div>
             <div class="botones"><button class="principal" data-descargar="alumnos" data-formato="xlsx"><span data-icono="descargar"></span> Descargar en Excel</button></div></div>
@@ -262,12 +272,10 @@
       </div>
     </section>
 
-    <!-- ============ REPORTES PARA LA SEP: cómo va la escuela ============ -->
+    <!-- ============ CÓMO VA LA ESCUELA (fuera del menú: la escuela pidió formatos, no estadísticas) ============ -->
     <section class="pestana" data-pestana="datos">
-      <h1>Reportes para la SEP</h1>
-      <div class="segmentos" data-segmentos="sep"></div>
       <div class="encabezado-pantalla">
-        <div><h2 style="margin:0">Cómo va la escuela</h2>
+        <div><h1>Cómo va la escuela</h1>
           <p class="subtitulo">Lo que dicen los datos de los alumnos. Se actualiza solo mientras se escanea. Solo números: sin nombres ni CURP.</p></div>
         <button id="dt-actualizar">Actualizar ahora</button>
       </div>
@@ -503,6 +511,10 @@
   <button class="cerrar" id="cerrar-ayuda">Cerrar</button>
   <h2 id="ayuda-titulo">Ayuda</h2>
   <div id="ayuda-texto"></div>
+  <h3>Recorrido guiado</h3>
+  <p>Muestra paso a paso dónde está cada cosa.</p>
+  <p class="botones-ayuda"><button class="principal" data-recorrido="direccion">Recorrido para la dirección</button>
+    <button data-recorrido="maestro">Recorrido para maestros</button></p>
   <h3>Si algo no funciona</h3>
   <ol>
     <li>Revisa que esta computadora esté conectada a la red de la escuela.</li>
@@ -511,6 +523,21 @@
   </ol>
 </aside>
 <div class="avisos-flotantes" id="flotantes" aria-live="polite"></div>
+
+<!-- ============ RECORRIDO GUIADO ============ -->
+<div class="recorrido-velo oculto" id="recorrido-velo"></div>
+<div class="recorrido-foco oculto" id="recorrido-foco"></div>
+<div class="recorrido-tarjeta oculto" id="recorrido-tarjeta" role="dialog" aria-modal="true" aria-labelledby="recorrido-titulo" aria-describedby="recorrido-texto">
+  <div class="paso-de" id="recorrido-paso"></div>
+  <h2 id="recorrido-titulo"></h2>
+  <p id="recorrido-texto"></p>
+  <div class="botones">
+    <button id="recorrido-salir" class="enlace">Salir del recorrido</button>
+    <span class="espacio"></span>
+    <button id="recorrido-anterior">Anterior</button>
+    <button id="recorrido-siguiente" class="principal">Siguiente</button>
+  </div>
+</div>
 <script>
 const motor = crearMotor();
 const $ = (id) => document.getElementById(id);
@@ -549,7 +576,7 @@ for (const e of document.querySelectorAll('[data-icono]')) e.outerHTML = icono(e
 let yo = null;
 const puede = (permiso) => !permiso || !yo || !yo.permisos || yo.permisos.includes(permiso);
 
-// --- Pantallas. "grupo" junta varias en una sola entrada del menú, con pestañas arriba (Por revisar, Reportes para la SEP). ---
+// --- Pantallas. "grupo" junta varias en una sola entrada del menú, con pestañas arriba (Por revisar, Formatos oficiales). ---
 const PESTANAS = [
   { id: 'inicio', nombre: 'Inicio', icono: 'inicio' },
   { id: 'listas', nombre: 'Alumnos y grupos', icono: 'alumnos', permiso: 'grupos' },
@@ -557,9 +584,10 @@ const PESTANAS = [
   { id: 'revision', nombre: 'Por revisar', icono: 'revision', grupo: 'revisar', permiso: 'documentos', segmento: 'Lo que mandaron los padres' },
   { id: 'confirmar', grupo: 'revisar', permiso: 'documentos', segmento: 'Datos dudosos', necesita: 'porConfirmar' },
   { id: 'curp', grupo: 'revisar', permiso: 'renapo', segmento: 'CURP en RENAPO' },
-  { id: 'reportes', nombre: 'Reportes para la SEP', icono: 'analisis', grupo: 'sep', permiso: 'ver_grupos', segmento: 'Lo que sigue' },
-  { id: 'analisis', grupo: 'sep', permiso: 'ver_grupos', segmento: 'Descargar en Excel' },
-  { id: 'datos', grupo: 'sep', permiso: 'ver_grupos', segmento: 'Cómo va la escuela', necesita: 'analisisPC4' },
+  { id: 'reportes', nombre: 'Formatos oficiales', icono: 'documento', grupo: 'sep', permiso: 'ver_grupos', segmento: 'Formatos' },
+  { id: 'analisis', grupo: 'sep', permiso: 'ver_grupos', segmento: 'Lista y matrícula' },
+  // Fuera del menú: la escuela entrega formatos y no usa estadísticas. Sigue en #datos por si se pide de vuelta.
+  { id: 'datos', nombre: 'Cómo va la escuela', oculta: true, permiso: 'ver_grupos', necesita: 'analisisPC4' },
   { id: 'inventario', nombre: 'Inventario', icono: 'inventario', permiso: 'grupos', necesita: 'inventario' },
   { id: 'biblioteca', nombre: 'Biblioteca', icono: 'libro', permiso: 'biblioteca', necesita: 'biblioteca' },
   { id: 'ajustes', nombre: 'Ajustes', icono: 'ajustes', permiso: 'ajustes', abajo: true },
@@ -645,8 +673,8 @@ const porRevisar = () => delGrupo('revisar').reduce((s, x) => s + (cuentas[x.id]
 
 // --- Ayuda de cada pantalla: tres frases, siempre en el mismo botón de arriba a la derecha ---
 const AYUDA = {
-  inicio: ['Elige lo que quieres hacer en las tarjetas grandes.', '«Pendiente hoy» dice lo más urgente; cada aviso tiene su botón.',
-    'Para encontrar a un alumno, escribe su nombre o su CURP en el buscador de arriba.'],
+  inicio: ['Los cuatro pasos dicen el orden del trabajo: listas, escanear, revisar y formatos. Cada uno tiene su botón.',
+    '«Pendiente hoy» dice lo más urgente; cada aviso tiene su botón.', 'Para encontrar a un alumno, escribe su nombre o su CURP en el buscador de arriba.'],
   listas: ['Cada tarjeta es un grupo. Ábrela para ver a sus alumnos y quién ya tiene expediente.',
     'Para un grupo nuevo, da «Agregar la lista de un grupo» y pon la lista escaneada o escribe los nombres.',
     '«Listo» quiere decir que su expediente ya está aceptado; «Falta», que no hay expediente; «Revisar», que alguien tiene que verlo.'],
@@ -658,8 +686,9 @@ const AYUDA = {
     'Compara cada uno con la hoja de la derecha.', 'Da «Está bien», corrígelo o quítalo. Lo que haces queda en el historial de cambios.'],
   curp: ['Cada CURP se confirma en la página oficial de RENAPO.', 'Da «Copiar CURP y abrir RENAPO», pega la CURP, marca «No soy un robot» y descarga el PDF.',
     'Pon el PDF aquí: el sistema encuentra solo al alumno y corrige su nombre si hace falta.'],
-  reportes: ['Aquí está lo que pide el gobierno en cada época del año.', 'Cada documento sale listo en Excel, Word o PDF, con los datos de los alumnos.',
-    'Si un reporte dice que faltan datos, la lista de abajo dice de quién y cómo completarlos.'],
+  reportes: ['Los formatos están ordenados por a quién se entregan: supervisión, maestros y familias.',
+    'Elige el grupo si el formato lo pide y da el botón: el archivo queda en la carpeta Descargas, ya lleno.',
+    'Si un formato dice que faltan datos, la lista de abajo dice de quién y cómo completarlos.'],
   analisis: ['Cada botón descarga un Excel a la carpeta Descargas.', 'Tienen datos personales: no los mandes por correo ni los subas a internet.',
     'La tabla de abajo es la matrícula por grado y sexo.'],
   datos: ['Son números de toda la escuela, sin nombres.', 'Se actualizan solos mientras se escanean expedientes.',
@@ -685,6 +714,131 @@ $('abrir-ayuda').onclick = () => { mostrarAyuda(); $('cerrar-ayuda').focus(); };
 $('cerrar-ayuda').onclick = cerrarAyuda;
 $('ayuda-velo').onclick = cerrarAyuda;
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('ayuda').classList.contains('oculto')) cerrarAyuda(); });
+
+// --- Recorrido guiado: lleva a cada pantalla y señala dónde está cada cosa. Uno para la dirección y otro para los maestros. ---
+// Un paso con "ir" abre esa pantalla; con "en", señala esa parte. Si la persona no puede abrir la pantalla, el paso se salta.
+const RECORRIDOS = {
+  direccion: [
+    { titulo: 'Bienvenida a SIDP', texto: 'SIDP guarda el expediente de cada alumno y prepara los formatos que la escuela entrega. Este recorrido muestra dónde está cada cosa; se puede salir en cualquier momento.' },
+    { ir: 'inicio', en: '#inicio-manual', titulo: 'El trabajo, en cuatro pasos', texto: 'Esta página es el manual de SIDP: listas de grupo, escanear, revisar y formatos oficiales. Cada paso dice qué le falta y tiene su botón.' },
+    { en: '#menu', titulo: 'El menú', texto: 'A la izquierda están las mismas secciones. El número amarillo dice cuántas cosas esperan a una persona.' },
+    { ir: 'listas', en: '#ls-nueva', titulo: 'Paso 1. Listas de grupo', texto: 'Primero se carga la lista oficial de cada grupo: escaneada, en foto o escrita. Así cada expediente queda en su grado y su grupo.' },
+    { ir: 'escanear', en: '#es-soltar', titulo: 'Paso 2. Escanear expedientes', texto: 'Se elige el grupo y se ponen aquí los documentos del alumno. SIDP distingue el acta del alumno de la del tutor y saca la fecha de nacimiento de la CURP.' },
+    { ir: 'revision', en: '.pestana.activa [data-segmentos]', titulo: 'Paso 3. Revisar los datos', texto: 'Aquí llega lo que mandan los padres, los datos que no se leyeron con seguridad y las CURP por confirmar en RENAPO. El sistema solo propone: una persona decide.' },
+    { ir: 'reportes', en: '[data-seccion]', titulo: 'Paso 4. Formatos oficiales', texto: 'Metadato, 911, censo de discapacidad y constancias salen en Excel, ya llenos. Las fórmulas quedan vivas: si se corrige un dato, los totales cambian solos.' },
+    { ir: 'reportes', en: '#rp-calendario', titulo: 'Calendario de entregas', texto: 'Lo que pide la supervisión en cada época del ciclo escolar, con el botón del formato que corresponde.' },
+    { en: '.buscador', titulo: 'Buscar a un alumno', texto: 'Con su nombre o su CURP se abre su ficha: datos, salud, a quién llamar y sus documentos en PDF.', permiso: 'expedientes' },
+    { en: '#abrir-ayuda', titulo: 'Ayuda en cada pantalla', texto: 'Este botón explica en tres frases la pantalla en la que se está, y desde ahí se repite este recorrido.' },
+    { ir: 'ajustes', en: '#panel-cuentas', titulo: 'Personas que usan SIDP', texto: 'La dirección da de alta a cada persona con su usuario y su contraseña. Cada una ve solo lo que le toca.' },
+    { ir: 'inicio', en: '#recorridos', titulo: 'Fin del recorrido', texto: 'Para repetirlo, aquí están los dos recorridos: el de la dirección y el de los maestros.' },
+  ],
+  maestro: [
+    { titulo: 'SIDP para los maestros', texto: 'La dirección prepara en SIDP los formatos de cada grupo con los alumnos ya escritos. El maestro solo llena calificaciones y asistencias: los promedios y los totales salen solos.' },
+    { ir: 'reportes', en: '[data-seccion="Para los maestros"]', titulo: 'Los formatos del maestro', texto: 'Lista de grupo, ficha de salud y emergencia, concentrado de calificaciones, base de la boleta y asistencias. Se elige el grupo y se descarga en Excel.' },
+    { ir: 'reportes', en: '[data-documento="calificaciones"]', titulo: 'Calificaciones y dispersión', texto: 'Se escribe la calificación de cada campo formativo, de 5 a 10. El promedio, la dispersión por nivel y el concentrado de la escuela se calculan solos.' },
+    { ir: 'reportes', en: '[data-documento="asistencias"]', titulo: 'Asistencias', texto: 'Asistencias, faltas justificadas y faltas sin justificar, de septiembre a julio. Los totales del mes y del ciclo se suman solos.' },
+    { ir: 'reportes', en: '[data-documento="emergencia"]', titulo: 'Para tener en el salón', texto: 'Las alergias, los padecimientos, los medicamentos y a quién llamar de cada alumno del grupo.' },
+    { en: '.buscador', titulo: 'La ficha de un alumno', texto: 'Con su nombre o su CURP se abre su ficha, con su salud y el contacto de emergencia.', permiso: 'expedientes' },
+    { titulo: 'Fin del recorrido', texto: 'Los archivos tienen datos personales de los alumnos: se guardan en la escuela, no se mandan por correo ni se suben a internet. Los formatos de cada grupo se piden en la dirección.' },
+  ],
+};
+const LLAVE_RECORRIDO = 'sidp.recorrido_visto';
+let recorrido = null;  // { pasos, i }
+
+function iniciarRecorrido(cual) {
+  const pasos = RECORRIDOS[cual].filter((p) => (!p.ir || abrible(p.ir)) && (!p.permiso || puede(p.permiso)));
+  if (!$('ayuda').classList.contains('oculto')) cerrarAyuda();
+  recorrido = { pasos, i: 0 };
+  try { localStorage.setItem(LLAVE_RECORRIDO, '1'); } catch (error) { /* Sin almacenamiento: se vuelve a ofrecer la próxima vez. */ }
+  for (const id of ['recorrido-velo', 'recorrido-foco', 'recorrido-tarjeta']) $(id).classList.remove('oculto');
+  pasoRecorrido(0);
+}
+const abrible = (id) => { const p = PESTANAS.find((x) => x.id === id); return p && (disponible(p) || p.grupo && delGrupo(p.grupo).length); };
+const visible = (e) => e && e.getClientRects().length && e.offsetWidth > 0;
+
+async function pasoRecorrido(i) {
+  if (!recorrido) return;
+  recorrido.i = Math.max(0, Math.min(i, recorrido.pasos.length - 1));
+  const p = recorrido.pasos[recorrido.i];
+  if (p.ir && pestana !== p.ir) irA(p.ir);
+  $('recorrido-paso').textContent = `Paso ${recorrido.i + 1} de ${recorrido.pasos.length}`;
+  $('recorrido-titulo').textContent = p.titulo;
+  $('recorrido-texto').textContent = p.texto;
+  $('recorrido-anterior').disabled = recorrido.i === 0;
+  $('recorrido-siguiente').textContent = recorrido.i === recorrido.pasos.length - 1 ? 'Terminar' : 'Siguiente';
+  // Lo que se carga al abrir la pantalla (los formatos, por ejemplo) tarda un momento en aparecer.
+  let objetivo = null;
+  for (let espera = 0; p.en && espera < 20; espera++) {
+    objetivo = document.querySelector(p.en);
+    if (visible(objetivo)) break;
+    await new Promise((listo) => setTimeout(listo, 100));
+    if (!recorrido || recorrido.pasos[recorrido.i] !== p) return;
+  }
+  recorrido.objetivo = visible(objetivo) ? objetivo : null;
+  if (recorrido.objetivo) {
+    // Lo que se queda fijo arriba (la barra de arriba; en el teléfono, también el menú) no debe tapar lo señalado.
+    const tapa = Math.max(0, ...['.superior', '.lateral'].map((s) => document.querySelector(s).getBoundingClientRect())
+      .filter((b) => b.width > innerWidth * 0.6 && b.top <= 1).map((b) => b.bottom));
+    const r = recorrido.objetivo.getBoundingClientRect();
+    if (r.top < tapa + 8 || r.bottom > innerHeight) window.scrollTo(0, Math.max(0, r.top + scrollY - tapa - 20));
+  }
+  colocarRecorrido();
+  $('recorrido-siguiente').focus();
+}
+
+function colocarRecorrido() {
+  if (!recorrido) return;
+  const foco = $('recorrido-foco'), tarjeta = $('recorrido-tarjeta');
+  const margen = 16, ancho = tarjeta.offsetWidth, alto = tarjeta.offsetHeight;
+  if (!recorrido.objetivo) {
+    foco.classList.add('sin-objetivo'); foco.removeAttribute('style');
+    tarjeta.style.left = `${Math.max(margen, (innerWidth - ancho) / 2)}px`;
+    tarjeta.style.top = `${Math.max(margen, (innerHeight - alto) / 2)}px`;
+    return;
+  }
+  foco.classList.remove('sin-objetivo');
+  const r = recorrido.objetivo.getBoundingClientRect();
+  const arriba = Math.max(8, r.top - 8), abajo = Math.min(innerHeight - 8, r.bottom + 8);
+  Object.assign(foco.style, { top: `${arriba}px`, left: `${r.left - 8}px`, width: `${r.width + 16}px`, height: `${Math.max(0, abajo - arriba)}px` });
+  // La tarjeta va abajo, arriba, a la derecha o a la izquierda de lo señalado; si no cabe, abajo de la pantalla.
+  let x = Math.min(Math.max(margen, r.left), innerWidth - ancho - margen), y;
+  if (innerHeight - abajo >= alto + margen) y = abajo + 12;
+  else if (arriba >= alto + margen) y = arriba - alto - 12;
+  else if (innerWidth - r.right >= ancho + 2 * margen) { x = r.right + 20; y = Math.min(Math.max(margen, r.top), innerHeight - alto - margen); }
+  else if (r.left >= ancho + 2 * margen) { x = r.left - ancho - 20; y = Math.min(Math.max(margen, r.top), innerHeight - alto - margen); }
+  else { x = innerWidth - ancho - margen; y = innerHeight - alto - margen; }
+  tarjeta.style.left = `${Math.max(margen, x)}px`;
+  tarjeta.style.top = `${Math.max(margen, y)}px`;
+}
+
+function terminarRecorrido() {
+  recorrido = null;
+  for (const id of ['recorrido-velo', 'recorrido-foco', 'recorrido-tarjeta']) $(id).classList.add('oculto');
+}
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-recorrido]'); if (b) iniciarRecorrido(b.dataset.recorrido); });
+$('recorrido-siguiente').onclick = () => (recorrido.i === recorrido.pasos.length - 1 ? terminarRecorrido() : pasoRecorrido(recorrido.i + 1));
+$('recorrido-anterior').onclick = () => pasoRecorrido(recorrido.i - 1);
+$('recorrido-salir').onclick = terminarRecorrido;
+window.addEventListener('resize', colocarRecorrido);
+window.addEventListener('scroll', colocarRecorrido, { passive: true });
+document.addEventListener('keydown', (e) => {
+  if (!recorrido) return;
+  if (e.key === 'Escape') terminarRecorrido();
+  else if (e.key === 'ArrowRight') $('recorrido-siguiente').click();
+  else if (e.key === 'ArrowLeft' && recorrido.i) pasoRecorrido(recorrido.i - 1);
+  else if (e.key === 'Tab') {  // El foco no sale de la tarjeta mientras dura el recorrido.
+    const botones = [...$('recorrido-tarjeta').querySelectorAll('button:not(:disabled)')];
+    const n = botones.indexOf(document.activeElement);
+    e.preventDefault();
+    botones[(n + (e.shiftKey ? -1 : 1) + botones.length) % botones.length].focus();
+  }
+});
+// La primera vez que alguien abre SIDP en esta computadora, el recorrido empieza solo.
+function ofrecerRecorrido() {
+  let visto = '';
+  try { visto = localStorage.getItem(LLAVE_RECORRIDO) || ''; } catch (error) { visto = '1'; }
+  if (!visto && pestana === 'inicio') iniciarRecorrido(yo && yo.rol === 'docente' ? 'maestro' : 'direccion');
+}
 
 // --- Datos compartidos por todas las pantallas ---
 const ESTADO_VACIO = { expedientes: [], hoy: new Date().toISOString().slice(0, 10),
@@ -774,14 +928,41 @@ function kpi(color, ic, numero, texto) {
     <div><div class="numero">${esc(numero)}</div><div class="etiqueta">${esc(texto)}</div></div></div>`;
 }
 
-// ================= INICIO: "¿Qué quieres hacer?" y "Pendiente hoy" =================
+// ================= INICIO: el manual en cuatro pasos y "Pendiente hoy" =================
 function porDecidir(e) { return !e.decision && e.estado !== 'validado en papel'; }
-let todosLosPendientes = false;
+let todosLosPendientes = false, escuelaDatos = null;
+const TURNOS = { matutino: 'Turno matutino', vespertino: 'Turno vespertino', tiempo_completo: 'Tiempo completo' };
 
-function saludo() {
-  const hora = new Date().getHours();
-  const parte = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
-  return yo && yo.nombres ? `${parte}, ${yo.nombres}` : parte;
+function mostrarMembrete() {
+  const e = escuelaDatos || {};
+  $('inicio-escuela').textContent = e.nombre || $('nombre-escuela').textContent || 'Escuela Primaria';
+  $('inicio-datos-escuela').textContent = [e.cct && `C.C.T. ${e.cct}`, TURNOS[e.turno], e.zona_escolar && `Zona escolar ${e.zona_escolar}`,
+    e.municipio, datos.grupos.ciclo && `Ciclo escolar ${datos.grupos.ciclo}`].filter(Boolean).join(' · ');
+  $('inicio-fecha').textContent = new Date((datos.estado.hoy || new Date().toISOString().slice(0, 10)) + 'T12:00')
+    .toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Cada paso dice qué hace, dónde se hace y qué le falta, en palabras.
+function pasosManual() {
+  const { grupos } = datos;
+  const alumnos = grupos.grupos.reduce((s, g) => s + g.alumnos, 0);
+  const sinExpediente = alumnos - grupos.grupos.reduce((s, g) => s + g.con_documentos, 0);
+  const n = porRevisar();
+  const ahora = (window.reportesPendientes || [])[0];
+  return [
+    { ir: 'listas', boton: 'Ir a Alumnos y grupos', titulo: 'Listas de grupo',
+      texto: 'Se carga la lista oficial de cada grupo, escaneada, en foto o escrita. Así cada expediente queda en su grado y su grupo.',
+      estado: alumnos ? `${grupos.grupos.length} grupo(s) y ${alumnos} alumno(s) cargados.` : 'Todavía no hay listas: es lo primero.', hecho: !!alumnos },
+    { ir: 'escanear', boton: 'Ir a Expedientes', titulo: 'Escanear expedientes',
+      texto: 'Se escanean los documentos de cada alumno, ya revisados en papel. SIDP distingue el acta del alumno de la del tutor y saca los datos del acta, la CURP, el certificado médico y las boletas.',
+      estado: !alumnos ? 'Primero, las listas de grupo.' : sinExpediente ? `Faltan ${sinExpediente} alumno(s) por escanear.` : 'Todos los alumnos tienen expediente.', hecho: alumnos && !sinExpediente },
+    { ir: 'revision', boton: 'Ir a Por revisar', titulo: 'Revisar los datos',
+      texto: 'Lo que la lectura no leyó con seguridad se confirma con la hoja a la vista; las CURP se confirman en RENAPO, y lo que mandan los padres se acepta o se pide de nuevo. El sistema propone; una persona decide.',
+      estado: n ? `${n} pendiente(s) por revisar.` : 'Nada pendiente.', hecho: !n },
+    { ir: 'reportes', boton: 'Ir a Formatos oficiales', titulo: 'Formatos oficiales',
+      texto: 'El Metadato, el 911, el censo de discapacidad, las constancias y las plantillas de los maestros salen en Excel, ya llenos. Las fórmulas quedan vivas: si se corrige un dato, los totales cambian solos.',
+      estado: ahora ? ahora.texto.replace(/<[^>]+>/g, '') : 'Listos para descargar cuando se necesiten.', hecho: false },
+  ];
 }
 
 function mostrarInicio() {
@@ -795,23 +976,21 @@ function mostrarInicio() {
   const sinGrupo = est.expedientes.filter((e) => !e.grupo);
   const validadas = curps.alumnos.filter((a) => a.estado === 'validada').length;
   contador('revision', pendientes.length);
-  $('inicio-saludo').textContent = saludo();
-  $('inicio-sub').textContent = [grupos.ciclo && `Ciclo escolar ${grupos.ciclo}`,
-    new Date(est.hoy + 'T12:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })].filter(Boolean).join(' · ');
-  const n = porRevisar();
+  mostrarMembrete();
+  const abre = (id) => disponible(PESTANAS.find((x) => x.id === id)) || (id === 'revision' && delGrupo('revisar').length);
+  $('inicio-manual').innerHTML = pasosManual().map((p, i) => `<li class="paso-manual" data-paso="${p.ir}">
+      <span class="numero-paso" aria-hidden="true">${i + 1}</span>
+      <div><h2><span class="lectores">Paso ${i + 1}: </span>${esc(p.titulo)}</h2><p>${esc(p.texto)}</p>
+        <p class="estado-paso ${p.hecho ? 'hecho' : ''}">${icono(p.hecho ? 'bien' : 'documento')} ${esc(p.estado)}</p></div>
+      ${abre(p.ir) ? `<button data-ir="${p.ir}">${esc(p.boton)}</button>` : '<span class="chico">Lo hace la dirección o la secretaría.</span>'}</li>`).join('');
+
   const libros = window.bibliotecaResumen;
   const acciones = [
-    { ir: 'escanear', ic: 'escanear', color: 'azul', que: 'Escanear expedientes',
-      como: alumnos ? `${conDocumentos} de ${alumnos} alumnos ya tienen expediente` : 'Primero agrega las listas de grupo' },
-    { ir: 'revision', ic: 'revision', color: n ? 'ambar' : 'verde', que: 'Revisar pendientes', como: n ? `${n} por revisar` : 'Nada pendiente' },
-    { ir: 'listas', ic: 'alumnos', color: 'verde', que: 'Ver alumnos y grupos',
-      como: alumnos ? `${grupos.grupos.length} grupos · ${alumnos} alumnos` : 'Todavía no hay listas' },
-    { ir: 'reportes', ic: 'analisis', color: 'morado', que: 'Reportes para la SEP', como: '911, constancias y listas oficiales' },
-    { ir: 'biblioteca', ic: 'libro', color: 'azul', que: 'Registrar o prestar un libro',
-      como: libros ? `${libros.ejemplares} libros en la biblioteca` : 'Con una foto de la portada' },
-    { ir: 'inventario', ic: 'inventario', color: 'verde', que: 'Buscar o dar de alta una pieza', como: 'Inventario con código de barras' },
-  ].filter((a) => disponible(PESTANAS.find((x) => x.id === a.ir)) || (a.ir === 'revision' && delGrupo('revisar').length));
-  $('inicio-acciones').innerHTML = acciones.map((a) => `<button class="accion" data-ir="${a.ir}"><span class="ficha ${a.color}">${icono(a.ic)}</span>
+    { ir: 'biblioteca', ic: 'libro', que: 'Biblioteca', como: libros ? `Registrar o prestar libros · ${libros.ejemplares} en la biblioteca` : 'Registrar o prestar libros con una foto de la portada' },
+    { ir: 'inventario', ic: 'inventario', que: 'Inventario', como: 'Muebles, computadoras y material, con código de barras' },
+  ].filter((a) => abre(a.ir));
+  $('inicio-otras-caja').classList.toggle('oculto', !acciones.length);
+  $('inicio-acciones').innerHTML = acciones.map((a) => `<button class="accion" data-ir="${a.ir}"><span class="ficha azul">${icono(a.ic)}</span>
     <span><span class="que">${esc(a.que)}</span><span class="como">${esc(a.como)}</span></span></button>`).join('');
 
   // Lo más urgente primero; se muestran 3 y el resto con "Ver los N pendientes".
@@ -1382,11 +1561,9 @@ $('elegir-constancia').onchange = () => { subirConstancia($('elegir-constancia')
 // ================= ANÁLISIS =================
 function mostrarAnalisis() {
   const a = datos.analisis;
-  if (!a) { $('an-conteo').innerHTML = ''; $('an-kpis').innerHTML = ''; $('an-faltan').innerHTML = ''; return; }
+  if (!a) { $('an-conteo').innerHTML = ''; $('an-faltan').innerHTML = ''; return; }
   const suma = (k) => a.grados.reduce((s, g) => s + g[k], 0);
   const columnas = ['grupos', 'hombres', 'mujeres', 'sin_dato', 'total'];
-  $('an-kpis').innerHTML = kpi('azul', 'alumnos', suma('total'), 'Alumnos inscritos') + kpi('morado', 'listas', suma('grupos'), 'Grupos')
-    + kpi('azul', 'alumnos', suma('hombres'), 'Hombres') + kpi('rojo', 'alumnos', suma('mujeres'), 'Mujeres');
   $('an-conteo').innerHTML = '<tr><th>Grado</th><th class="cifra">Grupos</th><th class="cifra">Hombres</th><th class="cifra">Mujeres</th><th class="cifra">Sin dato de sexo</th><th class="cifra">Total</th></tr>'
     + a.grados.map((g) => `<tr><td>${esc(NOMBRE_GRADO[g.grado])}</td>${columnas.map((k) => `<td class="cifra">${g[k]}</td>`).join('')}</tr>`).join('')
     + `<tr class="total"><td>Total</td>${columnas.map((k) => `<td class="cifra">${suma(k)}</td>`).join('')}</tr>`;
@@ -2243,12 +2420,23 @@ async function cargarReportes() {
   if (datosReportes.aviso) avisoEn('rp-mensaje', 'ojo', datosReportes.aviso);
   mostrarReportes();
   completar911();
-  $('rp-documentos').innerHTML = datosReportes.documentos.map((d) => `<div class="documento-oficial" data-documento="${esc(d.clave)}">
+  // Agrupados por a quién se entregan, en el orden del catálogo.
+  const secciones = [];
+  for (const d of datosReportes.documentos) {
+    const titulo = d.seccion || 'Otros formatos';
+    let s = secciones.find((x) => x.titulo === titulo);
+    if (!s) secciones.push(s = { titulo, documentos: [] });
+    s.documentos.push(d);
+  }
+  const tarjeta = (d) => `<div class="documento-oficial" data-documento="${esc(d.clave)}">
       <div class="que">${esc(d.nombre)}</div><div class="chico">${esc(d.descripcion)}</div>
       ${d.alcance !== 'escuela' ? `<div><label for="rp-grupo-${esc(d.clave)}">Grupo</label><select id="rp-grupo-${esc(d.clave)}" data-grupo-de="${esc(d.clave)}">${opcionesGrupos(d.alcance === 'grupo_o_escuela')}</select></div>` : ''}
       ${d.alcance === 'alumno' ? `<div><label for="rp-alumno-${esc(d.clave)}">Alumno</label><select id="rp-alumno-${esc(d.clave)}"><option value="">Todo el grupo (una hoja por alumno)</option></select></div>` : ''}
       <div class="botones">${d.formatos.map((f, i) => `<button class="${i ? '' : 'principal'}" data-generar="${esc(d.clave)}" data-formato="${esc(f)}">${icono('descargar')} ${esc(FORMATOS[f] || f)}</button>`).join('')}</div>
-      <div id="rp-aviso-${esc(d.clave)}"></div></div>`).join('');
+      <div id="rp-aviso-${esc(d.clave)}"></div></div>`;
+  $('rp-documentos').innerHTML = secciones.map((s) => `<div class="seccion-formatos" data-seccion="${esc(s.titulo)}">
+      <h2 class="seccion-titulo">${esc(s.titulo)} <span class="chico">${s.documentos.length} formato(s)</span></h2>
+      <div class="documentos-oficiales">${s.documentos.map(tarjeta).join('')}</div></div>`).join('');
   for (const s of $('rp-documentos').querySelectorAll('[data-grupo-de]')) {
     const alumnos = $(`rp-alumno-${s.dataset.grupoDe}`);
     if (!alumnos) continue;
@@ -2595,6 +2783,7 @@ async function cargarEscuela() {
   let e;
   try { e = await motor.escuela(); } catch (error) { avisoEn('es-mensaje', 'mal', error.message, error.tecnico); return; }
   for (const [campo, id] of CAMPOS_ESCUELA) $(id).value = e[campo] || '';
+  escuelaDatos = e;
   if (e.nombre) $('nombre-escuela').textContent = e.nombre;
 }
 $('es-guardar').onclick = async () => {
@@ -2602,6 +2791,7 @@ $('es-guardar').onclick = async () => {
   const r = await trabajar('Guardando…', () => motor.escuelaGuardar(datosEscuela), (c, t, d) => avisoEn('es-mensaje', c, t, d));
   if (!r) return;
   avisoEn('es-mensaje', 'bien', 'Guardado ✓ Así saldrán en las constancias y en el 911.');
+  escuelaDatos = { ...(escuelaDatos || {}), ...datosEscuela, ...r };
   if (r.nombre) $('nombre-escuela').textContent = r.nombre;
 };
 
@@ -2685,8 +2875,9 @@ async function empezar(usuario) {
     if (SIDP.modo === 'demo') await trabajar('Revisando los expedientes de ejemplo…', () => motor.revisarTodo());
     if (motor.biblioteca && puede('biblioteca')) cargarBiblioteca(true).then(mostrarInicio);
     if (motor.documentos && puede('ver_grupos')) motor.documentos().then((r) => { datosReportes = r; mostrarReportes(); mostrarInicio(); }).catch(() => {});
-    if (motor.escuela) motor.escuela().then((e) => { if (e.nombre) $('nombre-escuela').textContent = e.nombre; }).catch(() => {});
+    if (motor.escuela) motor.escuela().then((e) => { escuelaDatos = e; if (e.nombre) $('nombre-escuela').textContent = e.nombre; mostrarMembrete(); }).catch(() => {});
     estado('');
+    ofrecerRecorrido();
   } catch (error) {
     estado('');
     flotante('mal', 'No se pudo cargar todo. Revisa que esta computadora esté conectada a la red de la escuela y vuelve a abrir la página.', error.tecnico || error.message);
