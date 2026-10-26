@@ -1,0 +1,853 @@
+{
+  "escuela_referencia": {
+    "nombre": "ESCUELA PRIMARIA PROFR. DELFINO PANDO MEDINA",
+    "cct": "[CCT de la escuela]",
+    "sector": "II (02)",
+    "zona_escolar": "49",
+    "subdireccion": "SUBDIRECCION DE EDUCACION PRIMARIA EN LA REGION DE NEZAHUALCOYOTL (SEIEM)",
+    "turno": "TIEMPO COMPLETO / JORNADA AMPLIADA / HORARIO EXTENDIDO (08:00 - 16:00)",
+    "municipio": "CHALCO, ESTADO DE MEXICO",
+    "grupos": [
+      "1° A",
+      "2° A",
+      "3° A",
+      "4° A",
+      "5° A",
+      "6° A"
+    ]
+  },
+  "metadato_71_columnas": [
+    {
+      "col": 1,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 2,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 3,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 4,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 5,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 6,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 7,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 8,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 9,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 10,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 11,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 12,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 13,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 14,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 15,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 16,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 17,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 18,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 19,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 20,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 21,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 22,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 23,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 24,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 25,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 26,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 27,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 28,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 29,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 30,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 31,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 32,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 33,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 34,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 35,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 36,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 37,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 38,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 39,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 40,
+      "bloque": "ALUMNO"
+    },
+    {
+      "col": 41,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 42,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 43,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 44,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 45,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 46,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 47,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 48,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 49,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 50,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 51,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 52,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 53,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 54,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 55,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 56,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 57,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 58,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 59,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 60,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 61,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 62,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 63,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 64,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 65,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 66,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 67,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 68,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 69,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 70,
+      "bloque": "MADRE_PADRE_TUTOR"
+    },
+    {
+      "col": 71,
+      "bloque": "MADRE_PADRE_TUTOR"
+    }
+  ],
+  "layout_77_plus_78_columnas": [
+    {
+      "col": 1,
+      "numero": 1,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "NO LLENAR",
+      "nombre_campo": "IDENTIFICADOR REGISTRO (No. PROGRESIVO)"
+    },
+    {
+      "col": 2,
+      "numero": 2,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "SUBDIRECCION O DEPARTAMENTO"
+    },
+    {
+      "col": 3,
+      "numero": 3,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "números y letras  (diez)",
+      "nombre_campo": "CLAVE DEL CENTRO DE TRABAJO"
+    },
+    {
+      "col": 4,
+      "numero": 4,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números     (dos)",
+      "nombre_campo": "SECTOR"
+    },
+    {
+      "col": 5,
+      "numero": 5,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números    (dos)",
+      "nombre_campo": "ZONA"
+    },
+    {
+      "col": 6,
+      "numero": 6,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números",
+      "nombre_campo": "NOMBRE DEL CENTRO DE TRABAJO"
+    },
+    {
+      "col": 7,
+      "numero": 7,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "TURNO CT"
+    },
+    {
+      "col": 8,
+      "numero": 8,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números  (trece)",
+      "nombre_campo": "RFC"
+    },
+    {
+      "col": 9,
+      "numero": 9,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números  (dieciocho)",
+      "nombre_campo": "CURP"
+    },
+    {
+      "col": 10,
+      "numero": 10,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números",
+      "nombre_campo": "NUMERO DE SEGURIDAD SOCIAL NSS"
+    },
+    {
+      "col": 11,
+      "numero": 11,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "NOMBRE (S) TRABAJADOR"
+    },
+    {
+      "col": 12,
+      "numero": 12,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "PRIMER APELLIDO"
+    },
+    {
+      "col": 13,
+      "numero": 13,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "SEGUNDO APELLIDO"
+    },
+    {
+      "col": 14,
+      "numero": 14,
+      "tipo_excel": "NUMERO",
+      "regla_captura": "números  (hasta dos)",
+      "nombre_campo": "NIVEL DE ESTUDIOS"
+    },
+    {
+      "col": 15,
+      "numero": 15,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "ESPECIALIDAD"
+    },
+    {
+      "col": 16,
+      "numero": 16,
+      "tipo_excel": "NUMERO",
+      "regla_captura": "números     (uno)",
+      "nombre_campo": "DOCUMENTO OBTENIDO"
+    },
+    {
+      "col": 17,
+      "numero": 17,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números",
+      "nombre_campo": "NO. DE CÉDULA PROFESIONAL,  NO. DEL TÍTULO O CERTIFICADO TOTAL DEL DOCUMENTO OBTENIDO"
+    },
+    {
+      "col": 18,
+      "numero": 18,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números     (seis)",
+      "nombre_campo": "QUINCENA DE INGRESO A LA SEP"
+    },
+    {
+      "col": 19,
+      "numero": 19,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números     (seis)",
+      "nombre_campo": "QUINCENA DE INGRESO A LA RAMA"
+    },
+    {
+      "col": 20,
+      "numero": 20,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números     (seis)",
+      "nombre_campo": "QUINCENA DE INGRESO A LA FUNCION"
+    },
+    {
+      "col": 21,
+      "numero": 21,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números     (seis)",
+      "nombre_campo": "QUINCENA DE INGRESO AL CENTRO DE TRABAJO"
+    },
+    {
+      "col": 22,
+      "numero": 22,
+      "tipo_excel": "NUMERO",
+      "regla_captura": "números    (dos)",
+      "nombre_campo": "AÑOS COMO DOCENTE"
+    },
+    {
+      "col": 23,
+      "numero": 23,
+      "tipo_excel": "NUMERO",
+      "regla_captura": "números    (dos)",
+      "nombre_campo": "AÑOS COMO DIRECTOR"
+    },
+    {
+      "col": 24,
+      "numero": 24,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "números    (uno)",
+      "nombre_campo": "ESTATUS DEL TRABAJADOR"
+    },
+    {
+      "col": 25,
+      "numero": 25,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "números y letras  (diez)",
+      "nombre_campo": "DOBLE PLAZA EN"
+    },
+    {
+      "col": 26,
+      "numero": 26,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números    (dos)",
+      "nombre_campo": "CLAVE PRESUPUESTAL: CODIGO DE PAGO"
+    },
+    {
+      "col": 27,
+      "numero": 27,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números    (dos)",
+      "nombre_campo": "CLAVE PRESUPUESTAL: CLAVE DE UNIDAD"
+    },
+    {
+      "col": 28,
+      "numero": 28,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números    (dos)",
+      "nombre_campo": "CLAVE PRESUPUESTAL: CLAVE DE SUBUNIDAD"
+    },
+    {
+      "col": 29,
+      "numero": 29,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números  (siete)",
+      "nombre_campo": "CLAVE PRESUPUESTAL: CLAVE DE CATEGORIA"
+    },
+    {
+      "col": 30,
+      "numero": 30,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números  (dos.uno)",
+      "nombre_campo": "CLAVE PRESUPUESTAL: HORAS"
+    },
+    {
+      "col": 31,
+      "numero": 31,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números    (seis)",
+      "nombre_campo": "CLAVE PRESUPUESTAL: NUMERO DE PLAZA"
+    },
+    {
+      "col": 32,
+      "numero": 32,
+      "tipo_excel": "NUMERO",
+      "regla_captura": "números    (dos)",
+      "nombre_campo": "TIPO NOMBRAMIENTO"
+    },
+    {
+      "col": 33,
+      "numero": 33,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "PUESTO"
+    },
+    {
+      "col": 34,
+      "numero": 34,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "DESCRIPCION DE LA FUNCION DEL PUESTO"
+    },
+    {
+      "col": 35,
+      "numero": 35,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras           (uno)",
+      "nombre_campo": "SEXO (M, H)"
+    },
+    {
+      "col": 36,
+      "numero": 36,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "letras y números",
+      "nombre_campo": "NO. DE DOCUMENTO OFICIAL IFE / INE"
+    },
+    {
+      "col": 37,
+      "numero": 37,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "NACIONALIDAD"
+    },
+    {
+      "col": 38,
+      "numero": 38,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números",
+      "nombre_campo": "DOMICILIO: CALLE Y NO."
+    },
+    {
+      "col": 39,
+      "numero": 39,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números",
+      "nombre_campo": "DOMICILIO: NOMBRE DE LA COLONIA "
+    },
+    {
+      "col": 40,
+      "numero": 40,
+      "tipo_excel": "NUMERO",
+      "regla_captura": "números  (hasta tres)",
+      "nombre_campo": "DOMICILIO: CLAVE DEL MUNICIPIO"
+    },
+    {
+      "col": 41,
+      "numero": 41,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números",
+      "nombre_campo": "DOMICILIO: NOMBRE DEL MUNICIPIO O DELEGACION"
+    },
+    {
+      "col": 42,
+      "numero": 42,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números",
+      "nombre_campo": "DOMICILIO: NOMBRE DE LA LOCALIDAD"
+    },
+    {
+      "col": 43,
+      "numero": 43,
+      "tipo_excel": "NUMERO",
+      "regla_captura": "números  (hasta dos)",
+      "nombre_campo": "DOMICILIO: CLAVE DE LA ENTIDAD FEDERATIVA"
+    },
+    {
+      "col": 44,
+      "numero": 44,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números  (cinco)",
+      "nombre_campo": "DOMICILIO: CODIGO POSTAL"
+    },
+    {
+      "col": 45,
+      "numero": 45,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "letras",
+      "nombre_campo": "PARENTESCO , NOMBRE DE CONTACTO, TELEFONO"
+    },
+    {
+      "col": 46,
+      "numero": 46,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números  (diez)",
+      "nombre_campo": "TELEFONO CELULAR"
+    },
+    {
+      "col": 47,
+      "numero": 47,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "letras y números",
+      "nombre_campo": "CORREO ELECTRONICO"
+    },
+    {
+      "col": 48,
+      "numero": 48,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números  (cinco)",
+      "nombre_campo": "HORA ENTRADA"
+    },
+    {
+      "col": 49,
+      "numero": 49,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "números  (cinco)",
+      "nombre_campo": "HORA SALIDA"
+    },
+    {
+      "col": 50,
+      "numero": 50,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": "DIAS QUE LABORA"
+    },
+    {
+      "col": 51,
+      "numero": 51,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "letras y números",
+      "nombre_campo": "CARRERA MAGISTERIAL / NIVEL DE SPD / CARRERA ADMINISTRATIVA "
+    },
+    {
+      "col": 52,
+      "numero": 52,
+      "tipo_excel": "TEXTO",
+      "regla_captura": "letras y números",
+      "nombre_campo": "FOLIO FEDERAL-INGRESO"
+    },
+    {
+      "col": 53,
+      "numero": 53,
+      "tipo_excel": null,
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "ALFABETIZACION-GRADO"
+    },
+    {
+      "col": 54,
+      "numero": 54,
+      "tipo_excel": null,
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "ALFABETIZACION-GRUPO"
+    },
+    {
+      "col": 55,
+      "numero": 55,
+      "tipo_excel": null,
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "ALFABETIZACION-ALUMNOS"
+    },
+    {
+      "col": 56,
+      "numero": 56,
+      "tipo_excel": null,
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "INICIAL-GRADO"
+    },
+    {
+      "col": 57,
+      "numero": 57,
+      "tipo_excel": null,
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "INICIAL-GRUPO"
+    },
+    {
+      "col": 58,
+      "numero": 58,
+      "tipo_excel": null,
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "INICIAL-ALUMNOS"
+    },
+    {
+      "col": 59,
+      "numero": 59,
+      "tipo_excel": null,
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "INICIAL NO ESC -GRADO"
+    },
+    {
+      "col": 60,
+      "numero": 60,
+      "tipo_excel": null,
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "INICIAL NO ESC -GRUPO"
+    },
+    {
+      "col": 61,
+      "numero": 61,
+      "tipo_excel": null,
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "INICIAL NO ESC -ALUMNOS"
+    },
+    {
+      "col": 62,
+      "numero": 62,
+      "tipo_excel": null,
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "PREESCOLAR-GRADO"
+    },
+    {
+      "col": 63,
+      "numero": 63,
+      "tipo_excel": null,
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "PREESCOLAR-GRUPO"
+    },
+    {
+      "col": 64,
+      "numero": 64,
+      "tipo_excel": null,
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "PREESCOLAR-ALUMNOS"
+    },
+    {
+      "col": 65,
+      "numero": 65,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "PRIMARIA-GRADO"
+    },
+    {
+      "col": 66,
+      "numero": 66,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "PRIMARIA-GRUPO"
+    },
+    {
+      "col": 67,
+      "numero": 67,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "PRIMARIA-ALUMNOS"
+    },
+    {
+      "col": 68,
+      "numero": 68,
+      "tipo_excel": null,
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "SECUNDARIA-GRADO"
+    },
+    {
+      "col": 69,
+      "numero": 69,
+      "tipo_excel": null,
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "SECUNDARIA-GRUPO"
+    },
+    {
+      "col": 70,
+      "numero": 70,
+      "tipo_excel": null,
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "SECUNDARIA-ALUMNOS"
+    },
+    {
+      "col": 71,
+      "numero": 71,
+      "tipo_excel": null,
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "TALLER-GRADO"
+    },
+    {
+      "col": 72,
+      "numero": 72,
+      "tipo_excel": null,
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "TALLER-NOMBRE"
+    },
+    {
+      "col": 73,
+      "numero": 73,
+      "tipo_excel": null,
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "TALLER-ALUMNOS"
+    },
+    {
+      "col": 74,
+      "numero": 74,
+      "tipo_excel": null,
+      "regla_captura": "números  (uno)",
+      "nombre_campo": "MISIONES-GRADO"
+    },
+    {
+      "col": 75,
+      "numero": 75,
+      "tipo_excel": null,
+      "regla_captura": "letras  (uno)",
+      "nombre_campo": "MISIONES-GRUPO"
+    },
+    {
+      "col": 76,
+      "numero": 76,
+      "tipo_excel": null,
+      "regla_captura": "números  (tres)",
+      "nombre_campo": "MISIONES-ALUMNOS"
+    },
+    {
+      "col": 77,
+      "numero": 77,
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras y números",
+      "nombre_campo": "OBSERVACIONES"
+    },
+    {
+      "col": 78,
+      "numero": "+",
+      "tipo_excel": "GENERAL",
+      "regla_captura": "letras",
+      "nombre_campo": null
+    }
+  ]
+}

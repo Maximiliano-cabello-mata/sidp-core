@@ -68,7 +68,7 @@ erDiagram
 
 | Área | Tablas | Fase |
 |---|---|---|
-| Escuela y calendario | `escuela` (CCT 15E/15D), `ciclo`, `periodo` (3 por ciclo), `campo_formativo` (los 4 del Plan 2022) | 4 |
+| Escuela y calendario | `escuela` (CCT 15E/15D, turno, zona, domicilio, municipio, director y subdirector: lo que llevan las constancias y el 911), `ciclo`, `periodo` (3 por ciclo), `campo_formativo` (los 4 del Plan 2022) | 4 |
 | Personal y cuentas | `personal`, `usuario`, `sesion` | 4 |
 | Alumnos y familias | `alumno`, `alumno_salud`, `tutor`, `alumno_tutor`, `grupo`, `inscripcion` | 6 |
 | Evaluación | `calificacion`, `calificacion_correccion`, vista `calificacion_vigente`, `examen_diagnostico`, `resultado_diagnostico` | 7 |

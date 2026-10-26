@@ -396,6 +396,72 @@ def sp_asignar_tutor(db, alumno_id, tutor_id, parentesco, actor, principal=True,
         _anotar(db, fecha, actor, 'alumno_tutor.asignado', 'alumno_tutor', f'{alumno_id}/{tutor_id}', actual, despues)
 
 
+def sp_validar_curp_renapo(db, alumno_id, archivo_sha256, resultado, actor, version, motivo=None, *, ahora=None):
+    """Guarda la constancia de RENAPO que trajo una persona y, si coincide, confirma la CURP del alumno.
+
+    La constancia queda como documento 'curp' revisado (validado o rechazado con su motivo); con
+    'validado', alumno.curp_confirmada pasa a 1. Quién y cuándo quedan en la revisión y la bitácora.
+    """
+    fecha = _ahora(ahora)
+    with _transaccion(db):
+        _persona(db, actor)
+        _opcion(resultado, ('validado', 'rechazado'), 'Resultado')
+        alumno = _uno(db, 'SELECT curp, curp_confirmada, version FROM alumno WHERE id = ?', (alumno_id,))
+        if alumno is None:
+            raise ProcedimientoError('El alumno no existe.')
+        _misma_version(alumno, version, 'El alumno')
+        if not _uno(db, 'SELECT 1 FROM archivo WHERE sha256 = ?', (archivo_sha256,)):
+            raise ProcedimientoError(f'El archivo físico con hash {archivo_sha256} no está registrado.')
+        motivo = motivo.strip() if motivo and motivo.strip() else None
+        if resultado == 'rechazado' and motivo is None:
+            raise ProcedimientoError('Es obligatorio especificar por qué no coincide la constancia.')
+        documento_id = _uid()
+        db.execute('INSERT INTO documento(id, tipo, alumno_id, archivo_sha256, origen, estado, motivo_rechazo, recibio, recibido) '
+                   "VALUES(?, 'curp', ?, ?, 'escaneo', ?, ?, ?, ?)",
+                   (documento_id, alumno_id, archivo_sha256, resultado, motivo if resultado == 'rechazado' else None, actor, fecha))
+        db.execute('INSERT INTO revision_documento(id, documento_id, resultado, motivo, reviso, fecha) VALUES(?,?,?,?,?,?)',
+                   (_uid(), documento_id, resultado, motivo or 'Constancia de la CURP descargada de RENAPO', actor, fecha))
+        despues = {'documento_id': documento_id, 'curp': alumno['curp'], 'fuente': 'constancia RENAPO'}
+        if resultado == 'validado':
+            _actualizar(db, 'alumno', alumno_id, {'curp_confirmada': 1})
+            _anotar(db, fecha, actor, 'alumno.renapo_validada', 'alumno', alumno_id,
+                    {'curp_confirmada': alumno['curp_confirmada']}, {**despues, 'curp_confirmada': 1})
+        else:
+            _anotar(db, fecha, actor, 'alumno.renapo_no_coincide', 'alumno', alumno_id, None, {**despues, 'motivo': motivo})
+    return documento_id
+
+
+def sp_pasar_lista(db, grupo_id, fecha, marcas, actor, *, ahora=None):
+    """Asistencia de un grupo en una fecha. marcas: {inscripcion_id: 'presente'|'falta'|'retardo'|'justificada'}.
+
+    Volver a pasar lista el mismo día cambia la marca y deja el valor anterior en la bitácora.
+    """
+    momento = _ahora(ahora)
+    try:
+        datetime.date.fromisoformat(fecha)
+    except (TypeError, ValueError) as error:
+        raise ProcedimientoError('La fecha debe tener la forma AAAA-MM-DD.') from error
+    with _transaccion(db):
+        _persona(db, actor)
+        inscritas = {i for (i,) in db.execute("SELECT id FROM inscripcion WHERE grupo_id = ? AND estado IN ('incompleta','completa')",
+                                              (grupo_id,))}
+        for inscripcion_id, estado in marcas.items():
+            _opcion(estado, ('presente', 'falta', 'retardo', 'justificada'), 'Asistencia')
+            if inscripcion_id not in inscritas:
+                raise ProcedimientoError('Un alumno de la lista no está inscrito en este grupo.')
+            actual = _uno(db, 'SELECT estado FROM asistencia_alumno WHERE inscripcion_id = ? AND fecha = ?', (inscripcion_id, fecha))
+            if actual is None:
+                db.execute('INSERT INTO asistencia_alumno(inscripcion_id, fecha, estado, capturo) VALUES(?,?,?,?)',
+                           (inscripcion_id, fecha, estado, actor))
+            elif actual['estado'] != estado:
+                db.execute('UPDATE asistencia_alumno SET estado = ?, capturo = ?, version = version + 1 '
+                           'WHERE inscripcion_id = ? AND fecha = ?', (estado, actor, inscripcion_id, fecha))
+            else:
+                continue
+            _anotar(db, momento, actor, 'asistencia.capturada', 'inscripcion', inscripcion_id, actual,
+                    {'fecha': fecha, 'estado': estado})
+
+
 def sp_capturar_calificacion(db, inscripcion_id, periodo_id, campo, valor, actor, version=None, observaciones=None,
                              *, ahora=None):
     """Captura o cambia la calificación de un campo formativo en un periodo abierto."""

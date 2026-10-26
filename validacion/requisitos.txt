@@ -2,8 +2,15 @@
 # Instalar con: python -m pip install -r validacion/requisitos.txt
 # Tesseract (respaldo del OCR y detector del giro) se instala aparte, con español: ver docs/guias/ENTORNO_PRUEBAS.md.
 # PaddleOCR va aparte porque es pesado: validacion/requisitos_paddle.txt.
+# pg8000 conecta el cerebro con su base de datos PostgreSQL (solo Python: sirve en cualquier versión).
 pypdf>=5.1
 pypdfium2>=4.30
 pillow>=10.0
 opencv-python-headless>=4.10
 zxing-cpp>=2.2
+pg8000>=1.31
+# pandas (con numpy) hace el análisis de datos de la PC 4: pestaña "Análisis de datos" y python -m validacion.base_cerebro analisis.
+pandas>=2.2
+# openpyxl y reportlab: el motor de documentos del cerebro (911 y listas en Excel; constancias y listas en PDF).
+openpyxl==3.1.5
+reportlab==4.4.4

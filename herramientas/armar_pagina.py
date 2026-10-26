@@ -7,6 +7,7 @@ código con Pyodide: nada se envía a ningún lado y no hay documentos reales.
     python -m herramientas.armar_pagina _pagina
 """
 import argparse
+import ast
 import json
 import shutil
 from pathlib import Path
@@ -15,9 +16,23 @@ RAIZ = Path(__file__).resolve().parents[1]
 INTERFAZ = RAIZ / 'validacion' / 'interfaz'
 EJEMPLO = RAIZ / 'validacion' / 'ejemplo'
 PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
-CODIGO = ['validacion/__init__.py', 'validacion/comparador.py', 'validacion/modelo.py', 'validacion/lector.py',
-          'validacion/expediente.py', 'validacion/prueba.py', 'validacion/cerebro_red.py', 'validacion/registro.py',
-          'validacion/servicio.py', 'database/__init__.py', 'database/procedimientos.py', 'database/diseno_integral.sql']
+def codigo_necesario(inicio=('validacion/servicio.py', 'validacion/registro.py')):
+    """Lo que usa la página (motor.js) y todo lo que importa del repositorio (también dentro de una función)."""
+    pendientes, vistos = list(inicio), []
+    while pendientes:
+        ruta = pendientes.pop()
+        if ruta in vistos or not (RAIZ / ruta).exists():
+            continue
+        vistos.append(ruta)
+        for nodo in ast.walk(ast.parse((RAIZ / ruta).read_text(encoding='utf-8'))):
+            if isinstance(nodo, ast.ImportFrom) and nodo.module and nodo.module.split('.')[0] in ('validacion', 'database'):
+                if nodo.module in ('validacion', 'database'):
+                    pendientes += [f'{nodo.module}/{a.name}.py' for a in nodo.names]
+                else:
+                    pendientes.append(nodo.module.replace('.', '/') + '.py')
+            elif isinstance(nodo, ast.Import):
+                pendientes += [a.name.replace('.', '/') + '.py' for a in nodo.names if a.name.split('.')[0] in ('validacion', 'database')]
+    return sorted(set(vistos) | {'validacion/__init__.py', 'database/__init__.py', 'database/diseno_integral.sql'})
 
 
 def ejemplo():
@@ -40,7 +55,7 @@ def armar(destino, pyodide=PYODIDE):
         (destino / salida).write_text(texto.replace('/*SIDP_CONFIG*/', config), encoding='utf-8')
     for nombre in ('estilo.css', 'motor.js'):
         shutil.copy(INTERFAZ / nombre, destino / nombre)
-    codigo = {ruta: (RAIZ / ruta).read_text(encoding='utf-8') for ruta in CODIGO}
+    codigo = {ruta: (RAIZ / ruta).read_text(encoding='utf-8') for ruta in codigo_necesario()}
     (destino / 'codigo.json').write_text(json.dumps(codigo, ensure_ascii=False), encoding='utf-8')
     (destino / 'ejemplo.json').write_text(json.dumps(ejemplo(), ensure_ascii=False), encoding='utf-8')
     (destino / '.nojekyll').write_text('', encoding='utf-8')

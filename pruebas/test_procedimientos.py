@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from database.procedimientos import (
     ProcedimientoError, procesar_expediente_extraido, sp_asignar_tutor, sp_baja_alumno, sp_cancelardocumentoemitido,
-    sp_capturar_calificacion, sp_finalizar_lote_importacion, sp_inscribir_alumno, sp_inventario,
+    sp_capturar_calificacion, sp_finalizar_lote_importacion, sp_inscribir_alumno, sp_inventario, sp_pasar_lista,
     sp_publicarversionformato, sp_reemplazardocumento, sp_revisardocumento, sp_siguenteciclo, sp_solicitudtutor)
 
 DISENO = Path(__file__).resolve().parent.parent / 'database' / 'diseno_integral.sql'
@@ -360,3 +360,15 @@ def test_baja_de_alumno_e_inscripcion(db, escuela):
         'baja', '2026-10-15T09:00:00', 'Cambio de domicilio', 2)
     assert bitacora(db, 'alumno.baja')[0]['despues']['motivo'] == 'Cambio de domicilio'
     falla('El alumno cambió', sp_baja_alumno, db, a, 'Otra vez', escuela['usuario'], 1)
+
+
+def test_pasar_lista_y_corregirla(db, escuela):
+    lista = (db, escuela['grupo'], '2026-10-13')
+    sp_pasar_lista(*lista, {escuela['inscripcion']: 'falta'}, escuela['usuario'])
+    sp_pasar_lista(*lista, {escuela['inscripcion']: 'falta'}, escuela['usuario'])  # Igual: no cambia nada.
+    sp_pasar_lista(*lista, {escuela['inscripcion']: 'presente'}, escuela['usuario'])
+    assert db.execute('SELECT estado, version FROM asistencia_alumno').fetchall() == [('presente', 2)]
+    assert [b['antes'] for b in bitacora(db, 'asistencia.capturada')] == [None, {'estado': 'falta'}]
+    falla('Asistencia', sp_pasar_lista, *lista, {escuela['inscripcion']: 'tarde'}, escuela['usuario'])
+    falla('no está inscrito', sp_pasar_lista, *lista, {uid(): 'presente'}, escuela['usuario'])
+    falla('AAAA-MM-DD', sp_pasar_lista, db, escuela['grupo'], '13/10/2026', {}, escuela['usuario'])
