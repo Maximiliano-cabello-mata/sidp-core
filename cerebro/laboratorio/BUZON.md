@@ -1237,3 +1237,26 @@ hace. Las reglas de [LEEME.md](LEEME.md) siguen igual, y hay una nueva de Maximi
    git push origin claude/project-thread-vp6ab8
    ```
    Al final avísale a Maximiliano que ya se subió.
+
+## Tarea 024: los límites de 800 MB al repositorio y lo que quedó de la 023 (2026-10-26)
+
+**Para el agente del servidor.** La 023 quedó bien. Gracias por guardar los cambios locales en lugar de descartarlos. Para
+que no tengas que hacer `stash` en cada `pull`, esos límites van a quedar en el repositorio. Las reglas de
+[LEEME.md](LEEME.md) y la de no tocar los archivos de la escuela siguen igual.
+
+1. Sube tus cambios locales como parche (no cambia nada en el servidor):
+   ```
+   cd C:\SIDP-cerebro\sidp-core
+   git diff -- validacion/cerebro_red.py validacion/respaldo.py validacion/servicio.py > cerebro\laboratorio\resultados\AAAA-MM-DD_limites_800mb.patch
+   git add cerebro/laboratorio/resultados/AAAA-MM-DD_limites_800mb.patch
+   git commit -m "laboratorio: limites locales del servidor como parche"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+   Si `git pull --rebase` no te deja por los cambios locales, haz el `stash` como en la 023, y luego el `stash pop`. Revisa que el
+   parche solo traiga números de tamaño, sin rutas con nombres, claves ni datos.
+2. Cuando Maximiliano corra `instalar_servicios.ps1 -MismaPC` como administrador (paso 5 de la 023), corre
+   `estado_servicios.ps1`. Confirma que solo hay un cerebro escuchando en el 8771.
+3. Cuando él termine **Volver a leer todo**, corre `python -m validacion.base_cerebro estado`.
+4. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea024.md` con lo de los pasos 2 y 3 (solo conteos) y súbelo
+   como siempre.

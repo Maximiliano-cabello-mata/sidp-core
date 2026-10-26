@@ -101,6 +101,19 @@ def test_el_telefono_del_padre_no_se_toma_del_renglon_de_la_madre():
     assert campos.de_texto(hoja, lista, HOY) == {'telefono_de_la_madre': '722 111 2233', 'telefono_de_emergencia': '722 555 6677'}
 
 
+def test_una_curp_que_solo_leyo_el_modelo_la_confirma_una_persona():
+    # Tarea 023: la lectura completa y las dos lecturas con campos son del mismo modelo; si lee mal la CURP, la lee mal igual.
+    curp = generar.curp('GAHJ200512HMCRRNA')
+    lista = [campos.campo('curp', 'CURP del alumno', 'curp', 'alumno'), campos.campo('nombre_madre', 'Nombre de la madre', 'nombre', 'madre', 'nombre')]
+    visto = {'curp': {'valor': curp, 'seguro': True}, 'nombre_madre': {'valor': 'Rosa Pérez', 'seguro': True}}
+    del_modelo = {r['clave']: r['confianza'] for r in taller.combinar(lista, {'curp': (curp, 'lectura'), 'nombre_madre': ('Rosa Pérez', 'lectura')}, visto, {}, HOY)}
+    assert del_modelo == {'curp': 'baja', 'nombre_madre': 'media'}
+    assert {r['clave']: r['confianza'] for r in taller.combinar(lista, {'curp': (curp, 'lectura')}, None, {}, HOY)}['curp'] == 'baja'
+    assert {r['clave']: r['confianza'] for r in taller.combinar(lista, {}, visto, {}, HOY)}['curp'] == 'baja'
+    # Con otra fuente (el texto del PDF o el OCR) sí: la CURP además se salva con su dígito.
+    assert {r['clave']: r['confianza'] for r in taller.combinar(lista, {'curp': (curp, 'ocr')}, visto, {}, HOY)}['curp'] == 'alta'
+
+
 def test_lo_que_lee_solo_el_ocr_o_dos_lecturas_distintas_queda_por_confirmar(monkeypatch):
     lista = [campos.campo('cp', 'Código postal', 'cp', 'domicilio'), campos.campo('telefono', 'Teléfono', 'telefono', 'contacto', 'telefono'),
              campos.campo('alergias', 'Alergias', 'lista', 'salud', 'alergia')]

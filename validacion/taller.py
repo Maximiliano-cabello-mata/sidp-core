@@ -211,6 +211,15 @@ def ver(hojas, nombre_documento, lista, modelo_vision, url=modelo.URL, lecturas=
     return primera, segundos + mas
 
 
+def _de_acuerdo(c, metodo):
+    """La confianza cuando el proceso y el modelo que ve dicen lo mismo. La lectura completa también es del modelo que ve:
+    si se equivoca, se equivoca igual en las dos (Tarea 023: una CURP escrita a mano salió mal y marcada segura). Una CURP
+    que solo leyó el modelo la confirma una persona, o la lista oficial, o RENAPO."""
+    if metodo != 'lectura':
+        return 'alta'
+    return 'baja' if c['tipo'] == 'curp' else 'media'
+
+
 def combinar(campos, procesos, vistos, identidad, hoy):
     """Un valor por campo con su confianza. vistos: lo que leyó el modelo {clave: {valor, seguro}}."""
     salida = []
@@ -226,7 +235,7 @@ def combinar(campos, procesos, vistos, identidad, hoy):
         if limpio_p and limpio_v:
             iguales = comparador.normalizar(str(limpio_p)) == comparador.normalizar(str(limpio_v))
             valor, detalle = (limpio_p, detalle_p)
-            confianza, metodo = ('alta', f'{metodo}+vision') if iguales else ('baja', metodo)
+            confianza, metodo = (_de_acuerdo(c, metodo), f'{metodo}+vision') if iguales else ('baja', metodo)
             if not iguales and metodo in ('ocr', 'lectura'):  # En una foto, el modelo que ve suele leer mejor que el OCR: se propone lo suyo.
                 valor, detalle, metodo = limpio_v, {**detalle_v, 'otra_lectura': limpio_p}, 'vision'
             elif not iguales:
@@ -235,10 +244,10 @@ def combinar(campos, procesos, vistos, identidad, hoy):
             valor, detalle = limpio_p, detalle_p
             # El OCR de una foto confunde 5 con 3 o 7 con 1, y una sola lectura del modelo también se equivoca: solo, queda por
             # confirmar (la CURP se salva con su dígito).
-            confianza = 'alta' if c['tipo'] == 'curp' or metodo == 'qr' else 'baja' if metodo in ('ocr', 'lectura') else 'media'
+            confianza = 'alta' if (c['tipo'] == 'curp' and metodo != 'lectura') or metodo == 'qr' else 'baja' if metodo in ('ocr', 'lectura') else 'media'
         elif limpio_v:
             valor, detalle, metodo = limpio_v, detalle_v, 'vision'
-            confianza = 'media' if visto.get('seguro') else 'baja'
+            confianza = 'media' if visto.get('seguro') and c['tipo'] != 'curp' else 'baja'
             if visto.get('otra'):
                 detalle = {**detalle, 'otra_lectura': visto['otra']}
         elif crudo_visto and not campos_mod.vacio(crudo_visto):
