@@ -8,11 +8,15 @@ con reglas fijas y sin IA, se sacan de esos textos:
 - el nombre del contacto de emergencia y su parentesco;
 - lo de salud del alumno (alergias, padecimientos, medicamentos, discapacidad o condición). Lo que el médico escribió
   o marcó del alumno sí; las opciones impresas sin marcar y los antecedentes de familiares (heredofamiliares) no,
-  porque un "Hipertensión [ ]" sin marcar o la diabetes del abuelo no son del niño.
+  porque un "Hipertensión [ ]" sin marcar o la diabetes del abuelo no son del niño;
+- su salud general (salud_general): peso, estatura, tipo de sangre, vista, lentes, oído, dientes, vacunas, educación
+  física, servicio médico, lo que concluyó el médico, sus recomendaciones y la fecha del certificado. Cada uno pasa
+  por sus reglas (un peso de niño, un tipo de sangre que existe); el peso al nacer y los signos vitales no se toman.
 
 Cada lectura (lo transcrito, el OCR, cada lectura del modelo) es una fuente. Un dato que sale igual en varias fuentes
 es más seguro; uno que sale en una sola queda por confirmar. Las enfermedades graves siempre las confirma una persona.
 """
+import datetime
 import difflib
 import re
 import unicodedata
@@ -61,9 +65,10 @@ SALUD = (
 )
 # Antecedentes de la familia: lo que sigue no es del alumno.
 FAMILIA = re.compile(r'HEREDO|FAMILIAR|\bABUEL|\bPADRES\b|\bMADRE\b|\bPADRE\b|\bMAMA\b|\bPAPA\b|MATERN|PATERN|\bHERMAN')
-# Lo que la etiqueta "Diagnóstico" o "Condición" también trae y no es de lo que se saca (Solo lo necesario).
+# Etiquetas de la salud general (salud_general): no son alergias, padecimientos, medicamentos ni discapacidad.
 NO_SALUD = re.compile(r'NUTRICI|\bPESO\b|TALLA|\bIMC\b|AGUDEZA|VISUAL|DENTAL|BUCAL|VACUN|ESQUEMA|SANGU|\bRH\b|ACTIVIDAD FISICA|'
-                      r'NO PATOLOGIC|SIGNOS VITALES|TEMPERATURA|FRECUENCIA')
+                      r'NO PATOLOGIC|SIGNOS VITALES|TEMPERATURA|FRECUENCIA|CONDICION (?:FISICA|GENERAL)|ESTADO (?:FISICO|GENERAL|DE SALUD)|'
+                      r'\bAPT[OA]\b|LENTES|AUDICI|AUDITIV|\bOIDOS?\b|EDUCACION FISICA')
 # Otra sección de la hoja: termina la de antecedentes de la familia.
 OTRA_SECCION = re.compile(r'PERSONALES|DEL ALUMNO|DEL PACIENTE|EXPLORACI|ALERGI|MEDICAMENT|DISCAPAC|OBSERVACI|DIAGNOSTIC|'
                           r'NO PATOLOGIC|IMPRESION|CONCLUSI|PADECIMIENTO ACTUAL')
@@ -89,7 +94,10 @@ def renglones(texto):
 
 def es_ninguno(texto):
     t = ' '.join(re.sub(r'[^A-Z0-9/ -]+', ' ', normal(texto)).split())
-    return not t or bool(NADA.fullmatch(t) or NADA_PARTIDO.fullmatch(t.replace(' ', '')))
+    junto = t.replace(' ', '')
+    # El OCR de letra a mano también da "NINNGUNA" o "NINGUMA": una sola palabra casi igual a NINGUNA.
+    return not t or bool(NADA.fullmatch(t) or NADA_PARTIDO.fullmatch(junto)) or (
+        len(t.split()) <= 2 and 6 <= len(junto) <= 9 and difflib.SequenceMatcher(None, junto, 'NINGUNA').ratio() >= 0.85)
 
 
 def es_grave(texto):
@@ -357,15 +365,193 @@ def salud(texto):
     return salida
 
 
+# ---------------------------------------------------------------- Salud general del alumno
+
+# La etiqueta dice a qué dato va. El orden importa: "Agudeza auditiva" es del oído y "Peso para la talla" es nutrición.
+GENERAL = (
+    ('audicion', re.compile(r'AUDICI|AUDITIV|\bOIDOS?\b')),
+    ('estado_nutricional', re.compile(r'NUTRICI|PESO\s*(?:/|PARA)|\bIMC\b|MASA CORPORAL')),
+    ('peso', re.compile(r'\bPESO\b(?!\s+(?:AL|DE)\s+NACER)')),
+    ('talla', re.compile(r'\b(?:TALLA|ESTATURA)\b(?!\s+(?:AL|DE)\s+NACER)')),
+    ('tipo_sangre', re.compile(r'SANGU|\bSANGRE\b|\bRH\b')),
+    ('usa_lentes', re.compile(r'LENTES|ANTEOJOS')),
+    ('agudeza_visual', re.compile(r'AGUDEZA VISUAL|\bVISTA\b|\bVISION\b|\bVISUAL\b')),
+    ('salud_bucal', re.compile(r'BUCAL|DENTAL|DIENTES|DENTADURA|CARIES|ODONTOL')),
+    ('vacunas', re.compile(r'VACUN|CARTILLA|INMUNIZ')),
+    ('educacion_fisica', re.compile(r'EDUCACION FISICA|ACTIVIDAD(?:ES)? FISICAS?|DEPORT|\bAPT[OA]\b')),
+    ('servicio_medico', re.compile(r'SERVICIO MEDICO|DERECHOHABIEN|AFILIACI|SEGURIDAD SOCIAL|\bSEGURO\b')),
+    ('estado_general', re.compile(r'CONCLUSI|IMPRESION DIAGNOSTICA|ESTADO (?:DE SALUD|GENERAL)|DICTAMEN|^DIAGNOSTICO(?: MEDICO| GENERAL)?$')),
+    ('recomendaciones', re.compile(r'RECOMENDACI|INDICACIONES|SUGERENCIA|OBSERVACI')),
+    ('fecha_certificado', re.compile(r'^FECHA\b(?!.*NACIMIENTO)(?!.*\bNAC\b)(?!.*VACUN)')),
+)
+# Dónde empieza otra etiqueta en un renglón con varias ("PESO: 22 KG TALLA: 1.18 M"). Las que no están aquí ("OD:",
+# "OI:") se quedan en el valor de la anterior ("AGUDEZA VISUAL: OD: 20/20 OI: 20/25").
+INICIO = re.compile(r'¿?(?:PESO|TALLA|ESTATURA|TIPO|GRUPO|SANGRE|RH|AGUDEZA|VISTA|VISION|USA|LENTES|AUDICION|OIDOS?|SALUD|ESQUEMA|'
+                    r'VACUN\w*|CARTILLA|EDUCACION|ACTIVIDAD\w*|APT[OA]|PUEDE|SERVICIO|DERECHOHABIEN\w*|AFILIACION|SEGURO|CONCLUSION\w*|'
+                    r'IMPRESION|ESTADO|DIAGNOSTICO|RECOMENDACION\w*|OBSERVACION\w*|INDICACION\w*|FECHA|IMC|NOMBRE|EDAD|SEXO|CURP|'
+                    r'PRESION|TENSION|T/?A|F\.?C|F\.?R|FRECUENCIA|TEMPERATURA|TEMP|ALERGI\w*|MEDICAMENT\w*|PADECIM\w*|ENFERMEDAD\w*|'
+                    r'DISCAPACIDAD|CEDULA|MEDICO|FIRMA|GRADO|ESCUELA|DOMICILIO|TELEFONO|CELULAR|PERIMETRO|CINTURA|SATURACION)\b')
+# Lo que el médico escribe como conclusión, sin etiqueta: "El alumno se encuentra clínicamente sano".
+SANO = re.compile(r'(?:CLINICAMENTE|APARENTEMENTE) SAN[OA]|BUEN ESTADO DE SALUD|SE ENCUENTRA (?:EN )?(?:BUEN ESTADO|SAN[OA]|SALUDABLE)')
+
+
+def _donde_empieza(texto):
+    """La posición en `texto` donde empieza la etiqueta del valor que sigue (lo que va antes del siguiente ':'), o None."""
+    palabras = list(re.finditer(r'\S+', texto))
+    for m in palabras[-6:]:
+        resto = texto[m.start():]
+        if INICIO.match(resto) and not re.search(r'\d', resto):
+            return m.start()
+    return None
+
+
+def _segmentos(renglon):
+    """[(etiqueta, valor)] de un renglón con una o varias etiquetas."""
+    partes = renglon.split(':')
+    if len(partes) > 1:
+        salida = [[partes[0].strip(), None]]
+        for n, texto in enumerate(partes[1:], 1):
+            corte = None if n == len(partes) - 1 else _donde_empieza(texto)
+            valor = texto if corte is None else texto[:corte]
+            salida[-1][1] = valor if salida[-1][1] is None else f'{salida[-1][1]}:{valor}'
+            if corte is not None:
+                salida.append([texto[corte:].strip(), None])
+        return [(e, (v or '').strip()) for e, v in salida]
+    # Sin ':' ("PESO 22 KG TALLA 118 CM", "VACUNAS COMPLETAS"): cada etiqueta conocida empieza un pedazo.
+    inicios = [m.start() for m in re.finditer(r'(?:(?<=\s)|^)\S', renglon) if INICIO.match(renglon[m.start():])
+               and any(patron.match(renglon[m.start():]) or patron.search(' '.join(renglon[m.start():].split()[:2])) for _, patron in GENERAL)]
+    if not inicios or inicios[0] > 3:
+        return []
+    salida = []
+    for n, inicio in enumerate(inicios):
+        pedazo = renglon[inicio:inicios[n + 1] if n + 1 < len(inicios) else len(renglon)]
+        campo, patron = next(((c, p) for c, p in GENERAL if p.search(' '.join(pedazo.split()[:3]))), (None, None))
+        hallado = patron.search(pedazo) if patron else None
+        if hallado:
+            fin = hallado.end() + re.match(r'\w*', pedazo[hallado.end():]).end()  # "VACUN" de "VACUNAS": la palabra entera.
+            salida.append((pedazo[:fin], re.sub(r'^\s*(?:DE|DEL|ES)\b', '', pedazo[fin:]).strip()))
+    return salida
+
+
+def _marcado(texto):
+    """Lo marcado de un valor con casillas ("Sí [X] No [ ]" es SI; "[ ] Completo [X] Incompleto" es INCOMPLETO). None si
+    tiene casillas y ninguna está marcada."""
+    if not re.search(CASILLA, texto):
+        return texto
+    casilla_antes = bool(re.match(r'\s*' + CASILLA, texto))
+    partes = re.split(f'({CASILLA})', texto)
+    marcadas = []
+    for n, parte in enumerate(partes):
+        if re.fullmatch(MARCA, parte):
+            opcion = partes[n + 1] if casilla_antes and n + 1 < len(partes) else partes[n - 1] if n else ''
+            opcion = re.sub(r'^[\s,;:.¿?/-]+|[\s,;:.¿?/-]+$', '', opcion)
+            if opcion:
+                marcadas.append(opcion)
+    return ', '.join(marcadas) if marcadas else None
+
+
+def _general(campo, etiqueta, valor, hoy=None):
+    """El valor de un dato de salud general, ya limpio, o None si no dice nada que sirva para ese dato."""
+    valor = _marcado(valor or '')
+    valor = re.sub(r'\[?ILEGIBLE\]?', ' ', valor or '').strip(' .,;:-_')
+    valor = ' '.join(valor.split())
+    if not valor:
+        return None
+    if re.fullmatch(r'(?:SI|NO)\s*(?:/|,|O)?\s*(?:SI|NO)', valor) or (re.search(r'INCOMPLET', valor) and re.search(r'(?<!IN)COMPLET', valor)):
+        return None  # Las opciones impresas sin marcar ("Sí / No", "Completo / Incompleto") no dicen nada.
+    si_no = campos_mod.si_no(valor) if re.match(r'(SI|NO|S|N|X)\b', valor) else None
+    if campo in indicadores.MEDIDAS:
+        return indicadores.medida(campo, valor)
+    if campo == 'tipo_sangre':
+        return indicadores.sangre(valor)
+    if campo == 'fecha_certificado':
+        fecha = campos_mod.fecha(valor, hoy)
+        return fecha if fecha and '2015-01-01' <= fecha <= (hoy or datetime.date.today()).isoformat() else None
+    if campo == 'usa_lentes':
+        return 'NO' if es_ninguno(valor) or si_no == 'no' else 'SI' if si_no == 'sí' else None
+    if campo == 'educacion_fisica' and si_no:
+        valor = 'APTO' if si_no == 'sí' else 'NO APTO'
+    if campo == 'vacunas' and si_no and 'COMPLET' in etiqueta:
+        valor = 'COMPLETO' if si_no == 'sí' else 'INCOMPLETO'
+    if campo == 'agudeza_visual' and re.fullmatch(r'(?:O[DI]|AO|OJO \w+)?[\s:]*', valor):
+        return None
+    if campo in ('estado_general', 'recomendaciones'):
+        if len(re.sub(r'[^A-Z]', '', valor)) < 3 or (es_ninguno(valor) and not indicadores.es_sano(valor)):
+            return None
+        return valor[:160]
+    return valor[:80] if indicadores.CLASES[campo](valor) or (campo == 'agudeza_visual' and '20/' in valor.replace(' ', '')) else None
+
+
+def salud_general(texto, hoy=None):
+    """{campo: valor} de la salud general del alumno escrita en la hoja (solo lo que aparece y pasa sus reglas).
+
+    Lo de los antecedentes de la familia no cuenta ("Obesidad: madre"), ni el peso o la talla al nacer, ni las opciones
+    impresas sin marcar. Una etiqueta sola en su renglón ("Esquema de vacunación:") toma lo que está en el de abajo.
+    """
+    encontrados = {}
+    familia, abierto = 0, None
+    for crudo in renglones(texto):
+        renglon = ' '.join(normal(crudo).replace('¿', ' ').split())
+        segmentos = _segmentos(renglon)
+        etiqueta = segmentos[0][0] if segmentos else renglon
+        if FAMILIA.search(etiqueta) and not re.search(r'PERSONALES|DEL ALUMNO|DEL PACIENTE', etiqueta):
+            if re.search(r'HEREDO|FAMILIAR|ANTECEDENTES', etiqueta) and not (segmentos and segmentos[0][1]):
+                familia, abierto = 8, None
+            continue
+        generales = []
+        for e, v in segmentos:
+            campo = next((c for c, patron in GENERAL if patron.search(e)), None)
+            if campo:
+                generales.append((campo, e, v))
+        if familia and (generales or OTRA_SECCION.search(etiqueta)):
+            familia = 0
+        if familia:
+            familia -= 1
+            continue
+        if abierto and not segmentos:
+            valor = _general(abierto[0], abierto[1], renglon, hoy)
+            if valor:
+                encontrados.setdefault(abierto[0], valor)
+            abierto = None
+            continue
+        abierto = None
+        opciones = not re.search(MARCA, renglon) and re.search(r'(?<!NO )\bAPT[OA]\b', renglon) and re.search(r'\bNO APT[OA]\b', renglon)
+        for campo, e, v in generales:
+            if campo == 'educacion_fisica' and opciones:  # "Apto / No apto" impreso sin marcar no dice nada.
+                continue
+            if not v and len(generales) == 1:
+                abierto = (campo, e)
+                continue
+            valor = _general(campo, e, f'{e} {v}' if campo == 'educacion_fisica' and re.search(r'APT[OA]', e) and not re.search(CASILLA, v)
+                             and not campos_mod.si_no(v) else v, hoy)
+            if valor and campo == 'recomendaciones' and indicadores.es_sano(valor) and len(valor.split()) <= 4:
+                campo = 'estado_general'  # "Observaciones: sano" es lo que concluyó el médico.
+            if valor:
+                encontrados.setdefault(campo, valor)
+        if not re.search(CASILLA, renglon) and not generales:  # Una conclusión escrita como frase.
+            sano = SANO.search(renglon)
+            if sano:
+                encontrados.setdefault('estado_general', re.sub(r'^SE ENCUENTRA (?:EN )?', '', sano.group()))
+            apto, no_apto = re.search(r'(?<!NO )\bAPT[OA]\b.*', renglon), re.search(r'\bNO APT[OA]\b.*', renglon)
+            if bool(apto) != bool(no_apto):  # "APTO / NO APTO" impreso sin marcar no dice nada.
+                valor = _general('educacion_fisica', '', (apto or no_apto).group(), hoy)
+                if valor:
+                    encontrados.setdefault('educacion_fisica', valor)
+    return encontrados
+
+
 def de_campos(texto, lista, hoy=None):
     """{clave: valor} para los campos de la plantilla, sacado de un texto completo (lo transcrito o el PDF)."""
     salida = {}
     de_salud = salud(texto)
+    general = salud_general(texto, hoy) if any(c['categoria'] == 'salud' and c['tipo'] != 'lista' for c in lista) else {}
     hallados = contactos(texto)
     usados = set()
     for c in lista:
         if c['categoria'] == 'salud' and c['tipo'] == 'lista' and c['campo'] in de_salud:
             salida[c['clave']] = de_salud[c['campo']]
+        elif c['categoria'] == 'salud' and c['campo'] in general:
+            salida[c['clave']] = general[c['campo']]
         elif c['tipo'] in ('telefono', 'correo'):
             lista_datos = hallados['telefonos' if c['tipo'] == 'telefono' else 'correos']
             dato = next((d for d in lista_datos if d['valor'] not in usados and (d['de'] == c.get('de') or not c.get('de'))), None)

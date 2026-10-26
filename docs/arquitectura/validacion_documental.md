@@ -259,3 +259,23 @@ lectura vea todo lo que trae la hoja, aunque tarde más, y que de eso se queden 
   escanea va primero; lo que la máquina había leído de ese expediente se cambia por la lectura nueva.
 - **Los archivos de la escuela no se tocan.** SIDP no mueve, renombra ni borra los archivos de los directivos aunque
   tengan copias repetidas: solo concentra los datos dentro de la plataforma.
+
+## Salud general del certificado médico (2026-10-26)
+
+Pedido de Maximiliano: del certificado no solo quiere los padecimientos o la discapacidad, sino cómo está cada alumno
+en general (peso, estatura, lo que pide el gobierno y lo que anotan los centros de salud), en una tabla con datos y con
+generalidades. Esto deja atrás el «Solo lo necesario» del 23 de octubre.
+
+- **Qué se saca.** Peso, talla, tipo de sangre, agudeza visual y lentes, audición, salud bucal, esquema de vacunación,
+  aptitud para educación física, servicio médico, conclusión del médico, recomendaciones y fecha del certificado
+  (`estandar.DICCIONARIO`, categoría salud). Los signos vitales, el nombre y la cédula del médico no se guardan.
+- **Cómo se lee.** `purificar.salud_general` saca esos datos de la transcripción completa por sus etiquetas, sin tomar
+  los de la sección de la familia ni el peso al nacer, y sin contar opciones impresas sin marcar. La lectura con
+  campos del modelo los confirma. La talla en centímetros pasa a metros (`indicadores.medida`); lo que no cabe en una
+  medida de niño se descarta. Un texto que suena grave queda por confirmar, como en las listas.
+- **Generalidades.** `indicadores.salud_general` agrupa cada dato en pocas clases (vista normal o necesita valoración,
+  dientes sanos o necesita dentista, vacunas completas o incompletas...), calcula el estado nutricional con la OMS y
+  arma una frase por alumno: lo que concluyó el médico y lo que requiere atención.
+- **Dónde sale.** Formatos oficiales > **Estado de salud del grupo** (Excel y PDF, una hoja por grupo, con la columna
+  «En general»), la tarjeta «Estado de salud» de la ficha del alumno, y las columnas de salud del Metadato (sangre,
+  peso, talla, lentes, servicio médico, certificado entregado, vacunas completas).

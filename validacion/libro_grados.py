@@ -8,7 +8,8 @@ Hojas:
 - Resumen: un renglón por grado y las gráficas que comparan los grados.
 - Salud: un renglón por alumno con lo que la maestra debe saber (alergias, padecimientos, medicamentos, discapacidad), en rojo.
 - Salud por grado: cuántos tienen alergias, padecimientos, medicamentos o discapacidad, y las alergias más comunes.
-  Solo lo necesario (validacion/estandar.py): sin peso, talla, vista, dientes, sangre ni vacunas.
+  Aquí solo lo que hay que cuidar; la salud general (peso, talla, vista, dientes, sangre, vacunas) sale en el formato
+  «Estado de salud del grupo» (validacion/documentos.py).
 - Dónde viven: municipios, colonias y códigos postales.
 - Boletas: el promedio de cada año anterior de cada alumno y el promedio por grado cursado.
 - 911: alumnos por grado, sexo y edad al 1 de septiembre; grupos; discapacidad por tipo; nacidos en otra entidad o país.

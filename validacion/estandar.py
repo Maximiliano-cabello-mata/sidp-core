@@ -5,9 +5,12 @@ aquí (taller.py pregunta `permitido`); lo que ya estaba guardado de antes no se
 en el estudio ni en los documentos. De dónde sale cada dato y para qué lo pide el gobierno:
 docs/investigacion/gobierno_y_estandar.md.
 
-Salud (decisión de Maximiliano del 23 de octubre de 2026, «Solo lo necesario»): discapacidad o condición (para el
-911), alergias, medicamentos, padecimientos y contacto de emergencia. Peso, talla, IMC, vista, salud bucal, tipo de
-sangre y vacunas ya no se sacan: los resultados de "Vive saludable" se quedan en el sector salud.
+Salud: el 23 de octubre de 2026 se decidió «Solo lo necesario» (discapacidad o condición para el 911, alergias,
+medicamentos, padecimientos y contacto de emergencia). El 26 de octubre Maximiliano lo cambió: quiere saber el estado
+de salud general de cada alumno, con lo que trae el certificado médico (peso, estatura, tipo de sangre, vista, oído,
+dientes, vacunas, educación física, lo que concluyó el médico y sus recomendaciones). El Metadato de la supervisión
+pide varios de ellos (tipo de sangre, peso, talla, lentes, servicio médico, vacunación). Signos vitales del día (presión,
+temperatura, frecuencia), el nombre del médico y su cédula no se guardan.
 
 Quién gana cuando dos documentos dicen cosas distintas: lo que escribió o confirmó una persona; luego la fuente con
 más prioridad (RENAPO > acta > CURP > lista oficial > boleta > ficha de la escuela); luego la más segura; luego la
@@ -58,10 +61,26 @@ DICCIONARIO = (
     dato('afrodescendiente', '¿Se considera afromexicano o afrodescendiente?', 'alumno', 'afrodescendiente', ('911',), 'persona', SI_NO,
          sensible=True),
     dato('discapacidad', 'Discapacidad o condición', 'salud', 'discapacidad', ('911',), 'documento', sensible=True, varios=True),
-    # Salud mínima: para cuidar al alumno en la escuela.
+    # Lo que hay que cuidar en la escuela.
     dato('alergias', 'Alergias', 'salud', 'alergia', ('Escuela',), 'documento', sensible=True, varios=True),
     dato('padecimientos', 'Padecimientos', 'salud', 'padecimiento', ('Escuela',), 'documento', sensible=True, varios=True),
     dato('medicamentos', 'Medicamentos', 'salud', 'medicamento', ('Escuela',), 'documento', sensible=True, varios=True),
+    # Salud general del certificado médico (decisión del 26 de octubre de 2026): cómo está el alumno, para la escuela y el Metadato.
+    dato('peso', 'Peso (kg)', 'salud', 'peso', ('Metadato', 'Escuela'), 'documento', sensible=True),
+    dato('talla', 'Estatura (m)', 'salud', 'talla', ('Metadato', 'Escuela'), 'documento', sensible=True),
+    dato('tipo_sangre', 'Tipo de sangre', 'salud', 'tipo_sangre', ('Metadato', 'Escuela'), 'documento', sensible=True),
+    dato('estado_nutricional', 'Estado nutricional (lo que anotó el médico)', 'salud', 'estado_nutricional', ('Escuela',), 'documento',
+         sensible=True),
+    dato('agudeza_visual', 'Vista (agudeza visual)', 'salud', 'agudeza_visual', ('Escuela',), 'documento', sensible=True),
+    dato('usa_lentes', '¿Usa lentes?', 'salud', 'usa_lentes', ('Metadato',), 'documento', SI_NO, sensible=True),
+    dato('audicion', 'Audición', 'salud', 'audicion', ('Metadato', 'Escuela'), 'documento', sensible=True),
+    dato('salud_bucal', 'Salud bucal', 'salud', 'salud_bucal', ('Escuela',), 'documento', sensible=True),
+    dato('vacunas', 'Esquema de vacunación', 'salud', 'vacunas', ('Metadato',), 'documento', sensible=True),
+    dato('educacion_fisica', 'Educación física', 'salud', 'educacion_fisica', ('Escuela',), 'documento', sensible=True),
+    dato('estado_general', 'Estado de salud general (según el médico)', 'salud', 'estado_general', ('Escuela',), 'documento', sensible=True),
+    dato('recomendaciones', 'Recomendaciones del médico', 'salud', 'recomendaciones', ('Escuela',), 'documento', sensible=True),
+    dato('servicio_medico', 'Servicio médico (IMSS, ISSSTE...)', 'salud', 'servicio_medico', ('Metadato',), 'documento', sensible=True),
+    dato('fecha_certificado', 'Fecha del certificado médico', 'salud', 'fecha_certificado', ('Metadato',), 'documento', sensible=True),
     # Tutores y contacto: control escolar, SAID y avisos.
     dato('madre_nombre', 'Nombre de la madre', 'madre', 'nombre', ('Control escolar',), 'documento'),
     dato('madre_curp', 'CURP de la madre', 'madre', 'curp', ('SAID',), 'documento'),

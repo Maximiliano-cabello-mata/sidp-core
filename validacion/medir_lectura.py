@@ -28,27 +28,29 @@ import time
 from pathlib import Path
 
 from validacion import campos as campos_mod
-from validacion import comparador, modelo, taller, vision
+from validacion import comparador, indicadores, modelo, taller, vision
 
 CLASES = ('bien_solo', 'bien_un_clic', 'corregir', 'vacio', 'peligroso')
 NOMBRES = {'bien_solo': 'Bien y solo', 'bien_un_clic': 'Bien, un clic', 'corregir': 'Leído mal (por confirmar)',
            'vacio': 'No se leyó', 'peligroso': 'PELIGROSO: mal y marcado seguro'}
 
 
-def igual(tipo, leido, correcto, hoy):
+def igual(tipo, leido, correcto, hoy, campo=None):
+    """Lo leído dice lo mismo que la hoja. En la salud general basta que diga lo mismo con otras palabras ("20/20 ambos ojos"
+    es vista normal, como "20/20")."""
     if tipo == 'lista':
         return set(campos_mod.lista(leido or '')) == set(campos_mod.lista(correcto or ''))
-    a = campos_mod.limpiar(tipo, leido, hoy)[0] if leido else None
-    b = campos_mod.limpiar(tipo, correcto, hoy)[0] or correcto
-    return a is not None and comparador.normalizar(str(a)) == comparador.normalizar(str(b))
+    a = campos_mod.limpiar(tipo, leido, hoy, campo)[0] if leido else None
+    b = campos_mod.limpiar(tipo, correcto, hoy, campo)[0] or correcto
+    return a is not None and (comparador.normalizar(str(a)) == comparador.normalizar(str(b)) or indicadores.misma_clase(campo, a, b))
 
 
-def clase(resultado, tipo, correcto, hoy):
+def clase(resultado, tipo, correcto, hoy, campo=None):
     if resultado is None:
         return 'vacio', ''
     leido = '' if resultado.get('nada') else str(resultado.get('valor') or '')
     seguro = resultado['confianza'] in ('alta', 'media', 'confirmado')
-    if igual(tipo, leido, correcto, hoy):
+    if igual(tipo, leido, correcto, hoy, campo):
         return ('bien_solo' if seguro else 'bien_un_clic'), leido
     return ('peligroso' if seguro else 'corregir'), leido
 
@@ -110,10 +112,11 @@ def medir(carpeta, hoy=None, con_vision=True, nombre_modelo=None, url=modelo.URL
         leidos, segundos = leer_hoja(archivo, tipo, lista, hoy, modelo_vision, url, lecturas)
         tiempos.append((time.monotonic() - inicio, segundos))
         tipos = {**EXTRAS, **{c['clave']: c['tipo'] for c in lista}}
+        campos_de = {c['clave']: c['campo'] for c in lista}
         for fila in filas:
             if fila['clave'] not in tipos:
                 continue
-            que, leido = clase(leidos.get(fila['clave']), tipos[fila['clave']], fila['valor'], hoy)
+            que, leido = clase(leidos.get(fila['clave']), tipos[fila['clave']], fila['valor'], hoy, campos_de.get(fila['clave']))
             detalle.append({'archivo': nombre, 'tipo': tipo, 'clave': fila['clave'], 'tipo_campo': tipos[fila['clave']], 'correcto': fila['valor'],
                             'leido': leido, 'confianza': (leidos.get(fila['clave']) or {}).get('confianza', ''), 'resultado': que,
                             'letra': fila.get('letra', ''), 'variante': fila.get('variante', '')})

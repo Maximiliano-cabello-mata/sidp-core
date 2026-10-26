@@ -32,7 +32,7 @@ import threading
 import urllib.parse
 from pathlib import Path
 
-from validacion import extraer
+from validacion import extraer, indicadores
 from validacion.expediente import mayusculas
 
 ESQUEMA = Path(__file__).with_name('base_cerebro.sql')
@@ -156,7 +156,9 @@ class BaseCerebro:
                                            'WHERE at.alumno_id = %s AND at.vigente', (alumno,))]
         trabajos = [dict(zip(('id', 'estado', 'resumen', 'creado', 'problema'), (t[0], t[1], t[2], t[3].isoformat(timespec='minutes'), t[4])))
                     for t in self._consulta('SELECT id, estado, resumen, creado, problema FROM sidp.trabajo WHERE alumno_id = %s ORDER BY id DESC LIMIT 20', (alumno,))]
-        return {'alumno': ficha, 'datos': datos, 'tutores': tutores, 'trabajos': trabajos}
+        cuenta = indicadores.de_alumno(datos, ficha['grado'], ficha['sexo'], ficha['fecha_nacimiento'], ficha['curp'])
+        salud = {clave: cuenta[clave] for clave in indicadores.CLAVES_SALUD}  # Cómo está, con lo confirmado o leído seguro.
+        return {'alumno': ficha, 'datos': datos, 'tutores': tutores, 'trabajos': trabajos, 'salud': salud}
 
     def por_confirmar(self, limite=300):
         """Los datos dudosos de todos los alumnos, para confirmarlos de corrido."""

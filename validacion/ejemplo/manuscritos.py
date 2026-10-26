@@ -41,11 +41,12 @@ FICHA = [
     C('contacto_emergencia', 'En caso de emergencia avisar a', 'nombre', 'contacto', 'nombre_emergencia', 'emergencia'),
     C('telefono_emergencia', 'Teléfono de emergencia', 'telefono', 'contacto', 'telefono', 'emergencia'),
 ]
-# Lo que dice impreso el certificado médico dibujado, y a qué campo de fábrica corresponde. Trae peso, talla y fecha como
-# uno de verdad, pero solo se miden los cuatro datos que se sacan (Solo lo necesario, validacion/estandar.py).
-MEDICO = [('Nombre del paciente', None), ('Peso (kg)', 'peso'), ('Talla (m)', 'talla'), ('Alergias', 'alergias'),
+# Lo que dice impreso el certificado médico dibujado, y a qué campo de fábrica corresponde. Se mide su salud general
+# (peso, talla, sangre, vista, vacunas, conclusión y fecha) y lo que hay que cuidar; el médico y su cédula no se guardan.
+MEDICO = [('Nombre del paciente', None), ('Peso (kg)', 'peso'), ('Talla (m)', 'talla'), ('Tipo de sangre', 'tipo_sangre'),
+          ('Agudeza visual', 'agudeza_visual'), ('Esquema de vacunación', 'vacunas'), ('Alergias', 'alergias'),
           ('Padecimientos', 'padecimientos'), ('Medicamentos', 'medicamentos'), ('Discapacidad o condición', 'discapacidad'),
-          ('Observaciones', 'observaciones'), ('Fecha', 'fecha'), ('Nombre del médico', 'medico'), ('Cédula profesional', 'cedula')]
+          ('Conclusión', 'estado_general'), ('Fecha', 'fecha_certificado'), ('Nombre del médico', 'medico'), ('Cédula profesional', 'cedula')]
 FUENTES = [('Inkfree.ttf', 'clara'), ('segoepr.ttf', 'clara'), ('comic.ttf', 'clara'),
            ('segoesc.ttf', 'fea'), ('BRADHITC.TTF', 'fea'), ('ITCKRIST.TTF', 'fea')]
 NINOS = [('MARIA FERNANDA', 'M'), ('JOSE LUIS', 'H'), ('ANA SOFIA', 'M'), ('DIEGO', 'H'), ('XIMENA', 'M'), ('SANTIAGO', 'H'),
@@ -169,7 +170,7 @@ def hoja_medico(verdad, escrito, fuente, azar, fea):
         valor = escrito['nombre_alumno'] if clave is None else escrito.get(clave)
         if valor:
             escribir(imagen, x + 10, y, valor, fuente, azar, fea)
-        y += 140
+        y += 125
     return imagen
 
 
@@ -222,9 +223,17 @@ def datos_medico(azar):
     cedula = str(azar.randint(1000000, 12999999))
     medicamentos = azar.sample(MEDICAMENTOS, azar.choice((0, 0, 0, 1)))
     condiciones = azar.sample(CONDICIONES, azar.choice((0, 0, 0, 0, 1)))
-    verdad = {'medicamentos': ', '.join(medicamentos) or 'NINGUNO', 'discapacidad': ', '.join(condiciones) or 'NINGUNA'}
-    escrito = {'peso': f'{peso} kg'.replace('.', azar.choice(['.', ','])), 'talla': f'{talla} m', 'observaciones': 'Sano',
-               'fecha': f'{fecha.day:02d}/{fecha.month:02d}/{fecha.year}', 'medico': medico.title(), 'cedula': cedula,
+    sangre = azar.choice(['O+', 'O+', 'O+', 'A+', 'B+', 'O-', 'AB+'])
+    vista = azar.choice(['20/20', '20/20', '20/25', '20/40'])
+    vacunas = azar.choice(['Completo', 'Completo', 'Incompleto'])
+    general = azar.choice(['Sano', 'Clínicamente sano'])
+    verdad = {'medicamentos': ', '.join(medicamentos) or 'NINGUNO', 'discapacidad': ', '.join(condiciones) or 'NINGUNA',
+              'peso': f'{peso:g}', 'talla': f'{talla:.2f}', 'tipo_sangre': sangre, 'agudeza_visual': vista, 'vacunas': vacunas.upper(),
+              'estado_general': general.upper().replace('Í', 'I'), 'fecha_certificado': fecha.isoformat()}
+    escrito = {'peso': f'{peso} kg'.replace('.', azar.choice(['.', ','])), 'talla': f'{talla} m', 'estado_general': general,
+               'tipo_sangre': sangre.replace('+', ' positivo').replace('-', ' negativo') if azar.random() < 0.3 else sangre,
+               'agudeza_visual': vista, 'vacunas': vacunas,
+               'fecha_certificado': f'{fecha.day:02d}/{fecha.month:02d}/{fecha.year}', 'medico': medico.title(), 'cedula': cedula,
                'medicamentos': ', '.join(m.lower() for m in medicamentos).capitalize() or azar.choice(['Ninguno', 'No']),
                'discapacidad': ', '.join(condiciones) or azar.choice(['Ninguna', 'No'])}
     return verdad, escrito

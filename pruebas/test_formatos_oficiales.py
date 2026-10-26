@@ -19,7 +19,9 @@ def con_tutor():
                           {'tutor': [dato('nombre', 'MARIA ELENA RAMOS SOTO'), dato('parentesco', 'madre'), dato('curp', MADRE)],
                            'contacto': [dato('telefono', '5512345678'), dato('correo', 'familia@ejemplo.mx')],
                            'domicilio': [dato('domicilio', 'CALLE PINO 5 COL. CENTRO CP 56600 MUNICIPIO DE CHALCO')],
-                           'salud': [dato('padecimiento', 'Asma'), dato('discapacidad', 'Baja visión')]}))
+                           'salud': [dato('padecimiento', 'Asma'), dato('discapacidad', 'Baja visión'), dato('peso', '24.5'),
+                                     dato('talla', '1.21'), dato('tipo_sangre', 'A+'), dato('usa_lentes', 'sí'), dato('vacunas', 'Completo'),
+                                     dato('servicio_medico', 'IMSS Bienestar'), dato('fecha_certificado', '2026-08-30')]}))
     return lista
 
 
@@ -55,8 +57,13 @@ def test_el_metadato_trae_las_71_columnas_y_llena_lo_que_tiene_sidp():
     assert jose[columna['EDAD']].startswith('=IF(H') and 'DATEDIF' in jose[columna['EDAD']]
     assert (jose[columna['CALLE']], jose[columna['NO. EXTERIOR']], jose[columna['C. P.']]) == ('CALLE PINO', '5', '56600')
     assert jose[columna['ENFERMEDAD CRÓNICA O PADECIMIENTO']] == 'ASMA' and jose[columna['PRESENTA ALGUNA DISCAPACIDAD']] == 'BAJA VISIÓN'
-    # Solo lo necesario: tipo de sangre, peso y talla quedan en blanco.
-    assert jose[columna['TIPO DE SANGRE']] is None and jose[columna['PESO']] is None
+    # La salud general del certificado médico llena sus columnas.
+    assert [jose[columna[c]] for c in ('TIPO DE SANGRE', 'PESO', 'TALLA', 'PIE PLANO, USA LENTES, APARATO AUDITIVO O PRÓTESIS',
+                                       'CUENTA CON SERVICIO MÉDICO', 'INSTITUCIÓN', 'ENTREGÓ CERTIFICADO MÉDICO',
+                                       'CUENTA CON ESQUEMA DE VACUNACIÓN COMPLETO')] == \
+        ['A+', 24.5, 1.21, 'USA LENTES', 'SÍ', 'IMSS-BIENESTAR', 'SÍ', 'SÍ']
+    pedro = next(renglon(hoja, n) for n in range(7, 11) if renglon(hoja, n)[columna['NOMBRE (S)']] == 'PEDRO')
+    assert pedro[columna['TIPO DE SANGRE']] is None and pedro[columna['ENTREGÓ CERTIFICADO MÉDICO']] is None  # Sin certificado leído.
     # Las letras de la CURP de la madre dicen cuál es su apellido y cuál su nombre.
     assert [jose[tutor[c]] for c in ('APELLIDO PATERNO', 'APELLIDO MATERNO', 'NOMBRE (S)', 'PARENTESCO')] == ['RAMOS', 'SOTO', 'MARIA ELENA', 'MADRE']
     assert jose[tutor['GÉNERO']] == 'MUJER' and jose[tutor['FECHA DE NACIMIENTO']].date() == datetime.date(1988, 5, 21)

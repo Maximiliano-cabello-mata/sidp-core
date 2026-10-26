@@ -19,7 +19,7 @@ import datetime
 import re
 import unicodedata
 
-from validacion import comparador
+from validacion import comparador, indicadores
 
 TIPOS = {
     'texto': 'Texto', 'nombre': 'Nombre de una persona', 'fecha': 'Fecha', 'curp': 'CURP', 'telefono': 'Teléfono',
@@ -60,11 +60,26 @@ FABRICA = {
         campo('curp_padre', 'CURP del padre', 'curp', 'padre', 'curp'),
     ],
     'certificado_medico': [
-        # Solo lo necesario (estandar.py, decisión del 23/10/2026): lo que hay que cuidar y la discapacidad para el 911.
+        # Lo que hay que cuidar y la discapacidad para el 911.
         campo('alergias', 'Alergias', 'lista', 'salud', 'alergia'),
         campo('padecimientos', 'Enfermedades o padecimientos (crónicos o actuales)', 'lista', 'salud', 'padecimiento'),
         campo('medicamentos', 'Medicamentos o tratamiento que toma', 'lista', 'salud', 'medicamento'),
         campo('discapacidad', 'Discapacidad o condición (por ejemplo: baja visión, sordera, autismo, TDAH)', 'lista', 'salud', 'discapacidad'),
+        # Su estado de salud general (estandar.py, decisión del 26/10/2026).
+        campo('peso', 'Peso (kg)', 'numero', 'salud'),
+        campo('talla', 'Talla o estatura', 'numero', 'salud'),
+        campo('tipo_sangre', 'Tipo de sangre y RH', 'sangre', 'salud'),
+        campo('estado_nutricional', 'Estado o diagnóstico nutricional que escribió el médico', 'texto', 'salud'),
+        campo('agudeza_visual', 'Agudeza visual o vista (por ejemplo 20/20)', 'texto', 'salud'),
+        campo('usa_lentes', '¿Usa lentes? (sí o no)', 'si_no', 'salud'),
+        campo('audicion', 'Audición u oídos', 'texto', 'salud'),
+        campo('salud_bucal', 'Salud bucal o dental', 'texto', 'salud'),
+        campo('vacunas', 'Esquema de vacunación (completo o incompleto)', 'texto', 'salud'),
+        campo('educacion_fisica', '¿Puede hacer educación física? (apto, con restricciones o no apto)', 'texto', 'salud'),
+        campo('estado_general', 'Estado de salud general o conclusión del médico (por ejemplo: clínicamente sano)', 'texto', 'salud'),
+        campo('recomendaciones', 'Recomendaciones u observaciones del médico', 'texto', 'salud'),
+        campo('servicio_medico', 'Servicio médico del alumno (IMSS, ISSSTE, IMSS-Bienestar o ninguno)', 'texto', 'salud'),
+        campo('fecha_certificado', 'Fecha en que se expidió el certificado', 'fecha', 'salud'),
     ],
     'boleta': [
         # Hay una boleta por cada año cursado (un alumno de 6.° trae las de 1.° a 5.°): cada hoja se lee aparte y sus
@@ -112,12 +127,19 @@ PISTAS = [
     (r'DISCAPACIDAD|BARRERAS|NECESIDADES EDUCATIVAS', 'lista', 'salud', 'discapacidad'),
     (r'ENFERMEDAD|PADECIM|CR[OÓ]NIC|CONDICI[OÓ]N', 'lista', 'salud', 'padecimiento'),
     (r'VACUNA|CARTILLA', 'texto', 'salud', 'vacunas'),
-    (r'LENTES|VISTA|VISUAL', 'texto', 'salud', 'agudeza_visual'),
+    (r'LENTES|ANTEOJOS', 'si_no', 'salud', 'usa_lentes'),
+    (r'VISTA|VISUAL', 'texto', 'salud', 'agudeza_visual'),
     (r'DENTAL|BUCAL|CARIES', 'texto', 'salud', 'salud_bucal'),
     (r'\bPESO\b', 'numero', 'salud', 'peso'),
     (r'TALLA|ESTATURA', 'numero', 'salud', 'talla'),
-    (r'SEGURO|IMSS|ISSSTE|AFILIACI', 'texto', 'salud', 'servicio_medico'),
+    (r'SERVICIO M[EÉ]DICO|SEGURO|IMSS|ISSSTE|AFILIACI|DERECHOHABIEN', 'texto', 'salud', 'servicio_medico'),
+    (r'NUTRICI', 'texto', 'salud', 'estado_nutricional'),
+    (r'AUDICI|AUDITIV|O[IÍ]DO', 'texto', 'salud', 'audicion'),
+    (r'EDUCACI[OÓ]N F[IÍ]SICA|ACTIVIDAD F[IÍ]SICA|\bAPT[OA]\b', 'texto', 'salud', 'educacion_fisica'),
+    (r'CONCLUSI|IMPRESI[OÓ]N DIAGN|ESTADO DE SALUD|ESTADO GENERAL', 'texto', 'salud', 'estado_general'),
+    (r'RECOMENDACI|INDICACIONES|OBSERVACI', 'texto', 'salud', 'recomendaciones'),
     (r'CURP', 'curp', 'alumno', 'curp'),
+    (r'FECHA DE EXPEDICI|FECHA DEL CERTIFICADO|FECHA DE ELABORACI', 'fecha', 'salud', 'fecha_certificado'),
     (r'FECHA DE NACIMIENTO|NACIMIENTO', 'fecha', 'alumno', 'fecha_nacimiento'),
     (r'FECHA', 'fecha', 'otro', 'fecha'),
     (r'OCUPACI[OÓ]N|TRABAJO|EMPLEO', 'texto', 'tutor', 'ocupacion'),
@@ -286,9 +308,12 @@ def lista(texto):
     return [p.strip(' .') for p in re.split(r',|;|/|\bY\b|\n', t) if p.strip(' .') and p.strip(' .') not in VACIOS][:10]
 
 
-def limpiar(tipo, valor, hoy=None):
-    """(valor útil o None, detalle). None quiere decir que no pasó las reglas de su tipo (queda por confirmar)."""
+def limpiar(tipo, valor, hoy=None, campo=None):
+    """(valor útil o None, detalle). None quiere decir que no pasó las reglas de su tipo (queda por confirmar).
+    campo: el peso queda en kg y la estatura en metros ("118 cm" y "1.18" son lo mismo)."""
     crudo = str(valor or '').strip()
+    if tipo == 'numero' and campo in indicadores.MEDIDAS:
+        return indicadores.medida(campo, crudo), {}
     if tipo == 'telefono':
         return telefono(crudo), {}
     if tipo == 'correo':

@@ -66,6 +66,29 @@ def test_el_911_cuenta_por_grado_sexo_y_edad_y_dice_si_cuadra():
     assert not any('peso' in str(c.value).lower() for hoja in libro for fila in hoja.iter_rows() for c in fila)  # Solo lo necesario.
 
 
+def test_el_estado_de_salud_del_grupo_dice_como_esta_cada_alumno():
+    r = registros()
+    r[1] = registro('XEXB190710HDFXXXA2', 'LUIS', 'CRUZ', 1, 'A', datetime.date(2019, 7, 10), 'H',
+                    {'salud': [dato('peso', '30 kg'), dato('talla', '118 cm'), dato('tipo_sangre', 'O+'), dato('agudeza_visual', '20/20'),
+                               dato('salud_bucal', 'Caries'), dato('vacunas', 'Completo'), dato('educacion_fisica', 'Apto'),
+                               dato('estado_general', 'Clínicamente sano'), dato('fecha_certificado', '2026-09-01')]})
+    nombre, contenido, _ = documentos.generar('salud', 'xlsx', r, ESCUELA, '2026-2027', HOY, grado=1, letra='A')
+    assert nombre == 'salud_1A_2026-10-23.xlsx'
+    hoja = openpyxl.load_workbook(io.BytesIO(contenido))['1° A']
+    assert hoja['A1'].value == 'Estado de salud · Grupo 1° A' and '2 alumnos: 1 con certificado médico leído y 2 con algo' in hoja['A2'].value
+    encabezado = [c.value for c in hoja[4]]
+    assert encabezado[:6] == ['No.', 'Nombre', 'Edad', 'Peso (kg)', 'Estatura (m)', 'IMC'] and encabezado[-1] == 'En general'
+    luis = dict(zip(encabezado, [c.value for c in hoja[5]]))
+    assert (luis['Nombre'], luis['Edad'], luis['Peso (kg)'], luis['Estatura (m)'], luis['IMC']) == ('CRUZ GIL LUIS', 7, 30, 1.18, 21.5)
+    assert (luis['Estado nutricional'], luis['Sangre'], luis['Vista'], luis['Dientes'], luis['Vacunas']) == \
+        ('Obesidad', 'O+', 'Normal', 'Necesita dentista', 'Completas')
+    assert luis['En general'] == 'Sano según el médico. Requiere atención: obesidad para su edad, atención dental.'
+    ana = dict(zip(encabezado, [c.value for c in hoja[6]]))
+    assert ana['En general'] == 'Requiere atención: alergia a polvo, TDAH.' and ana['Peso (kg)'] is None
+    nombre, contenido, _ = documentos.generar('salud', 'pdf', r, ESCUELA, '2026-2027', HOY)
+    assert nombre == 'salud_escuela_2026-10-23.pdf' and contenido.startswith(b'%PDF')
+
+
 def test_constancias_y_listas_salen_en_word_pdf_y_excel():
     r = registros()
     nombre, contenido, _ = documentos.generar('constancia', 'docx', r, ESCUELA, '2026-2027', HOY, curp='XEXA190305MMCXXXA1')
@@ -131,7 +154,7 @@ def test_el_panel_arma_documentos_con_las_listas_de_aqui_si_no_esta_la_pc_4(ento
     assert pedir(url, '/api/escuela/guardar', ESCUELA, token)[1]['completa'] is True
     codigo, lista = pedir(url, '/api/documentos', cabeceras=token)
     assert codigo == 200 and lista['escuela']['completa'] and 'PC 4' in lista['aviso']
-    assert {d['clave'] for d in lista['documentos']} == {'911', 'constancia', 'lista', 'emergencia', 'vive_saludable', 'metadato', 'base_911',
+    assert {d['clave'] for d in lista['documentos']} == {'911', 'constancia', 'lista', 'emergencia', 'salud', 'vive_saludable', 'metadato', 'base_911',
                                                        'condicion', 'calificaciones', 'boleta', 'asistencias'}
     grupo = pedir(url, '/api/grupos', cabeceras=token)[1]['grupos'][0]['id']
     alumno = pedir(url, f'/api/grupo?id={grupo}', cabeceras=token)[1]['alumnos'][0]['id']

@@ -6,6 +6,12 @@
 > salud bucal, tipo de sangre y vacunas ya no se sacan ni salen en el Excel ni en el estudio; lo que ya estaba
 > guardado no se borra. Con estos datos salen el 911 (Excel con su hoja «Revisión»), las constancias de inscripción,
 > las listas de grupo, «Lo que la maestra debe saber» y la lista de «Vive saludable» (`validacion/documentos.py`).
+>
+> **Cambio (2026-10-26).** Maximiliano pidió el estado de salud general del certificado médico, no solo lo que hay que
+> cuidar. Desde entonces SIDP vuelve a sacar peso, talla, estado nutricional (OMS), tipo de sangre, vista, oído, salud
+> bucal, vacunas, educación física, servicio médico, conclusión, recomendaciones y fecha del certificado, y los
+> muestra en «Estado de salud del grupo». Los signos vitales y el nombre y la cédula del médico siguen sin guardarse.
+> Ver [validacion_documental.md](../arquitectura/validacion_documental.md#salud-general-del-certificado-médico-2026-10-26).
 
 Pedido del dueño: que SIDP guarde **un solo conjunto fijo de datos por alumno**: los que pide el gobierno, con
 sus catálogos y formatos, y que con ellos salgan los documentos oficiales (911, SAID, boleta, becas).

@@ -57,6 +57,11 @@ CATALOGO = (
     {'clave': 'emergencia', 'seccion': MAE, 'nombre': 'Ficha de salud y emergencia del grupo', 'alcance': 'grupo_o_escuela', 'formatos': ['pdf', 'xlsx'],
      'descripcion': 'Por grupo: alergias, padecimientos, medicamentos, discapacidad, tutor, teléfono y contacto de emergencia, '
                     'para tenerlo a la mano en el salón.'},
+    {'clave': 'salud', 'seccion': MAE, 'nombre': 'Estado de salud del grupo', 'boton': 'Bajar el estado de salud', 'alcance': 'grupo_o_escuela',
+     'formatos': ['xlsx', 'pdf'],
+     'descripcion': 'Lo que dice el certificado médico de cada alumno: peso, estatura, IMC y estado nutricional (con las tablas de la OMS, '
+                    'como Vive saludable), tipo de sangre, vista, oído, dientes, vacunas y educación física, y en una frase cómo está en '
+                    'general y qué requiere atención.'},
     {'clave': 'calificaciones', 'seccion': MAE, 'nombre': 'Concentrado de calificaciones y dispersión', 'alcance': 'grupo_o_escuela', 'formatos': ['xlsx'],
      'descripcion': 'Una hoja por grupo con los alumnos ya puestos. El maestro escribe las calificaciones de los cuatro campos formativos; '
                     'el promedio, la dispersión por nivel y el concentrado escolar se calculan solos.'},
@@ -175,10 +180,10 @@ def generar(clave, formato, registros, escuela=None, ciclo='', hoy=None, grado=N
         return nombre, _excel(vive_saludable(elegidos, escuela, ciclo)), MIME['xlsx']
     if clave in formatos_oficiales.GENERADORES:
         return nombre, formatos_oficiales.GENERADORES[clave](elegidos, escuela, ciclo, hoy), MIME['xlsx']
-    hojas = listas(elegidos, escuela, ciclo, salud=clave == 'emergencia')
+    hojas = estado_salud(elegidos, escuela, ciclo) if clave == 'salud' else listas(elegidos, escuela, ciclo, salud=clave == 'emergencia')
     if formato == 'xlsx':
         return nombre, _excel(hojas), MIME['xlsx']
-    return nombre, _escribir(formato, _hojas_a_bloques(hojas, escuela), horizontal=clave == 'emergencia'), MIME[formato]
+    return nombre, _escribir(formato, _hojas_a_bloques(hojas, escuela), horizontal=clave in ('emergencia', 'salud')), MIME[formato]
 
 
 # ---------------------------------------------------------------- Cada documento
@@ -252,6 +257,36 @@ def listas(registros, escuela, ciclo, salud=False):
             anchos = (5, 42, 22, 6, 12, 6)
         hojas.append({'nombre': grupo, 'titulo': titulo, 'nota': nota, 'tablas': [(None, encabezado, filas)], 'anchos': anchos,
                       'escuela': escuela, 'ciclo': ciclo})
+    return hojas
+
+
+def _cifra(valor, decimales=1):
+    return '' if valor is None else round(float(valor), decimales)
+
+
+def estado_salud(registros, escuela, ciclo):
+    """Una hoja por grupo con la salud general de cada alumno según su certificado médico: los datos exactos y, en la
+    última columna, cómo está en general y qué requiere atención (indicadores.salud_general)."""
+    hojas = []
+    for (grado, letra), alumnos in _grupos(registros).items():
+        grupo = _nombre_grupo(grado, letra)
+        encabezado = ['No.', 'Nombre', 'Edad', 'Peso (kg)', 'Estatura (m)', 'IMC', 'Estado nutricional', 'Sangre', 'Vista', 'Oído', 'Dientes',
+                      'Vacunas', 'Educación física', 'En general']
+        filas = []
+        for i, r in enumerate(alumnos, 1):
+            nutricion = r.get('nutricion') or ''
+            if nutricion and r.get('nutricion_segun') == 'médico':
+                nutricion += ' (según el médico)'
+            filas.append([i, r['nombre'], '' if r.get('edad') is None else r['edad'], _cifra(r.get('peso')), _cifra(r.get('talla'), 2),
+                          _cifra(r.get('imc')), nutricion, r.get('tipo_sangre') or '', r.get('vista') or '', r.get('audicion') or '',
+                          r.get('bucal') or '', r.get('vacunas') or '', r.get('educacion_fisica') or '', r.get('resumen') or ''])
+        leidos = sum(1 for r in alumnos if r.get('con_certificado'))
+        atender = sum(1 for r in alumnos if r.get('atender'))
+        nota = (f'{len(alumnos)} alumnos: {leidos} con certificado médico leído y {atender} con algo que requiere atención. El estado '
+                'nutricional sale de las tablas de la OMS (IMC para la edad), como en Vive saludable. Lo que la lectura no aseguró no '
+                f'aparece hasta que una persona lo confirma. {CUIDADO}')
+        hojas.append({'nombre': grupo, 'titulo': f'Estado de salud · Grupo {grupo}', 'nota': nota, 'tablas': [(None, encabezado, filas)],
+                      'anchos': (7, 40, 10, 10, 14, 9, 17, 13, 17, 16, 17, 19, 19, 44), 'escuela': escuela, 'ciclo': ciclo})
     return hojas
 
 
@@ -575,7 +610,8 @@ def pdf(bloques, horizontal=False):
         raise ErrorDocumento('Para el PDF falta reportlab en esta computadora (python -m pip install reportlab). Mientras, bájalo en Word.')
     pagina = landscape(letter) if horizontal else letter
     salida = io.BytesIO()
-    hoja = SimpleDocTemplate(salida, pagesize=pagina, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm,
+    margen = 1.5 * cm if horizontal else 2 * cm  # Las tablas anchas (salud, emergencia) necesitan la hoja casi entera.
+    hoja = SimpleDocTemplate(salida, pagesize=pagina, leftMargin=margen, rightMargin=margen, topMargin=1.6 * cm, bottomMargin=1.6 * cm,
                              title='SIDP', author='SIDP')
     azul = colors.HexColor('#1F4E79')
     estilos = {
@@ -588,7 +624,7 @@ def pdf(bloques, horizontal=False):
         'cabeza': ParagraphStyle('cabeza', fontName='Helvetica-Bold', fontSize=8, leading=9.5, textColor=colors.white),
     }
     alinear = {'centro': TA_CENTER, 'derecha': TA_RIGHT, 'justificado': 4}
-    util = pagina[0] - 4 * cm
+    util = pagina[0] - 2 * margen
     historia = []
     for bloque in bloques:
         tipo = bloque[0]
@@ -621,7 +657,8 @@ def pdf(bloques, horizontal=False):
             tabla.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), azul), ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#A6A6A6')),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'), ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F2F6FA')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 2)]))
+                ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('LEFTPADDING', (0, 0), (-1, -1), 3), ('RIGHTPADDING', (0, 0), (-1, -1), 3)]))
             historia += [tabla, Spacer(1, 0.3 * cm)]
     hoja.build(historia)
     return salida.getvalue()

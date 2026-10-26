@@ -273,7 +273,7 @@ VISTO = {
                            'medicamentos': ('Salbutamol', False), 'discapacidad': ('Ninguna', True),
                            'telefonos_en_la_hoja': ('722 123 4567 (mamá)', True), 'correos_en_la_hoja': ('rosa.hdz@gmail.com', True),
                            'emergencia_en_la_hoja': ('Rosa Hernández Díaz, mamá', True),
-                           'peso': ('22,5 kg', True), 'tipo_sangre': ('O positivo', True)},  # Peso y sangre: el modelo no los ve.
+                           'peso': ('22,5 kg', True), 'tipo_sangre': ('O positivo', True)},
 }
 # La lectura completa de cada hoja (el certificado con su reverso). Trae el teléfono del médico, que no es de la familia.
 TRANSCRITO = {
@@ -341,7 +341,7 @@ def test_el_taller_saca_los_datos_y_los_guarda_por_categoria(base, modelo_que_ve
     assert sorted(p.name for p in (tmp_path / 'trabajos' / str(trabajo)).iterdir()) == ['acta_alumno_1.pdf', 'certificado_medico_1.pdf']
     cuenta = trabajos.una_vez()
     assert {k: cuenta[k] for k in ('esperados', 'alta', 'media', 'baja', 'vacios', 'utiles')} == \
-        {'esperados': 14, 'alta': 6, 'media': 4, 'baja': 2, 'vacios': 3, 'utiles': 83}  # 10 de 12 datos salieron seguros.
+        {'esperados': 28, 'alta': 6, 'media': 8, 'baja': 2, 'vacios': 13, 'utiles': 88}  # 14 de 16 datos salieron seguros.
     # Frente y vuelta del certificado se leyeron completos; cada dato de salud se revisó otra vez y la hipertensión (de la
     # familia) no se guardó. Los contactos salieron de la hoja aunque el certificado no tenga esos campos.
     assert {k: cuenta[k] for k in ('hojas_completas', 'revisados', 'descartados', 'contactos')} == \
@@ -359,13 +359,21 @@ def test_el_taller_saca_los_datos_y_los_guarda_por_categoria(base, modelo_que_ve
         ('contacto', 'telefono', '7221234567'): ('alta', 'vigente'),  # El del médico (722 555 0000) no.
         ('contacto', 'correo', 'rosa.hdz@gmail.com'): ('alta', 'vigente'),
         ('contacto', 'nombre_emergencia', 'ROSA HERNANDEZ DIAZ'): ('alta', 'vigente'),
-    }  # Ni peso ni tipo de sangre: no son de lo que se saca. Ni la hipertensión de los antecedentes de la familia.
+        # La salud general: el peso y la sangre los leyó el modelo dos veces igual; "se encuentra sano y apto" viene escrito en el PDF.
+        ('salud', 'peso', '22.5'): ('media', 'vigente'),
+        ('salud', 'tipo_sangre', 'O+'): ('media', 'vigente'),
+        ('salud', 'estado_general', 'SANO'): ('media', 'vigente'),
+        ('salud', 'educacion_fisica', 'APTO PARA REALIZAR ACTIVIDADES ESCOLARES'): ('media', 'vigente'),
+    }  # Ni la hipertensión de los antecedentes de la familia.
     contacto = {d['campo']: d['detalle'] for d in base.expediente_alumno(CURP_JUAN)['datos']['contacto']}
     assert contacto['telefono']['de'] == 'madre' and contacto['nombre_emergencia']['parentesco'] == 'MAMA'
     # El nombre, la CURP y la fecha ya estaban en la lista oficial: el acta los confirma y no se repiten.
     assert not any(c == 'alumno' and k in ('curp', 'nombres', 'fecha_nacimiento') for c, k, _ in datos_de(base))
     estado = trabajos.estado()
-    assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 83 and estado['por_confirmar'] == 2
+    assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 88 and estado['por_confirmar'] == 2
+    salud = base.expediente_alumno(CURP_JUAN)['salud']  # Cómo está en general, para su ficha.
+    assert (salud['peso'], salud['tipo_sangre'], salud['educacion_fisica'], salud['sano']) == (22.5, 'O+', 'Apto', True)
+    assert salud['resumen'] == 'Sano según el médico. Requiere atención: alergia a penicilina, alergia a polvo.'
     # Solo números en el resumen (nada de nombres).
     assert set(base._uno('SELECT resumen FROM sidp.trabajo WHERE id = %s', (trabajo,))) == \
         {'esperados', 'alta', 'media', 'baja', 'vacios', 'segundos_vision', 'modelo', 'utiles', 'hojas_completas', 'revisados', 'descartados',
@@ -384,7 +392,7 @@ def test_una_persona_confirma_corrige_o_agrega_y_la_lectura_no_pisa_lo_confirmad
     base.confirmar_dato(dudosos['nombre']['id'], '', 'secretaria')  # Estaba bien.
     base.confirmar_dato(dudosos['medicamento']['id'], 'SALBUTAMOL INHALADO', 'secretaria')  # Lo corrige viendo la hoja.
     with pytest.raises(base_cerebro.ErrorBase):  # Lo que no pide el gobierno ni necesita la escuela no se guarda.
-        base.agregar_dato(CURP_JUAN, 'salud', 'peso', '23', 'secretaria')
+        base.agregar_dato(CURP_JUAN, 'salud', 'presion', '100/60', 'secretaria')
     base.agregar_dato(CURP_JUAN, 'contacto', 'Teléfono', '7221234567', 'secretaria', {'de': 'madre'})
     base.agregar_dato(CURP_JUAN, 'contacto', 'telefono', '7227654321', 'secretaria', {'de': 'padre'})
     datos = datos_de(base)
@@ -549,9 +557,9 @@ def test_del_escaneo_al_expediente_del_alumno_en_el_panel(base, modelo_que_ve, t
         # El servidor ya le encargó el expediente a la PC 4: no quedó nada pendiente de mandar.
         estado = pedir(url, '/api/trabajos', cabeceras=token)[1]
         assert estado['trabajos'] == {'pendiente': 1} and estado['pendientes_de_enviar'] == 0, estado
-        assert trabajos.una_vez()['esperados'] == 14  # 10 del acta y 4 del certificado médico (solo lo necesario).
+        assert trabajos.una_vez()['esperados'] == 28  # 10 del acta y 18 del certificado médico.
         estado = pedir(url, '/api/trabajos', cabeceras=token)[1]
-        assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 83
+        assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 88
         codigo, expediente = pedir(url, f'/api/alumno?curp={CURP_JUAN}', cabeceras=token)
         assert codigo == 200, expediente
         assert expediente['alumno']['nombres'] == 'JUAN' and expediente['alumno']['grado'] == 1

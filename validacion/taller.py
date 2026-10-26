@@ -25,7 +25,7 @@ import time
 from pathlib import Path
 
 from validacion import campos as campos_mod
-from validacion import comparador, estandar, extraer, lector, modelo, purificar, vision
+from validacion import comparador, estandar, extraer, indicadores, lector, modelo, purificar, vision
 
 MAXIMO_HOJAS = 3  # Por documento, al modelo que ve (las demás hojas casi nunca traen datos nuevos).
 MAXIMO_HOJAS_COMPLETAS = 4  # Hojas de un documento que se transcriben completas (dos hojas con frente y vuelta).
@@ -162,13 +162,13 @@ def de_procesos(tipo, texto, qr, hoy, metodo_texto='texto'):
     return {k: v for k, v in salida.items() if v[0]}
 
 
-def coinciden(tipo, uno, otro, hoy=None):
+def coinciden(tipo, uno, otro, hoy=None, campo=None):
     if tipo == 'lista':
         return set(campos_mod.lista(uno)) == set(campos_mod.lista(otro))
     if campos_mod.vacio(uno) or campos_mod.vacio(otro):
         return campos_mod.vacio(uno) == campos_mod.vacio(otro)
-    a, b = campos_mod.limpiar(tipo, uno, hoy)[0] or uno, campos_mod.limpiar(tipo, otro, hoy)[0] or otro
-    return comparador.normalizar(str(a)) == comparador.normalizar(str(b))
+    a, b = campos_mod.limpiar(tipo, uno, hoy, campo)[0] or uno, campos_mod.limpiar(tipo, otro, hoy, campo)[0] or otro
+    return comparador.normalizar(str(a)) == comparador.normalizar(str(b)) or indicadores.misma_clase(campo, a, b)
 
 
 def necesita_ver(lista, procesos):
@@ -204,7 +204,7 @@ def ver(hojas, nombre_documento, lista, modelo_vision, url=modelo.URL, lecturas=
         uno, otro = str(a.get('valor') or '').strip(), str(b.get('valor') or '').strip()
         if not uno and not otro:
             continue
-        if not coinciden(c['tipo'], uno, otro, hoy):
+        if not coinciden(c['tipo'], uno, otro, hoy, c['campo']):
             primera[c['clave']] = {'valor': uno or otro, 'seguro': False, 'otra': otro if uno else '', 'lecturas': crudas}
         else:
             primera[c['clave']] = {'valor': uno, 'seguro': bool(a.get('seguro')) and bool(b.get('seguro')), 'lecturas': crudas}
@@ -220,6 +220,14 @@ def _de_acuerdo(c, metodo):
     return 'baja' if c['tipo'] == 'curp' else 'media'
 
 
+def _dicen_lo_mismo(c, uno, otro):
+    """Un dato de salud escrito con otras palabras en dos lecturas: "20/20 AMBOS OJOS" y "20/20" son vista normal; dos
+    recomendaciones casi iguales son la misma."""
+    if c['categoria'] != 'salud' or c['tipo'] != 'texto':
+        return False
+    return indicadores.misma_clase(c['campo'], uno, otro) or purificar.parecido(uno, otro)
+
+
 def combinar(campos, procesos, vistos, identidad, hoy):
     """Un valor por campo con su confianza. vistos: lo que leyó el modelo {clave: {valor, seguro}}."""
     salida = []
@@ -227,13 +235,14 @@ def combinar(campos, procesos, vistos, identidad, hoy):
         de_proceso, metodo = procesos.get(c['clave'], (None, None))
         visto = _visto((vistos or {}).get(c['clave']), c['tipo']) if vistos and c['clave'] in vistos else {}
         crudo_visto = str(visto.get('valor') or '').strip()
-        limpio_p, detalle_p = campos_mod.limpiar(c['tipo'], de_proceso, hoy) if de_proceso else (None, {})
-        limpio_v, detalle_v = campos_mod.limpiar(c['tipo'], crudo_visto, hoy) if crudo_visto and not campos_mod.vacio(crudo_visto) else (None, {})
+        limpio_p, detalle_p = campos_mod.limpiar(c['tipo'], de_proceso, hoy, c['campo']) if de_proceso else (None, {})
+        limpio_v, detalle_v = (campos_mod.limpiar(c['tipo'], crudo_visto, hoy, c['campo']) if crudo_visto and not campos_mod.vacio(crudo_visto)
+                               else (None, {}))
         if c['tipo'] == 'lista':
             salida += _lista(c, de_proceso, metodo, visto)
             continue
         if limpio_p and limpio_v:
-            iguales = comparador.normalizar(str(limpio_p)) == comparador.normalizar(str(limpio_v))
+            iguales = comparador.normalizar(str(limpio_p)) == comparador.normalizar(str(limpio_v)) or _dicen_lo_mismo(c, limpio_p, limpio_v)
             valor, detalle = (limpio_p, detalle_p)
             confianza, metodo = (_de_acuerdo(c, metodo), f'{metodo}+vision') if iguales else ('baja', metodo)
             if not iguales and metodo in ('ocr', 'lectura'):  # En una foto, el modelo que ve suele leer mejor que el OCR: se propone lo suyo.
@@ -260,6 +269,8 @@ def combinar(campos, procesos, vistos, identidad, hoy):
                 salida.append({**c, 'valor': valor, 'confianza': 'alta', 'metodo': metodo, 'confirma_lista': True})
                 continue
             confianza, detalle = 'baja', {**detalle, 'en_lista': identidad[c['campo']]}
+        if c['categoria'] == 'salud' and purificar.es_grave(valor):  # "Conclusión: asma" en un texto libre: la confirma una persona.
+            confianza, detalle = 'baja', {**detalle, 'grave': True}
         valores = campos_mod.lista(valor) if c['tipo'] == 'lista' else [valor]
         salida.append({**c, 'valores': valores, 'valor': valor, 'detalle': {**detalle, **({'de': c['de']} if c.get('de') else {})},
                        'confianza': confianza, 'metodo': metodo})
@@ -314,8 +325,10 @@ def _lista(c, de_proceso, metodo, visto):
         for valor in valores:
             grupo = next((g for g in grupos if purificar.parecido(g['valor'], valor)), None)
             if grupo is None:
-                grupo = {'valor': valor, 'fuentes': set(), 'metodos': set()}
+                grupo = {'valor': valor, 'fuentes': set(), 'metodos': set(), 'de': metodo_fuente}
                 grupos.append(grupo)
+            elif grupo['de'] == 'ocr' and metodo_fuente != 'ocr' and not dudoso:
+                grupo['valor'], grupo['de'] = valor, metodo_fuente  # "RI N ITIS" del OCR y "RINITIS" del modelo: se guarda lo del modelo.
             grupo['metodos'].add(metodo_fuente)
             if not dudoso:
                 grupo['fuentes'].add(numero)
@@ -338,7 +351,8 @@ def _lista(c, de_proceso, metodo, visto):
 
 
 def revisar_salud(resultado, hojas, modelo_vision, url, cuenta):
-    """Cada alergia, padecimiento, medicamento o condición encontrada se revisa una vez más, sola, con la hoja.
+    """Cada alergia, padecimiento, medicamento o condición encontrada se revisa una vez más, sola, con la hoja (el peso,
+    la vista o las vacunas no: no son de lo que el modelo confunde con lo de un familiar).
 
     Si el modelo dice que sí lo tiene el alumno, se queda como estaba. Si dice que no (es de un familiar, es una opción
     impresa sin marcar, está negado), se queda por confirmar cuando una lectura con etiqueta o casilla lo vio, y si no,
@@ -346,7 +360,7 @@ def revisar_salud(resultado, hojas, modelo_vision, url, cuenta):
     """
     salida = []
     for r in resultado:
-        if r['categoria'] != 'salud' or r.get('nada') or not r.get('valor'):
+        if r['categoria'] != 'salud' or r['tipo'] != 'lista' or r.get('nada') or not r.get('valor'):
             salida.append(r)
             continue
         try:

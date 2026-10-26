@@ -1,4 +1,4 @@
-"""La purificación: de todo lo que dice una hoja, solo teléfonos, correos, contacto de emergencia y salud del alumno.
+"""La purificación: de todo lo que dice una hoja, solo teléfonos, correos, contacto de emergencia y la salud del alumno.
 
 Todo es inventado (nombres, teléfonos y correos de prueba).
 """
@@ -75,7 +75,48 @@ def test_la_salud_es_solo_del_alumno_ni_de_la_familia_ni_las_opciones_sin_marcar
     assert marcado == {'padecimiento': 'EPILEPSIA, SOPLO', 'alergia': 'POLVO'}
     assert purificar.salud('Alergias negadas\nEnfermedades de los padres: diabetes') == {'alergia': 'NINGUNA'}
     assert purificar.es_ninguno('NINGU NA') and purificar.es_ninguno('nin guno') and not purificar.es_ninguno('NINGUNA SALVO POLVO')
+    assert purificar.es_ninguno('NINNGUNA') and not purificar.es_ninguno('PENICILINA') and not purificar.es_ninguno('NUEZ')
     assert purificar.es_grave('Hipertensión arterial') and purificar.es_grave('enfermedad nerviosa') and not purificar.es_grave('polvo')
+
+
+GENERAL = """[Hoja 1]
+CERTIFICADO MÉDICO ESCOLAR
+Antecedentes heredofamiliares:
+Obesidad: madre
+Antecedentes perinatales: peso al nacer 3.2 kg
+Exploración física
+Peso: 25,5 kg   Talla: 128 cm   IMC: 15.6
+T/A: 100/60  FC: 88  Temperatura: 36.5
+Tipo de sangre: O positivo
+Agudeza visual: OD: 20/20 OI: 20/30
+Usa lentes: Sí [ ] No [X]
+Salud bucal: caries en dos piezas
+Esquema de vacunación:
+[X] Completo [ ] Incompleto
+Apto para educación física: Sí [X] No [ ]
+Conclusión: Clínicamente sano
+Recomendaciones: consumir agua natural, revisión dental
+Derechohabiencia: IMSS
+Fecha: 14 de agosto de 2026
+"""
+
+
+def test_la_salud_general_sale_de_sus_etiquetas_y_no_de_la_familia_ni_del_nacimiento():
+    import datetime
+    hoy = datetime.date(2026, 10, 26)
+    assert purificar.salud_general(GENERAL, hoy) == {
+        'peso': '25.5', 'talla': '1.28', 'tipo_sangre': 'O+', 'agudeza_visual': 'OD: 20/20 OI: 20/30', 'usa_lentes': 'NO',
+        'salud_bucal': 'CARIES EN DOS PIEZAS', 'vacunas': 'COMPLETO', 'educacion_fisica': 'APTO', 'estado_general': 'CLINICAMENTE SANO',
+        'recomendaciones': 'CONSUMIR AGUA NATURAL, REVISION DENTAL', 'servicio_medico': 'IMSS', 'fecha_certificado': '2026-08-14',
+    }  # Ni la obesidad de la madre, ni el peso al nacer, ni la presión o la temperatura del día.
+    # Sin ':' y como frase; las opciones impresas sin marcar no dicen nada.
+    assert purificar.salud_general('PESO 31 KG TALLA 1.30 M\nVACUNAS INCOMPLETAS\nSe encuentra clínicamente sano y apto para '
+                                   'realizar actividades físicas', hoy) == {
+        'peso': '31', 'talla': '1.30', 'vacunas': 'INCOMPLETAS', 'estado_general': 'CLINICAMENTE SANO',
+        'educacion_fisica': 'APTO PARA REALIZAR ACTIVIDADES FISICAS'}
+    assert purificar.salud_general('Apto / No apto\nEsquema de vacunación: completo / incompleto\nUsa lentes: Sí / No\n'
+                                   'Observaciones: ninguna', hoy) == {}
+    assert purificar.salud_general('Observaciones: Sano', hoy) == {'estado_general': 'SANO'}
 
 
 def test_de_campos_llena_los_campos_de_la_plantilla_con_lo_transcrito():

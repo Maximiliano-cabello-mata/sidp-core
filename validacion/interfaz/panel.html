@@ -985,6 +985,7 @@ const USADOS = [
   { doc: 'constancia', ic: 'documento', que: 'Constancia de inscripción', como: 'De un alumno o de todo el grupo, en Word o PDF' },
   { doc: 'lista', ic: 'listas', que: 'Lista de grupo', como: 'Para el salón o la supervisión, en PDF, Excel o Word' },
   { doc: 'emergencia', ic: 'alumnos', que: 'Ficha de salud y emergencia', como: 'Alergias, medicamentos y a quién llamar, por grupo' },
+  { doc: 'salud', ic: 'alumnos', que: 'Estado de salud del grupo', como: 'Peso, estatura, vista, vacunas y cómo está cada alumno' },
   { doc: '911', ic: 'descargar', que: 'Estadística 911', como: 'El Excel de inicio de curso, ya lleno' },
   { doc: 'metadato', ic: 'descargar', que: 'Metadato', como: 'La base de 71 columnas, ya llena' },
 ];
@@ -1891,7 +1892,7 @@ function mostrarAnalisisPC4(r) {
     : '<p class="chico">Todavía no hay resumen. Se escribe solo cuando ya hay datos de más de la mitad de los alumnos; '
       + 'también puedes pedirlo con «Escribir un resumen nuevo».</p>');
   grafica('dt-cobertura', r.cobertura.map((c) => [`${c.area} (${c.con} de ${c.de})`, c.porcentaje]), 100, '%', 'verde');
-  const s = r.salud;  // Solo lo necesario para cuidar al alumno (decisión del 2026-10-23): sin peso, talla, vista ni sangre.
+  const s = r.salud;  // Lo que hay que cuidar; la salud general de cada alumno va en el formato «Estado de salud del grupo».
   grafica('dt-alergias', pares(s.alergias), maximo(s.alergias), '', 'ambar');
   grafica('dt-padecimientos', pares(s.padecimientos), maximo(s.padecimientos), '', 'ambar');
   grafica('dt-medicamentos', pares(s.medicamentos), maximo(s.medicamentos));
@@ -2032,7 +2033,7 @@ const CATEGORIAS = [['alumno', 'Datos del alumno'], ['salud', 'Salud'], ['contac
 const CAMPOS = {
   curp: 'CURP', nombre: 'Nombre', nombres: 'Nombre(s)', lugar_nacimiento: 'Lugar de nacimiento', fecha_nacimiento: 'Fecha de nacimiento',
   tipo_sangre: 'Tipo de sangre', alergia: 'Alergia', padecimiento: 'Enfermedad o padecimiento', medicamento: 'Medicamento',
-  peso: 'Peso (kg)', talla: 'Talla (m)', apto: 'Apto para actividades escolares', observaciones: 'Observaciones del médico',
+  peso: 'Peso (kg)', talla: 'Estatura (m)', estado_general: 'Estado de salud general (según el médico)', apto: 'Apto para actividades escolares', observaciones: 'Observaciones del médico',
   medico: 'Médico', cedula: 'Cédula del médico', fecha_certificado: 'Fecha del certificado', servicio_medico: 'Servicio médico',
   telefono: 'Teléfono', correo: 'Correo', nombre_emergencia: 'Contacto de emergencia', domicilio: 'Domicilio', cp: 'Código postal',
   titular: 'Titular del recibo', fecha_comprobante: 'Fecha del comprobante', vigencia_ine: 'Vigencia de la INE', ocupacion: 'Ocupación',
@@ -2053,6 +2054,11 @@ const ESTANDAR = [
   ['contacto', 'telefono', 'Teléfono'], ['contacto', 'correo', 'Correo electrónico'], ['contacto', 'nombre_emergencia', 'Contacto de emergencia (nombre)'],
   ['salud', 'alergia', 'Alergia'], ['salud', 'padecimiento', 'Enfermedad o padecimiento'], ['salud', 'medicamento', 'Medicamento'],
   ['salud', 'discapacidad', 'Discapacidad o condición'],
+  ['salud', 'peso', 'Peso (kg)'], ['salud', 'talla', 'Estatura (m)'], ['salud', 'tipo_sangre', 'Tipo de sangre (por ejemplo O+)'],
+  ['salud', 'agudeza_visual', 'Vista (por ejemplo 20/20)'], ['salud', 'usa_lentes', '¿Usa lentes?', SI_NO],
+  ['salud', 'vacunas', 'Esquema de vacunación', [['Completo', 'Completo'], ['Incompleto', 'Incompleto']]],
+  ['salud', 'educacion_fisica', 'Educación física', [['Apto', 'Apto'], ['Apto con restricciones', 'Apto con restricciones'], ['No apto', 'No apto']]],
+  ['salud', 'servicio_medico', 'Servicio médico (IMSS, ISSSTE, ninguno…)'],
   ['escolar', 'repite_grado', '¿Repite el grado?', SI_NO],
   ['escolar', 'procedencia', '¿De dónde viene?', [['misma', 'Ya estaba en esta escuela o entra a 1.°'], ['otra_edomex', 'De otra escuela del Estado de México'],
     ['otra_entidad', 'De una escuela de otro estado'], ['otro_pais', 'De una escuela de otro país']]],
@@ -2160,7 +2166,7 @@ function mostrarAlumno() {
   const dudosos = todos.filter((d) => d.estado === 'por_confirmar').length;
   const fila = (que, valor) => `<tr><td>${esc(que)}</td><td colspan="2"><b>${esc(valor || '—')}</b></td></tr>`;
   const tarjeta = (titulo, filas) => `<div class="panel tarjeta-datos"><h2>${esc(titulo)}</h2><table>${filas}</table></div>`;
-  let html = loImportante(r) + (dudosos ? htmlMensaje('ojo', `Tiene ${dudosos} dato(s) que hay que revisar: están marcados con «Revisa este dato».`) : '');
+  let html = loImportante(r) + estadoDeSalud(r.salud) + (dudosos ? htmlMensaje('ojo', `Tiene ${dudosos} dato(s) que hay que revisar: están marcados con «Revisa este dato».`) : '');
   html += tarjeta('Datos del alumno', fila('CURP', a.curp) + fila('Nombre', `${a.nombres} ${a.primer_apellido} ${a.segundo_apellido || ''}`)
     + fila('Fecha de nacimiento', a.fecha_nacimiento) + fila('Sexo', { H: 'Hombre', M: 'Mujer', X: 'No binario' }[a.sexo] || a.sexo)
     + fila('Grado y grupo', a.grado ? `${a.grado}.° ${a.letra}` : '') + fila('Inscripción', a.inscripcion)
@@ -2192,7 +2198,6 @@ function mostrarAlumno() {
 }
 
 // Lo que su maestra o maestro necesita saber de un vistazo: lo que hay que cuidar y a quién llamar.
-// Solo lo necesario (decisión del 2026-10-23): alergias, padecimientos, medicamentos y discapacidad; nada de peso, talla ni sangre.
 function loImportante(r) {
   const salud = (r.datos.salud || []).filter((d) => d.estado !== 'descartado');
   const de = (campo) => salud.filter((d) => d.campo === campo).map((d) => d.valor);
@@ -2209,6 +2214,21 @@ function loImportante(r) {
     <p>${cuidar.length ? '<b>Su maestra o maestro debe saber esto.</b>' : 'No tiene alergias, padecimientos ni medicamentos anotados.'}</p>
     <table>${cuidar.map(renglon).join('')}
       ${llamar.length ? llamar.map(renglon).join('') : renglon(['A quién llamar', 'No hay teléfono registrado'])}</table></div>`;
+}
+
+// Cómo está de salud según su certificado médico: los datos exactos y, arriba, en general (indicadores.salud_general).
+function estadoDeSalud(s) {
+  if (!s) return '';
+  const filas = [['En general', s.resumen], ['Peso', s.peso ? `${s.peso} kg` : ''], ['Estatura', s.talla ? `${s.talla.toFixed(2)} m` : ''],
+    ['IMC', s.imc ? String(s.imc) : ''],
+    ['Estado nutricional', s.nutricion ? `${s.nutricion} (${s.nutricion_segun === 'OMS' ? 'tablas de la OMS para su edad' : 'según el médico'})` : ''],
+    ['Tipo de sangre', s.tipo_sangre], ['Vista', [s.vista, s.agudeza_visual].filter(Boolean).join(' · ')], ['Oído', s.audicion],
+    ['Dientes', s.bucal], ['Vacunas', s.vacunas], ['Educación física', s.educacion_fisica], ['Servicio médico', s.servicio_medico],
+    ['Lo que concluyó el médico', s.estado_general], ['Recomendaciones', s.recomendaciones],
+    ['Fecha del certificado', s.fecha_certificado ? s.fecha_certificado.split('-').reverse().join('/') : '']].filter(([, v]) => v);
+  return `<div class="panel tarjeta-datos"><h2>Estado de salud</h2><table>
+    ${filas.map(([k, v]) => `<tr><td>${esc(k)}</td><td colspan="2"><b>${esc(v)}</b></td></tr>`).join('')}</table>
+    <p class="chico">Sale de su certificado médico. Lo que la lectura no aseguró está abajo, en «Salud», con «Revisa este dato», y no cuenta aquí hasta que se confirma.</p></div>`;
 }
 
 // Una fila por cada boleta de años anteriores (un alumno de 4.° trae las de 1.°, 2.° y 3.°).

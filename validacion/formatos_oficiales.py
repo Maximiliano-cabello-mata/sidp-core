@@ -10,8 +10,9 @@ dirección: cerebro/laboratorio/resultados/2026-10-25_analisis_formatos_directiv
 - Las plantillas de calificaciones (con la dispersión que se calcula sola), de la boleta con observaciones y de
   asistencias, con los alumnos ya puestos: el maestro solo escribe calificaciones y faltas.
 
-Solo se llena lo que SIDP tiene del estándar (validacion/estandar.py). Peso, talla, tipo de sangre y vacunas quedan en
-blanco por la decisión «Solo lo necesario» del 23 de octubre de 2026; las demás columnas vacías las llena la escuela.
+Solo se llena lo que SIDP tiene del estándar (validacion/estandar.py). Desde el 26 de octubre de 2026 también la salud
+general del certificado médico (tipo de sangre, peso, talla, lentes o aparato auditivo, servicio médico, vacunación);
+las demás columnas vacías las llena la escuela.
 """
 import datetime
 import io
@@ -278,6 +279,13 @@ def metadato(registros, escuela, ciclo, hoy):
             col['LUGAR DE NACIMIENTO']: _entidad(r.get('curp')).upper(), col['NACIONALIDAD']: _nacionalidad(r.get('curp')),
             col['ENFERMEDAD CRÓNICA O PADECIMIENTO']: _ninguna(r.get('padecimientos') or [], con_salud),
             col['ALERGIAS']: _ninguna(r.get('alergias') or [], con_salud),
+            col['TIPO DE SANGRE']: r.get('tipo_sangre') or '', col['PESO']: r.get('peso'), col['TALLA']: r.get('talla'),
+            col['PIE PLANO, USA LENTES, APARATO AUDITIVO O PRÓTESIS']: ', '.join(
+                t for t, si in (('USA LENTES', r.get('vista') == 'Usa lentes'), ('APARATO AUDITIVO', r.get('audicion') == 'Usa aparato auditivo')) if si),
+            col['CUENTA CON SERVICIO MÉDICO']: ('NO' if r.get('servicio_medico') == 'Ninguno' else 'SÍ') if r.get('servicio_medico') else '',
+            col['INSTITUCIÓN']: r['servicio_medico'].upper() if r.get('servicio_medico') not in (None, 'Ninguno') else '',
+            col['ENTREGÓ CERTIFICADO MÉDICO']: 'SÍ' if r.get('con_certificado') else '',
+            col['CUENTA CON ESQUEMA DE VACUNACIÓN COMPLETO']: {'Completas': 'SÍ', 'Incompletas': 'NO'}.get(r.get('vacunas'), ''),
             col['CALLE']: domicilio['calle'], col['NO. EXTERIOR']: domicilio['numero'], col['COLONIA']: domicilio['colonia'],
             col['C. P.']: domicilio['cp'], col['MUNICIPIO']: domicilio['municipio'],
             col['PRESENTA ALGUNA CONDICIÓN']: _ninguna([t for t in tipos if t in CONDICIONES], con_salud),

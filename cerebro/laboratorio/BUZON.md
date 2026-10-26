@@ -1260,3 +1260,29 @@ que no tengas que hacer `stash` en cada `pull`, esos límites van a quedar en el
 3. Cuando él termine **Volver a leer todo**, corre `python -m validacion.base_cerebro estado`.
 4. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea024.md` con lo de los pasos 2 y 3 (solo conteos) y súbelo
    como siempre.
+
+## Tarea 025: medir la salud general del certificado médico (2026-10-26)
+
+**Para el agente del servidor.** Maximiliano pidió que del certificado médico salga el estado de salud general de cada
+alumno (peso, estatura, sangre, vista, oído, dientes, vacunas, educación física, lo que concluyó el médico), no solo los
+padecimientos. El código nuevo ya lo hace. Las reglas de [LEEME.md](LEEME.md) y la de no tocar los archivos de la
+escuela siguen igual. Si la 024 sigue pendiente, termínala primero.
+
+1. Revisa que no haya cambios sin subir (`git status --short`), como en el paso 1 de la 023. Respalda la base
+   (`python -m validacion.base_cerebro respaldar`) y baja el código:
+   ```
+   cd C:\SIDP-cerebro\sidp-core
+   git pull origin claude/project-thread-vp6ab8
+   git log -1 --oneline
+   ```
+2. Pídele a Maximiliano que reinicie los servicios como en el paso 5 de la 023 (PowerShell de administrador).
+3. Mide con hojas inventadas. Los certificados inventados ahora traen los datos generales, así que los números **no**
+   se comparan con la 023:
+   ```
+   python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos_025 --cuantas 6 --semilla 23
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_025 --modelo qwen2.5vl:3b --lecturas 2 --lado 960 --etiqueta salud_general
+   ```
+4. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea025.md` con la salida de `git log -1 --oneline` y el
+   `resumen_lectura_salud_general.md` completo. **No** subas los `detalle_local_*.csv` ni las hojas. Revisa que no haya CURP,
+   teléfono, correo, nombre ni la clave de la escuela, tampoco en el mensaje del commit, y súbelo como siempre.
+   Avísale a Maximiliano que ya se subió.
