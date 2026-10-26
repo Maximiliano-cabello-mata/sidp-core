@@ -146,10 +146,13 @@ def clave(texto, permitidas):
 
 
 def valores_de(datos, categoria, campo):
-    """Los valores vigentes (o por confirmar si no hay otros) de un campo del expediente de la PC 4."""
+    """Los valores vigentes (o por confirmar si no hay otros) de un campo del expediente de la PC 4.
+
+    En salud, lo por confirmar no cuenta: una enfermedad que la lectura no aseguró (una "hipertensión" que era una opción
+    impresa sin marcar) no sale en los formatos hasta que una persona la confirma viendo la hoja."""
     filas = [d for d in (datos or {}).get(categoria, []) if d.get('campo') == campo and str(d.get('valor') or '').strip()
-             and d.get('estado') != 'descartado']
-    vigentes = [d for d in filas if d.get('estado') != 'por_confirmar'] or filas
+             and d.get('estado') not in ('descartado', 'reemplazado')]
+    vigentes = [d for d in filas if d.get('estado') != 'por_confirmar'] or ([] if categoria == 'salud' else filas)
     return [str(d['valor']).strip() for d in vigentes]
 
 

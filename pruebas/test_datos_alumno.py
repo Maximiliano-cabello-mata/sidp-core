@@ -113,11 +113,14 @@ def test_lo_que_lee_solo_el_ocr_o_dos_lecturas_distintas_queda_por_confirmar(mon
     monkeypatch.setattr(vision, 'preguntar', lambda *a, **k: (next(lecturas), 60.0))
     vistos, segundos = taller.ver([b'hoja'], 'Ficha', lista, 'modelo', lecturas=2, hoy=HOY)
     assert segundos == 120.0
-    assert vistos['cp'] == {'valor': '52079', 'seguro': True} and vistos['alergias']['seguro'] is True
-    assert vistos['telefono'] == {'valor': '722 123 4567', 'seguro': False, 'otra': '722 128 4567'}
+    assert vistos['cp'] == {'valor': '52079', 'seguro': True, 'lecturas': ['52079', '52079']} and vistos['alergias']['seguro'] is True
+    assert vistos['telefono'] == {'valor': '722 123 4567', 'seguro': False, 'otra': '722 128 4567', 'lecturas': ['722 123 4567', '722 128 4567']}
     salida = {r['clave']: r for r in taller.combinar(lista, {}, vistos, {}, HOY)}
     assert (salida['cp']['confianza'], salida['telefono']['confianza']) == ('media', 'baja')
     assert salida['telefono']['detalle']['otra_lectura'] == '722 128 4567'
+    # Las listas: un resultado por valor, con cuántas lecturas lo vieron. Las dos vieron polvo y nuez: vigentes.
+    alergias = [r for r in taller.combinar(lista, {}, vistos, {}, HOY) if r['clave'] == 'alergias']
+    assert {(r['valor'], r['confianza'], r['detalle']['lecturas']) for r in alergias} == {('POLVO', 'media', 2), ('NUEZ', 'media', 2)}
 
 
 def test_la_fecha_de_nacimiento_sale_de_la_curp_y_ninguna_lo_confirma_una_persona():
@@ -128,8 +131,8 @@ def test_la_fecha_de_nacimiento_sale_de_la_curp_y_ninguna_lo_confirma_una_person
     salida = {r['clave']: r for r in taller.combinar(lista, {'curp': (curp, 'texto')}, {'alergias': {'valor': 'Negadas', 'seguro': False}}, {}, HOY)}
     assert (salida['fecha_nacimiento']['valor'], salida['fecha_nacimiento']['metodo']) == ('2020-05-12', 'curp')
     assert salida['fecha_nacimiento']['confianza'] == 'media'
-    # "Negadas" no se guarda como dato y queda por confirmar: si era una alergia mal leída, la ve una persona.
-    assert salida['alergias']['nada'] and salida['alergias']['confianza'] == 'baja'
+    # "Negadas" leído una sola vez queda por confirmar: si era una alergia mal leída, la ve una persona.
+    assert salida['alergias']['nada'] and salida['alergias']['confianza'] == 'baja' and salida['alergias']['valor'] == 'NINGUNA'
     # Si la fecha leída no es la de la CURP, se avisa con las dos.
     otra = {r['clave']: r for r in taller.combinar(lista, {'curp': (curp, 'texto')}, {'fecha_nacimiento': {'valor': '12-mayo-2019', 'seguro': True}}, {}, HOY)}
     assert otra['fecha_nacimiento']['confianza'] == 'baja' and otra['fecha_nacimiento']['detalle']['otra_lectura'] == '2020-05-12'
@@ -141,9 +144,12 @@ def test_la_medicion_de_letra_a_mano_cuenta_aciertos_sin_sacar_datos(tmp_path, m
     import csv
     from validacion import medir_lectura
     from validacion.ejemplo import manuscritos
-    assert manuscritos.crear(tmp_path, cuantas=1) == 2
+    assert manuscritos.crear(tmp_path, cuantas=2) == 4
     respuestas = list(csv.DictReader(open(tmp_path / 'respuestas.csv', encoding='utf-8')))
     assert {r['tipo'] for r in respuestas} == {'ficha_inscripcion', 'certificado_medico'}
+    import pypdf  # El segundo certificado trae frente y vuelta: el contacto de emergencia viene atrás.
+    assert len(pypdf.PdfReader(str(tmp_path / '02_certificado_medico.pdf')).pages) == 2
+    assert {r['clave'] for r in respuestas if r['archivo'] == '02_certificado_medico.pdf'} >= {'contacto_emergencia', 'telefono_emergencia'}
     assert all(comparador.desglose_curp(r['valor']) for r in respuestas if r['clave'] == 'curp')
     # Un modelo que ve que lee bien todo, salvo un teléfono que lee distinto cada vez.
     verdad = {(r['archivo'], r['clave']): r['valor'] for r in respuestas}
@@ -151,9 +157,15 @@ def test_la_medicion_de_letra_a_mano_cuenta_aciertos_sin_sacar_datos(tmp_path, m
     monkeypatch.setattr(vision, 'elegir', lambda url=None, pedido=None: 'modelo-de-prueba')
     monkeypatch.setattr(vision, 'paginas', lambda contenido, nombre='': [nombre.encode()])
 
-    def preguntar(hojas, pregunta, esquema=None, nombre_modelo=None, url=None, espera=900):
+    def preguntar(hojas, pregunta, esquema=None, nombre_modelo=None, url=None, espera=900, **opciones):
         archivo, vez = hojas[0].decode(), next(veces)
-        leido = {c: {'valor': verdad.get((archivo, c), ''), 'seguro': True} for c in esquema['properties']}
+        if esquema is None:  # La lectura completa no saca nada aquí: cuenta lo de las lecturas con campos.
+            return '', 1.0
+        if 'respuesta' in esquema['properties']:  # La revisión de cada dato de salud.
+            return {'respuesta': 'lo_tiene', 'dice': ''}, 1.0
+        extras = {'emergencia_en_la_hoja': verdad.get((archivo, 'contacto_emergencia'), ''),
+                  'telefonos_en_la_hoja': f"{verdad[(archivo, 'telefono_emergencia')]} (emergencia)" if (archivo, 'telefono_emergencia') in verdad else ''}
+        leido = {c: {'valor': extras.get(c, verdad.get((archivo, c), '')), 'seguro': True} for c in esquema['properties']}
         if 'telefono_padre' in leido:
             leido['telefono_padre']['valor'] = f'72200000{vez:02d}'
         return leido, 1.0
@@ -162,7 +174,9 @@ def test_la_medicion_de_letra_a_mano_cuenta_aciertos_sin_sacar_datos(tmp_path, m
     monkeypatch.setattr(vision, 'cargar', lambda nombre_modelo, url=None: 0.0)
     detalle, tiempos, modelo_vision = medir_lectura.medir(tmp_path, HOY, lecturas=2)
     cuenta = {c: sum(1 for d in detalle if d['resultado'] == c) for c in medir_lectura.CLASES}
-    assert len(detalle) == len(respuestas) and cuenta['peligroso'] == 0 and cuenta['corregir'] == 1
+    assert len(detalle) == len(respuestas) and cuenta['peligroso'] == 0 and cuenta['corregir'] == 2  # El teléfono del padre de cada ficha.
+    atras = {d['clave']: d['resultado'] for d in detalle if d['archivo'] == '02_certificado_medico.pdf'}
+    assert atras['contacto_emergencia'] == atras['telefono_emergencia'] == 'bien_solo'
     texto = medir_lectura.resumen(detalle, tiempos, modelo_vision, 2)
     assert 'Bien (solo o con un clic)' in texto
     assert not any(r['valor'] in texto for r in respuestas if len(r['valor']) > 4)  # Solo números en el resumen.
@@ -237,14 +251,26 @@ else:
 con_base = pytest.mark.skipif(not os.environ.get('SIDP_PRUEBA_BASE'), reason='sin PostgreSQL de prueba (SIDP_PRUEBA_BASE)')
 
 ACTA = generar.acta('JUAN', 'GARCIA', 'HERNANDEZ', '12/05/2020', 'HOMBRE', CURP_JUAN, 'PEDRO GARCIA RUIZ', 'ROSA HERNANDEZ DIAZ')
-# Lo que "ve" el modelo en cada documento (con letra a mano: un apellido mal leído, un medicamento dudoso).
+# Lo que "ve" el modelo en cada documento (con letra a mano: un apellido mal leído, un medicamento dudoso). En el certificado,
+# el modelo se confunde con los antecedentes de la familia y "ve" hipertensión: al revisarlo dice que es de un familiar.
 VISTO = {
     'Acta de nacimiento': {'lugar_nacimiento': ('Toluca, México', True), 'nombre_madre': ('Rosa Hernández Díaz', True),
                            'nombre_padre': ('PEDRO GARCIA RUIS', True)},
-    'Certificado médico': {'alergias': ('Penicilina y polvo', True), 'padecimientos': ('ninguno', True),
+    'Certificado médico': {'alergias': ('Penicilina y polvo', True), 'padecimientos': ('Hipertensión', True),
                            'medicamentos': ('Salbutamol', False), 'discapacidad': ('Ninguna', True),
+                           'telefonos_en_la_hoja': ('722 123 4567 (mamá)', True), 'correos_en_la_hoja': ('rosa.hdz@gmail.com', True),
+                           'emergencia_en_la_hoja': ('Rosa Hernández Díaz, mamá', True),
                            'peso': ('22,5 kg', True), 'tipo_sangre': ('O positivo', True)},  # Peso y sangre: el modelo no los ve.
 }
+# La lectura completa de cada hoja (el certificado con su reverso). Trae el teléfono del médico, que no es de la familia.
+TRANSCRITO = {
+    'certificado_medico_1.pdf': [
+        'CERTIFICADO MÉDICO\nNombre del paciente: Juan García Hernández\nAlergias: penicilina, polvo\nPadecimientos: ninguno\n'
+        'Medicamentos: salbutamol\nDr. Ramón Pérez · Cédula 1234567 · Tel. 722 555 0000',
+        'ANTECEDENTES HEREDOFAMILIARES:\nHipertensión [X] Diabetes [X]\nEnfermedad mental o nerviosa [X]\n'
+        'En caso de emergencia avisar a: Rosa Hernández Díaz (mamá) Tel. 722 123 4567\nCorreo: rosa.hdz@gmail.com'],
+}
+REVISADO = {'HIPERTENSION': 'familiar'}  # Lo que contesta el modelo al revisar cada dato de salud (si no está: "lo_tiene").
 
 
 CLASIFICADO = {'tipo': 'certificado_medico', 'titulo': 'Constancia de salud', 'motivo': 'trae el sello de un centro de salud'}
@@ -254,8 +280,14 @@ CLASIFICADO = {'tipo': 'certificado_medico', 'titulo': 'Constancia de salud', 'm
 def modelo_que_ve(monkeypatch):
     preguntas = []
 
-    def preguntar(hojas, pregunta, esquema=None, nombre_modelo=None, url=None, espera=900):
+    def preguntar(hojas, pregunta, esquema=None, nombre_modelo=None, url=None, espera=900, **opciones):
         preguntas.append(pregunta)
+        if pregunta == vision.TRANSCRIBIR:  # La lectura completa de una hoja: "archivo#número de hoja".
+            archivo, numero = hojas[0].decode().split('#')
+            return TRANSCRITO.get(archivo, [''] * 9)[int(numero)], 20.0
+        if pregunta.startswith('Esta es la hoja de salud'):
+            valor = pregunta.split('«')[1].split('»')[0]
+            return {'respuesta': REVISADO.get(comparador.normalizar(valor), 'lo_tiene'), 'dice': ''}, 5.0
         if pregunta == campos.PROPONER:
             return {'titulo': 'Ficha de inscripción', 'senas': ['FICHA DE INSCRIPCION', 'Ciclo escolar 2026-2027', 'Datos del alumno', 'ficha de inscripción'],
                     'campos': ['Nombre del alumno', 'Teléfono de la madre', 'Alergias', 'Teléfono de la madre']}, 2.0
@@ -266,7 +298,7 @@ def modelo_que_ve(monkeypatch):
         return {c: {'valor': documento.get(c, ('', True))[0], 'seguro': documento.get(c, ('', True))[1]} for c in esquema['properties']}, 1.5
 
     monkeypatch.setattr(vision, 'elegir', lambda url=None, pedido=None: 'modelo-de-prueba')
-    monkeypatch.setattr(vision, 'paginas', lambda contenido, nombre='': [b'hoja'])
+    monkeypatch.setattr(vision, 'paginas', lambda contenido, nombre='': [f'{nombre}#{n}'.encode() for n in range(len(TRANSCRITO.get(nombre, [''])))])
     monkeypatch.setattr(vision, 'preguntar', preguntar)
     return preguntas
 
@@ -296,7 +328,11 @@ def test_el_taller_saca_los_datos_y_los_guarda_por_categoria(base, modelo_que_ve
     assert sorted(p.name for p in (tmp_path / 'trabajos' / str(trabajo)).iterdir()) == ['acta_alumno_1.pdf', 'certificado_medico_1.pdf']
     cuenta = trabajos.una_vez()
     assert {k: cuenta[k] for k in ('esperados', 'alta', 'media', 'baja', 'vacios', 'utiles')} == \
-        {'esperados': 14, 'alta': 6, 'media': 4, 'baja': 2, 'vacios': 2, 'utiles': 83}  # 10 de 12 datos salieron seguros.
+        {'esperados': 14, 'alta': 6, 'media': 4, 'baja': 2, 'vacios': 3, 'utiles': 83}  # 10 de 12 datos salieron seguros.
+    # Frente y vuelta del certificado se leyeron completos; cada dato de salud se revisó otra vez y la hipertensión (de la
+    # familia) no se guardó. Los contactos salieron de la hoja aunque el certificado no tenga esos campos.
+    assert {k: cuenta[k] for k in ('hojas_completas', 'revisados', 'descartados', 'contactos')} == \
+        {'hojas_completas': 3, 'revisados': 4, 'descartados': 1, 'contactos': 3}
     assert not (tmp_path / 'trabajos' / str(trabajo)).exists()  # Los archivos del trabajo ya no hacen falta.
     assert trabajos.una_vez() is None
     assert datos_de(base) == {
@@ -306,14 +342,21 @@ def test_el_taller_saca_los_datos_y_los_guarda_por_categoria(base, modelo_que_ve
         ('salud', 'alergia', 'PENICILINA'): ('media', 'vigente'),
         ('salud', 'alergia', 'POLVO'): ('media', 'vigente'),
         ('salud', 'medicamento', 'SALBUTAMOL'): ('baja', 'por_confirmar'),
-    }  # Ni peso ni tipo de sangre: no son de lo que se saca.
+        ('salud', 'discapacidad', 'NINGUNA'): ('media', 'vigente'),  # Se ve que el certificado sí se leyó.
+        ('contacto', 'telefono', '7221234567'): ('alta', 'vigente'),  # El del médico (722 555 0000) no.
+        ('contacto', 'correo', 'rosa.hdz@gmail.com'): ('alta', 'vigente'),
+        ('contacto', 'nombre_emergencia', 'ROSA HERNANDEZ DIAZ'): ('alta', 'vigente'),
+    }  # Ni peso ni tipo de sangre: no son de lo que se saca. Ni la hipertensión de los antecedentes de la familia.
+    contacto = {d['campo']: d['detalle'] for d in base.expediente_alumno(CURP_JUAN)['datos']['contacto']}
+    assert contacto['telefono']['de'] == 'madre' and contacto['nombre_emergencia']['parentesco'] == 'MAMA'
     # El nombre, la CURP y la fecha ya estaban en la lista oficial: el acta los confirma y no se repiten.
     assert not any(c == 'alumno' and k in ('curp', 'nombres', 'fecha_nacimiento') for c, k, _ in datos_de(base))
     estado = trabajos.estado()
     assert estado['trabajos'] == {'hecho': 1} and estado['porcentaje_util'] == 83 and estado['por_confirmar'] == 2
     # Solo números en el resumen (nada de nombres).
     assert set(base._uno('SELECT resumen FROM sidp.trabajo WHERE id = %s', (trabajo,))) == \
-        {'esperados', 'alta', 'media', 'baja', 'vacios', 'segundos_vision', 'modelo', 'utiles'}
+        {'esperados', 'alta', 'media', 'baja', 'vacios', 'segundos_vision', 'modelo', 'utiles', 'hojas_completas', 'revisados', 'descartados',
+         'contactos', 'duplicados'}
 
 
 @con_base
@@ -351,6 +394,96 @@ def test_una_persona_confirma_corrige_o_agrega_y_la_lectura_no_pisa_lo_confirmad
     assert ('salud', 'medicamento', 'SALBUTAMOL') not in datos  # Ya se corrigió una vez: no se vuelve a preguntar.
     with pytest.raises(Exception):
         base._consulta('DELETE FROM sidp.dato')  # En la base no se borra nada a mano.
+
+
+@con_base
+def test_volver_a_leer_un_expediente_reemplaza_lo_de_la_maquina_y_no_lo_de_las_personas(base, modelo_que_ve, tmp_path):
+    from validacion import base_cerebro
+    base.cargar(base_cerebro.ciclo_de(HOY), alumnos())
+    trabajos = taller.Taller(base, tmp_path / 'trabajos', hoy=HOY)
+    trabajos.encargar(pedido_de_juan())
+    trabajos.una_vez()
+    padre = next(d for d in base.por_confirmar() if d['campo'] == 'nombre')
+    base.confirmar_dato(padre['id'], '', 'secretaria')
+    antes = base._uno("SELECT count(*) FROM sidp.dato WHERE quien = 'cerebro' AND estado IN ('vigente', 'por_confirmar')")
+    # La auditoría pide leer otra vez el mismo expediente; pedido dos veces, se lee una.
+    primero = trabajos.encargar({**pedido_de_juan(), 'relectura': True})
+    assert trabajos.encargar({**pedido_de_juan(), 'relectura': True}) == primero
+    cuenta = trabajos.una_vez()
+    assert trabajos.una_vez() is None
+    assert cuenta['reemplazados'] == antes  # Todo lo que había leído la máquina de ese expediente.
+    marcados = base._consulta("SELECT DISTINCT (detalle->>'relectura')::bigint FROM sidp.dato WHERE estado = 'reemplazado' AND quien = 'cerebro' "
+                              "AND detalle ? 'relectura'")
+    assert marcados == [[primero]]
+    datos = datos_de(base)
+    assert datos[('padre', 'nombre', 'PEDRO GARCIA RUIZ')] == ('confirmado', 'vigente')  # Lo de la persona no se tocó.
+    assert datos[('salud', 'alergia', 'PENICILINA')] == ('media', 'vigente') and datos[('contacto', 'telefono', '7221234567')] == ('alta', 'vigente')
+    vigentes = base._consulta("SELECT categoria, campo, sidp.normalizar(valor), count(*) FROM sidp.dato WHERE estado IN ('vigente', 'por_confirmar') "
+                              "GROUP BY 1, 2, 3 HAVING count(*) > 1")
+    assert vigentes == []  # Ningún dato repetido.
+
+
+@con_base
+def test_la_depuracion_marca_las_lecturas_repetidas_sin_borrar(base):
+    from validacion import base_cerebro
+    base.cargar(base_cerebro.ciclo_de(HOY), alumnos())
+    alumno = id_de(base, CURP_JUAN)
+    guardar = 'SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)'
+    for categoria, campo, valor, nivel, varios in (('salud', 'alergia', 'PENICILINA', 'media', True), ('salud', 'alergia', 'PENISILINA', 'baja', True),
+                                                   ('salud', 'alergia', 'NINGUNA', 'media', True), ('contacto', 'telefono', '7221234567', 'alta', True),
+                                                   ('contacto', 'telefono', '7221234561', 'baja', True)):
+        base._uno(guardar, (alumno, categoria, campo, valor, '{}', nivel, 'vision', 'Certificado médico', None, 'cerebro', varios))
+    base.agregar_dato(CURP_JUAN, 'salud', 'padecimiento', 'ASMA', 'secretaria')
+    assert taller.depurar(base) == 3
+    assert taller.depurar(base) == 0  # Ya no hay qué marcar.
+    quedan = {(d[0], d[1]) for d in base._consulta("SELECT campo, valor FROM sidp.dato WHERE estado IN ('vigente', 'por_confirmar')")}
+    assert quedan == {('alergia', 'PENICILINA'), ('telefono', '7221234567'), ('padecimiento', 'ASMA')}
+    assert base._uno("SELECT count(*) FROM sidp.dato WHERE estado = 'reemplazado' AND detalle ? 'duplicado_de'") == 3  # Siguen ahí.
+
+
+@con_base
+def test_la_base_misma_no_deja_guardar_dos_veces_el_mismo_dato(base):
+    from validacion import base_cerebro
+    base.cargar(base_cerebro.ciclo_de(HOY), alumnos())
+    alumno = id_de(base, CURP_JUAN)
+    insertar = ("INSERT INTO sidp.dato (alumno_id, categoria, campo, valor, confianza, metodo, estado, quien) "
+                "VALUES (%s, 'salud', 'alergia', %s, %s, 'vision', %s, 'cerebro') RETURNING id")
+    # Una base de antes, sin la defensa: el mismo dato quedó tres veces (con y sin acento).
+    base._consulta('DROP INDEX sidp.dato_sin_repetir')
+    ids = [base._uno(insertar, (alumno, valor, nivel, estado)) for valor, nivel, estado in
+           (('PENICILINA', 'baja', 'por_confirmar'), ('Penicilína', 'alta', 'vigente'), ('penicilina ', 'media', 'vigente'))]
+    base.preparar()  # Al arrancar: lo repetido queda reemplazado (no se borra) y se queda el más seguro.
+    filas = base._consulta('SELECT id, estado, detalle FROM sidp.dato WHERE id = ANY(%s) ORDER BY id', (ids,))
+    assert [f[1] for f in filas] == ['reemplazado', 'vigente', 'reemplazado']
+    assert filas[0][2]['duplicado_de'] == filas[2][2]['duplicado_de'] == ids[1]
+    with pytest.raises(Exception):  # Ni metiéndolo a mano.
+        base._uno(insertar, (alumno, 'PENICILINA', 'media', 'vigente'))
+    guardar = 'SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)'
+    assert base._uno(guardar, (alumno, 'salud', 'alergia', 'PENICILINA', '{}', 'baja', 'vision', None, None, 'cerebro', True)) == ids[1]
+
+
+@con_base
+def test_la_base_avisa_de_alumnos_que_pueden_ser_el_mismo_nino(base):
+    from validacion import base_cerebro
+    base.cargar(base_cerebro.ciclo_de(HOY), alumnos())
+    juan = id_de(base, CURP_JUAN)
+    nuevo = ("INSERT INTO sidp.alumno (curp, nombres, primer_apellido, segundo_apellido, fecha_nacimiento) "
+             "VALUES (%s, %s, %s, %s, %s) RETURNING id")
+    sin_curp = base._uno(nuevo, (None, 'Juan', 'García', 'Hernández', None))  # El mismo nombre, cargado sin CURP.
+    otra = CURP_JUAN[:10] + ('M' if CURP_JUAN[10] == 'H' else 'H') + CURP_JUAN[11:]
+    curp_mal = base._uno(nuevo, (otra, 'Juana', 'Garza', 'Hernández', None))  # La CURP a una letra de la de Juan.
+    gemela = base._uno(nuevo, (None, 'Juana', 'García', 'Hernández', None))  # Nombre parecido, pero es otra niña.
+    repetidos = {(r['a']['id'], r['b']['id']): r['motivo'] for r in base.alumnos_repetidos()}
+    assert repetidos[(juan, sin_curp)] == 'mismo_nombre' and repetidos[(juan, curp_mal)] == 'curp_casi_igual'
+    assert all(r['a']['nombre'] and 'grado' in r['a'] for r in base.alumnos_repetidos())
+    for par in [p for p in repetidos if gemela in p]:  # Una persona dice que son distintos: ya no se pregunta.
+        assert base.marcar_distintos(par[1], par[0], 'directora') is True
+    assert base.marcar_distintos(juan, gemela, 'directora') in (True, False)  # Repetirlo no rompe nada.
+    assert not [r for r in base.alumnos_repetidos() if gemela in (r['a']['id'], r['b']['id'])]
+    assert base._uno("SELECT count(*) FROM sidp.bitacora WHERE tabla = 'alumnos_distintos'") >= 1
+    with pytest.raises(Exception):
+        base.marcar_distintos(juan, juan, 'directora')
+    base.borrar_alumno(CURP_JUAN, 'Se cargó dos veces', 'directora')  # Borrar a uno no se atora con lo anotado.
 
 
 @con_base
@@ -419,8 +552,11 @@ def test_del_escaneo_al_expediente_del_alumno_en_el_panel(base, modelo_que_ve, t
             assert respuesta.headers['Content-Type'] == 'application/pdf' and respuesta.read().startswith(b'%PDF')
         assert pedir(url, '/api/pdf?ruta=../sistema/plataforma_prueba.db', cabeceras=token)[0] == 400
         # Lo dudoso se confirma desde el panel.
-        dudosos = pedir(url, '/api/por_confirmar', cabeceras=token)[1]['datos']
-        assert {d['campo'] for d in dudosos} == {'nombre', 'medicamento'}
+        pendientes = pedir(url, '/api/por_confirmar', cabeceras=token)[1]
+        dudosos = pendientes['datos']
+        assert {d['campo'] for d in dudosos} == {'nombre', 'medicamento'} and pendientes['repetidos'] == []
+        mismo = pedir(url, '/api/alumno/distintos', {'a': 1, 'b': 1}, token)  # Un alumno no se repite consigo mismo.
+        assert mismo[0] != 200 and 'mismo alumno' in mismo[1]['error']
         assert pedir(url, '/api/dato/confirmar', {'id': dudosos[0]['id'], 'valor': ''}, token)[0] == 200
         assert pedir(url, '/api/dato/agregar', {'curp': CURP_JUAN, 'categoria': 'contacto', 'campo': 'telefono', 'valor': '7221234567',
                                                 'de': 'madre'}, token)[0] == 200

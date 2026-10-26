@@ -30,7 +30,10 @@ def test_cada_alumno_junta_la_lista_de_aqui_con_lo_que_saco_el_escaneo():
     nino = libro_grados.alumno(fila(1, 'A', 'LOPEZ', 'ANA', 'LORA190305MMCPZNA1'), 2026,
                                salud(['POLVO', 'POLVO', 'NUECES'], estado='por_confirmar', emergencia='TIA ROSA'), HOY)
     assert (nino['fecha_nacimiento'], nino['sexo'], nino['edad'], nino['situacion']) == (datetime.date(2019, 3, 5), 'Mujer', 7, 'En su edad')
-    assert nino['alergias'] == 'POLVO, NUECES' and nino['por_confirmar'] == 3 and nino['nacido'] == 'Estado de México'
+    # La salud por confirmar no sale hasta que una persona la confirma (una enfermedad mal leída no llega a los formatos).
+    assert nino['alergias'] is None and nino['por_confirmar'] == 3 and nino['nacido'] == 'Estado de México'
+    vigente = libro_grados.alumno(fila(1, 'A', 'LOPEZ', 'ANA', 'LORA190305MMCPZNA1'), 2026, salud(['POLVO', 'POLVO', 'NUECES']), HOY)
+    assert vigente['alergias'] == 'POLVO, NUECES'
     assert (nino['emergencia'], nino['repite']) == ('TIA ROSA', None)
     assert not {'peso', 'talla', 'imc', 'tipo_sangre', 'nutricion'} & set(nino)  # Solo lo necesario.
     grande = libro_grados.alumno(fila(4, 'A', 'PEREZ', 'LUIS', nacimiento='2015-01-10'), 2026,

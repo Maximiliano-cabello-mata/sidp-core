@@ -389,17 +389,25 @@ class Bandeja:
         if not (self.cerebro and dudosas):
             return
         activas = {p['clave']: p for p in self.plantillas.activas()}
-        tipos = [{'clave': clave, 'nombre': nombre, 'senas': (activas.get(clave) or {}).get('textos', [])[:5]}
-                 for clave, nombre in self._tipos_escaneo().items()]
+        nombres = self._tipos_escaneo()
+        tipos = [{'clave': clave, 'nombre': nombre, 'senas': (activas.get(clave) or {}).get('textos', [])[:5]} for clave, nombre in nombres.items()]
         for pagina in dudosas:
+            numero = paginas.index(pagina)
+            anterior = paginas[numero - 1]['tipo'] if numero else None
             try:
                 visto = cerebro_red.pedir_a_cerebro(*self.cerebro, '/clasificar', {
-                    'nombre': pagina['archivo'], 'tipos': tipos,
+                    'nombre': pagina['archivo'], 'tipos': tipos, 'anterior': nombres.get(anterior) if anterior and anterior != 'otro' else None,
                     'contenido': base64.b64encode((carpeta / pagina['archivo']).read_bytes()).decode()}, 330)
             except (cerebro_red.ErrorCerebro, OSError, ValueError):
                 return  # La IA no está o tardó demasiado: la persona elige el tipo, como siempre.
+            tipo = visto.get('tipo') if visto.get('tipo') in {t['clave'] for t in tipos} else 'otro'
+            if tipo == 'otro' and pagina['tipo'] != 'otro':
+                # Una hoja sin título justo después de un documento (el reverso del certificado médico): va con él.
+                pagina['ia'] = {'tipo': pagina['tipo'], 'titulo': 'Parte de atrás o continuación de la hoja anterior',
+                                'motivo': 'no trae título y viene justo después'}
+                continue
             pagina['ia'] = {k: visto.get(k) for k in ('tipo', 'titulo', 'motivo')}
-            pagina['tipo'] = visto.get('tipo') if visto.get('tipo') in {t['clave'] for t in tipos} else 'otro'
+            pagina['tipo'] = tipo
         anterior = None  # Las hojas que siguen a una que la IA reconoció (su reverso) van con ella.
         for pagina in paginas:
             if not pagina['reconocido'] and 'ia' not in pagina and anterior:
@@ -869,10 +877,10 @@ class Bandeja:
                 continue
             tipo = archivo.stem.rsplit('_', 1)[0] if archivo.stem.rsplit('_', 1)[-1].isdigit() else archivo.stem
             lista = campos_mod.de_documento(tipo, plantillas.get(tipo))
-            if not lista:
-                continue
-            documentos.append({'archivo': archivo.name, 'tipo': tipo, 'nombre': nombres.get(tipo, tipo), 'campos': lista,
-                               'contenido': base64.b64encode(archivo.read_bytes()).decode()})
+            if not lista and tipo in campos_mod.SIN_CONTACTOS:
+                continue  # Las hojas sin campos (lo que quedó como «Otro documento») también se leen: ahí vienen teléfonos.
+            documentos.append({'archivo': archivo.name, 'tipo': tipo, 'nombre': nombres.get(tipo, 'Otro documento' if tipo == 'otro' else tipo),
+                               'campos': lista, 'contenido': base64.b64encode(archivo.read_bytes()).decode()})
         return {'curp': curp.upper(), 'expediente': identificador, 'documentos': documentos} if documentos else None
 
     def enviar_pendientes(self):
@@ -886,6 +894,10 @@ class Bandeja:
             if pedido is None:
                 archivo.unlink()  # Sin CURP o sin documentos con campos: no hay qué sacar.
                 continue
+            try:
+                pedido['relectura'] = bool(json.loads(archivo.read_text(encoding='utf-8')).get('relectura'))
+            except (OSError, ValueError):
+                pass
             try:
                 cerebro_red.pedir_a_cerebro(*self.cerebro, '/trabajo', pedido, 300)
             except cerebro_red.ErrorCerebro as error:
@@ -907,6 +919,26 @@ class Bandeja:
         if enviados:
             self.datos_aviso = None
         return enviados
+
+    def releer_todo(self, quien='administrador'):
+        """La auditoría completa: todos los expedientes autorizados se vuelven a leer con la lectura completa.
+
+        Nada se borra. Antes, el cerebro marca como reemplazados los datos repetidos; al leer cada expediente, lo que la
+        máquina había sacado de él queda reemplazado por la lectura nueva; lo que escribió o confirmó una persona se queda.
+        Los escaneos nuevos van antes en la fila; esto avanza solo, aunque tarde horas.
+        """
+        decisiones = self.decisiones()
+        expedientes = [e for e in self.expedientes() if (decisiones.get(e) or {}).get('decision') == 'autorizado']
+        for identificador in expedientes:
+            (self._pendientes() / f'{identificador}.json').write_text(json.dumps({'expediente': identificador, 'relectura': True, 'quien': quien}),
+                                                                      encoding='utf-8')
+        duplicados = None
+        if self.cerebro:
+            try:
+                duplicados = cerebro_red.pedir_a_cerebro(*self.cerebro, '/depurar', {'persona': quien}, 300).get('hecho', {}).get('marcados')
+            except (cerebro_red.ErrorCerebro, OSError, ValueError) as error:
+                self.datos_aviso = f'El cerebro no revisó los datos repetidos ({error}); se revisan al leer cada expediente.'
+        return {'expedientes': len(expedientes), 'duplicados': duplicados, 'cerebro': bool(self.cerebro)}
 
     def trabajos_pc4(self):
         estado = self._pc4('/trabajos')
@@ -1026,6 +1058,9 @@ class Bandeja:
 
     def por_confirmar(self):
         return self._pc4('/por_confirmar')
+
+    def alumnos_distintos(self, datos):
+        return self._pc4('/alumno/distintos', {'a': datos.get('a'), 'b': datos.get('b'), 'persona': datos.get('persona')})
 
     def alumno_baja(self, datos, borrar=False):
         """Da de baja (o borra) al alumno en la PC 4 y lo quita de las listas de grupo de aquí."""

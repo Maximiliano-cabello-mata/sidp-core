@@ -241,7 +241,7 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 if ruta == '/trabajos':
                     return self._responder(200, taller.estado() if taller else {'trabajos': {}, 'sin_taller': True})
                 if ruta == '/por_confirmar':
-                    return self._responder(200, {'datos': base.por_confirmar()})
+                    return self._responder(200, {'datos': base.por_confirmar(), 'repetidos': base.alumnos_repetidos()})
                 if ruta in ('/documentos', '/registros'):  # El motor de documentos (validacion/documentos.py).
                     from urllib.parse import parse_qs
                     ciclo, registros = estandar.registros(base)
@@ -351,7 +351,8 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 if not tipos:
                     raise ValueError('faltan los tipos')
                 hojas = vision.paginas(base64.b64decode(pedido['contenido']), pedido.get('nombre', ''))[:1]
-                visto, segundos = vision.preguntar(hojas, campos.clasificar(tipos), campos.esquema_clasificar(tipos), url=url, espera=300)
+                anterior = str(pedido.get('anterior') or '')[:80] or None
+                visto, segundos = vision.preguntar(hojas, campos.clasificar(tipos, anterior), campos.esquema_clasificar(tipos), url=url, espera=300)
                 tipo = visto.get('tipo') if visto.get('tipo') in {t['clave'] for t in tipos} else 'otro'
                 return self._responder(200, {'tipo': tipo, 'titulo': str(visto.get('titulo') or '').strip()[:80],
                                              'motivo': str(visto.get('motivo') or '').strip()[:160], 'segundos': segundos})
@@ -382,6 +383,10 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                     hecho = base.agregar_varios(pedido['datos'], persona)
                 elif ruta == '/alumno/baja':
                     hecho = base.dar_baja_alumno(pedido['curp'], pedido.get('motivo'), persona)
+                elif ruta == '/depurar':  # Antes de la auditoría: los datos repetidos de la máquina quedan reemplazados.
+                    hecho = {'marcados': taller_mod.depurar(base)}
+                elif ruta == '/alumno/distintos':  # Dos alumnos que se parecen, pero una persona dice que son niños distintos.
+                    hecho = base.marcar_distintos(pedido['a'], pedido['b'], persona)
                 else:
                     hecho = base.borrar_alumno(pedido['curp'], pedido.get('motivo'), persona)
                 return self._responder(200, {'ok': True, 'hecho': hecho})
@@ -436,8 +441,8 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
         def do_POST(self):
             if self.path not in ('/opinar', '/validar', '/leer', '/padron', '/inventario/alta', '/inventario/cambiar',
                                  '/respaldo/faltan', '/respaldo/archivo', '/respaldo/listo', '/trabajo', '/plantilla/campos',
-                                 '/clasificar', '/dato/confirmar', '/dato/agregar', '/dato/varios', '/alumno/baja', '/alumno/borrar',
-                                 '/documento') and self.path not in biblioteca.RUTAS_POST:
+                                 '/clasificar', '/dato/confirmar', '/dato/agregar', '/dato/varios', '/alumno/baja', '/alumno/borrar', '/depurar',
+                                 '/alumno/distintos', '/documento') and self.path not in biblioteca.RUTAS_POST:
                 return self._responder(404, {'error': 'no existe'})
             if not self._autorizado():
                 return
@@ -447,7 +452,8 @@ def crear_servidor(clave, puerto=PUERTO, nombre_modelo=modelo.MODELO, url=modelo
                 return self._biblioteca(self.path)
             if self.path in ('/plantilla/campos', '/clasificar'):
                 return self._vision(self.path)
-            if self.path in ('/trabajo', '/dato/confirmar', '/dato/agregar', '/dato/varios', '/alumno/baja', '/alumno/borrar'):
+            if self.path in ('/trabajo', '/dato/confirmar', '/dato/agregar', '/dato/varios', '/alumno/baja', '/alumno/borrar', '/depurar',
+                             '/alumno/distintos'):
                 return self._expediente(self.path)
             if self.path.startswith('/respaldo/'):
                 return self._respaldo(self.path)

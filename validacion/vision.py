@@ -118,15 +118,18 @@ def cargar(nombre_modelo, url=modelo.URL, espera=900):
     return round(time.monotonic() - inicio, 1)
 
 
-def preguntar(imagenes, pregunta, esquema=None, nombre_modelo=None, url=modelo.URL, espera=900):
-    """(respuesta, segundos). Con esquema, la respuesta es el JSON que pide el esquema."""
+def preguntar(imagenes, pregunta, esquema=None, nombre_modelo=None, url=modelo.URL, espera=900, largo=768, repeticion=1.15):
+    """(respuesta, segundos). Con esquema, la respuesta es el JSON que pide el esquema.
+
+    largo: cuántos tokens puede escribir. repeticion: castigo a repetir palabras (1.0 es ninguno; al transcribir no se
+    castiga, porque un teléfono como 55 5555 1234 repite dígitos de verdad)."""
     nombre_modelo = nombre_modelo or elegir(url)
     if not nombre_modelo:
         raise ErrorVision('No hay modelo de visión en la PC 4 (ollama pull qwen2.5vl:3b).')
     # La imagen va antes que la pregunta: en la segunda lectura de la misma hoja Ollama reusa lo que ya vio.
     cuerpo = {
         'model': nombre_modelo, 'stream': False, 'keep_alive': '30m', 'think': False,
-        'options': {'temperature': 0, 'num_ctx': CONTEXTO, 'repeat_penalty': 1.15, 'num_predict': 768},
+        'options': {'temperature': 0, 'num_ctx': CONTEXTO, 'repeat_penalty': repeticion, 'num_predict': largo},
         'messages': [{'role': 'user', 'content': pregunta,
                       'images': [base64.b64encode(preparar(i)).decode() for i in imagenes]}],
     }
@@ -154,8 +157,46 @@ def preguntar(imagenes, pregunta, esquema=None, nombre_modelo=None, url=modelo.U
         raise ErrorVision('El modelo de visión no devolvió datos en orden.') from error
 
 
-TRANSCRIBIR = ('Transcribe todo el texto de esta hoja, renglón por renglón, tal como está escrito, incluida la letra a '
-               'mano. Si una palabra no se entiende, escribe [ilegible]. No expliques nada.')
+TRANSCRIBIR = ('Transcribe todo el texto de esta hoja, renglón por renglón y en orden, tal como está escrito: lo impreso y lo '
+               'escrito a mano. En un formato escribe cada etiqueta con lo que tiene escrito al lado, en el mismo renglón '
+               '(por ejemplo «Teléfono de la madre: 55 1234 5678»). Una casilla marcada va como [X] y una vacía como [ ]. '
+               'Copia los números dígito por dígito. Si algo no se entiende, escribe [ilegible]. No expliques ni resumas nada.')
+LARGO_TRANSCRIPCION = 2048  # Una hoja llena de texto cabe; con la imagen (~1,054 tokens a 960 px) no pasa de CONTEXTO.
+
+
+def _sin_bucle(texto):
+    """Un modelo chico a veces repite el mismo renglón sin parar: se deja una sola vez."""
+    salida, vistos = [], {}
+    for renglon in texto.splitlines():
+        clave = renglon.strip()
+        vistos[clave] = vistos.get(clave, 0) + 1
+        if clave and vistos[clave] > 3:
+            continue
+        salida.append(renglon)
+    return '\n'.join(salida)
+
+
+def transcribir(hoja, nombre_modelo=None, url=modelo.URL, espera=900):
+    """(todo el texto de una hoja, segundos): la lectura completa, de la que purificar.py saca lo que sirve."""
+    texto, segundos = preguntar([hoja], TRANSCRIBIR, None, nombre_modelo, url, espera, largo=LARGO_TRANSCRIPCION, repeticion=1.0)
+    return _sin_bucle(str(texto or '')), segundos
+
+
+# La revisión de cada dato de salud que se encontró: una lectura más, solo de ese dato (Maximiliano, 25/10/2026: "que se
+# dé un tiempo más para verificar los datos 2 o 3 veces, especialmente de los certificados médicos").
+RESPUESTAS_VERIFICAR = ('lo_tiene', 'no_lo_tiene', 'familiar', 'solo_impreso', 'no_aparece')
+
+
+def pregunta_verificar(valor, etiqueta):
+    return (f'Esta es la hoja de salud de un alumno de primaria. Revisa con mucho cuidado si dice que EL ALUMNO tiene «{valor}» '
+            f'({etiqueta}). En "respuesta" elige: "lo_tiene" si el médico lo escribió o lo marcó para el alumno; "no_lo_tiene" '
+            'si dice que no, está negado o tachado; "familiar" si es de un familiar (antecedentes heredofamiliares: padres, '
+            'abuelos); "solo_impreso" si solo es una opción impresa sin marcar; "no_aparece" si no está en la hoja. En "dice" '
+            'copia las palabras exactas de la hoja donde lo viste.')
+
+
+ESQUEMA_VERIFICAR = {'type': 'object', 'properties': {'respuesta': {'type': 'string', 'enum': list(RESPUESTAS_VERIFICAR)},
+                                                      'dice': {'type': 'string'}}, 'required': ['respuesta', 'dice']}
 
 
 def main(argumentos=None):
@@ -178,7 +219,7 @@ def main(argumentos=None):
         return 1
     hoja = paginas(args.archivo.read_bytes(), args.archivo.name)[0]
     try:
-        texto, segundos = preguntar([hoja], TRANSCRIBIR, nombre_modelo=elegir(pedido=args.modelo))
+        texto, segundos = transcribir(hoja, elegir(pedido=args.modelo))
     except ErrorVision as error:
         print(error)
         return 1

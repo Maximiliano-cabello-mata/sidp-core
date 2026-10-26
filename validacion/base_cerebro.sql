@@ -881,6 +881,8 @@ CREATE TABLE IF NOT EXISTS sidp.trabajo (
     terminado    timestamptz
 );
 CREATE INDEX IF NOT EXISTS trabajo_estado ON sidp.trabajo (estado, id);
+-- La auditoría (2026-10-25): volver a leer un expediente ya leído reemplaza lo que la máquina sacó de él antes.
+ALTER TABLE sidp.trabajo ADD COLUMN IF NOT EXISTS relectura boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS sidp.dato (
     id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -901,6 +903,23 @@ CREATE TABLE IF NOT EXISTS sidp.dato (
 );
 CREATE INDEX IF NOT EXISTS dato_alumno ON sidp.dato (alumno_id, categoria, campo) WHERE estado IN ('vigente', 'por_confirmar');
 CREATE INDEX IF NOT EXISTS dato_por_confirmar ON sidp.dato (estado) WHERE estado = 'por_confirmar';
+-- La base misma no deja guardar dos veces el mismo dato de un alumno (mismo campo y mismo valor, sin importar acentos ni
+-- espacios). Antes de exigirlo, lo repetido de antes queda reemplazado (no se borra): se queda el más seguro.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'sidp' AND indexname = 'dato_sin_repetir') THEN
+        PERFORM set_config('sidp.actor', 'sistema', true);
+        UPDATE sidp.dato d SET estado = 'reemplazado', detalle = d.detalle || jsonb_build_object('duplicado_de', r.queda)
+        FROM (SELECT id, first_value(id) OVER w AS queda, row_number() OVER w AS n
+              FROM sidp.dato WHERE estado IN ('vigente', 'por_confirmar')
+              WINDOW w AS (PARTITION BY alumno_id, categoria, campo, sidp.normalizar(valor)
+                           ORDER BY array_position(ARRAY['confirmado', 'alta', 'media', 'baja'], confianza), estado = 'por_confirmar',
+                                    id DESC)) r
+        WHERE d.id = r.id AND r.n > 1;
+        CREATE UNIQUE INDEX dato_sin_repetir ON sidp.dato (alumno_id, categoria, campo, sidp.normalizar(valor))
+            WHERE estado IN ('vigente', 'por_confirmar');
+    END IF;
+END $$;
 
 DO $$
 DECLARE
@@ -956,11 +975,95 @@ BEGIN
             UPDATE sidp.dato SET estado = 'reemplazado' WHERE id = actual.id;
         END IF;
     END IF;
-    INSERT INTO sidp.dato (alumno_id, categoria, campo, valor, detalle, confianza, metodo, documento, trabajo_id, estado, quien)
-    VALUES (alumno, cat, nombre_campo, nuevo_valor, coalesce(nuevo_detalle, '{}'), nivel, metodo_dato, de_documento, trabajo,
-            estado_nuevo, persona)
-    RETURNING id INTO nuevo;
+    BEGIN
+        INSERT INTO sidp.dato (alumno_id, categoria, campo, valor, detalle, confianza, metodo, documento, trabajo_id, estado, quien)
+        VALUES (alumno, cat, nombre_campo, nuevo_valor, coalesce(nuevo_detalle, '{}'), nivel, metodo_dato, de_documento, trabajo,
+                estado_nuevo, persona)
+        RETURNING id INTO nuevo;
+    EXCEPTION WHEN unique_violation THEN  -- Otra lectura lo guardó en ese mismo instante (dato_sin_repetir): se usa ese.
+        SELECT id INTO nuevo FROM sidp.dato
+        WHERE alumno_id = alumno AND categoria = cat AND campo = nombre_campo AND estado IN ('vigente', 'por_confirmar')
+          AND sidp.normalizar(valor) = sidp.normalizar(nuevo_valor);
+    END;
     RETURN nuevo;
+END $$;
+
+-- Volver a leer un expediente: lo que la máquina leyó antes de ese mismo expediente queda reemplazado (no se borra) y
+-- la lectura nueva entra limpia. Lo que escribió, confirmó o descartó una persona no se toca. Devuelve cuántos marcó.
+CREATE OR REPLACE FUNCTION sidp.relectura(id_alumno bigint, de_expediente text, id_trabajo bigint) RETURNS integer
+LANGUAGE plpgsql AS $$
+DECLARE
+    cuantos integer;
+BEGIN
+    PERFORM set_config('sidp.actor', 'cerebro', true);
+    UPDATE sidp.dato d SET estado = 'reemplazado', detalle = d.detalle || jsonb_build_object('relectura', id_trabajo)
+    WHERE d.alumno_id = id_alumno AND d.quien = 'cerebro' AND d.confianza <> 'confirmado' AND d.estado IN ('vigente', 'por_confirmar')
+      AND d.trabajo_id IN (SELECT t.id FROM sidp.trabajo t WHERE t.alumno_id = id_alumno AND t.expediente = de_expediente AND t.id <> id_trabajo);
+    GET DIAGNOSTICS cuantos = ROW_COUNT;
+    RETURN cuantos;
+END $$;
+
+-- Una lectura repetida de la máquina (casi igual a otro dato más seguro del mismo campo) queda reemplazada, con el id del
+-- dato que se quedó. Nunca marca lo de una persona. Devuelve true si la marcó.
+CREATE OR REPLACE FUNCTION sidp.marcar_duplicado(id_dato bigint, id_queda bigint) RETURNS boolean
+LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM set_config('sidp.actor', 'cerebro', true);
+    UPDATE sidp.dato d SET estado = 'reemplazado', detalle = d.detalle || jsonb_build_object('duplicado_de', id_queda)
+    WHERE d.id = id_dato AND d.id <> id_queda AND d.quien = 'cerebro' AND d.confianza <> 'confirmado'
+      AND d.estado IN ('vigente', 'por_confirmar')
+      AND EXISTS (SELECT 1 FROM sidp.dato q WHERE q.id = id_queda AND q.alumno_id = d.alumno_id AND q.categoria = d.categoria
+                  AND q.campo = d.campo AND q.estado IN ('vigente', 'por_confirmar'));
+    RETURN FOUND;
+END $$;
+
+-- ============================================================ Alumnos repetidos
+
+-- Cuando una persona revisa dos alumnos que se parecen y dice que son niños distintos (gemelos, primos con el mismo
+-- nombre), se anota para no volver a preguntar.
+CREATE TABLE IF NOT EXISTS sidp.alumnos_distintos (
+    id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    alumno_a  bigint NOT NULL REFERENCES sidp.alumno(id) ON DELETE RESTRICT,
+    alumno_b  bigint NOT NULL REFERENCES sidp.alumno(id) ON DELETE RESTRICT,
+    quien     text NOT NULL,
+    creado    timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (alumno_a, alumno_b),
+    CHECK (alumno_a < alumno_b)
+);
+CREATE OR REPLACE TRIGGER anotar_cambio AFTER INSERT ON sidp.alumnos_distintos FOR EACH ROW EXECUTE FUNCTION sidp.anotar_cambio();
+CREATE OR REPLACE TRIGGER no_borrar BEFORE DELETE ON sidp.alumnos_distintos FOR EACH ROW EXECUTE FUNCTION sidp.no_borrar();
+
+-- Parejas de alumnos activos que pueden ser el mismo niño cargado dos veces: el mismo nombre, una CURP a una letra de la
+-- otra (una mal leída), o un nombre casi igual con la misma fecha de nacimiento o sin CURP. No une nada: avisa, y una
+-- persona decide (da de baja el que sobra, o dice que son distintos).
+CREATE OR REPLACE FUNCTION sidp.alumnos_repetidos()
+RETURNS TABLE (alumno_a bigint, alumno_b bigint, motivo text, parecido real)
+LANGUAGE sql STABLE AS $$
+    SELECT a.id, b.id,
+           CASE WHEN a.nombre_busqueda = b.nombre_busqueda THEN 'mismo_nombre'
+                WHEN levenshtein(a.curp, b.curp) <= 1 THEN 'curp_casi_igual'
+                ELSE 'nombre_parecido' END,
+           round(similarity(a.nombre_busqueda, b.nombre_busqueda)::numeric, 2)::real
+    FROM sidp.alumno a JOIN sidp.alumno b ON a.id < b.id
+    WHERE a.estado = 'activo' AND b.estado = 'activo'
+      AND (a.nombre_busqueda = b.nombre_busqueda
+           OR (a.curp IS NOT NULL AND b.curp IS NOT NULL AND levenshtein(a.curp, b.curp) <= 1)
+           OR (similarity(a.nombre_busqueda, b.nombre_busqueda) >= 0.85
+               AND (a.curp IS NULL OR b.curp IS NULL OR a.fecha_nacimiento = b.fecha_nacimiento)))
+      AND NOT EXISTS (SELECT 1 FROM sidp.alumnos_distintos x WHERE x.alumno_a = a.id AND x.alumno_b = b.id)
+    ORDER BY 1, 2
+$$;
+
+CREATE OR REPLACE FUNCTION sidp.marcar_distintos(uno bigint, otro bigint, persona text) RETURNS boolean
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF uno = otro THEN
+        RAISE EXCEPTION 'Es el mismo alumno';
+    END IF;
+    PERFORM set_config('sidp.actor', persona, true);
+    INSERT INTO sidp.alumnos_distintos (alumno_a, alumno_b, quien) VALUES (least(uno, otro), greatest(uno, otro), persona)
+    ON CONFLICT (alumno_a, alumno_b) DO NOTHING;
+    RETURN FOUND;
 END $$;
 
 -- Una persona confirma (o corrige) un dato dudoso; o lo descarta si no sirve.
@@ -1015,6 +1118,7 @@ BEGIN
     END LOOP;
     DELETE FROM sidp.inscripcion WHERE alumno_id = id_alumno;
     DELETE FROM sidp.alumno_tutor WHERE alumno_id = id_alumno;
+    DELETE FROM sidp.alumnos_distintos WHERE id_alumno IN (alumno_a, alumno_b);
     -- Sus préstamos de la biblioteca se quedan (son de los libros), sin el alumno.
     UPDATE sidp.biblio_prestamo SET alumno_id = NULL, lector = coalesce(lector, 'Alumno borrado') WHERE alumno_id = id_alumno;
     DELETE FROM sidp.alumno WHERE id = id_alumno;

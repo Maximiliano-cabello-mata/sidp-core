@@ -49,6 +49,7 @@ PERMISO_RUTA = (
     ('/api/trabajos', 'expedientes'), ('/api/escaneo', 'documentos'), ('/api/expediente', 'documentos'), ('/api/archivo', 'documentos'),
     ('/api/pdf', 'documentos'), ('/api/dato', 'documentos'), ('/api/por_confirmar', 'documentos'), ('/api/plantillas', 'documentos'),
     ('/api/alumno/', 'decidir'), ('/api/alumno', 'documentos'), ('/api/decidir', 'decidir'), ('/api/revisar_todo', 'decidir'),
+    ('/api/releer_todo', 'decidir'),
     ('/api/grupo', 'grupos'), ('/api/listas', 'grupos'), ('/api/inventario', 'grupos'), ('/api/etiquetas', 'grupos'),
     ('/api/analisis', 'ver_grupos'), ('/api/exportar', 'ver_grupos'), ('/api/cuentas', 'personal'),
     ('/api/documentos/completar', 'documentos'), ('/api/documentos', 'ver_grupos'), ('/api/biblioteca', 'biblioteca'),
@@ -408,6 +409,9 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                     return self._enviar(200, app.bandeja.dato_confirmar(datos))
                 if url.path == '/api/dato/agregar':
                     return self._enviar(200, app.bandeja.dato_agregar(datos))
+                if url.path == '/api/alumno/distintos':
+                    persona = 'administrador' if self.usuario.get('local') else self.usuario['nombre']
+                    return self._enviar(200, app.bandeja.alumnos_distintos({**datos, 'persona': persona}))
                 if url.path in ('/api/alumno/baja', '/api/alumno/borrar'):
                     with app.candado:
                         return self._enviar(200, app.bandeja.alumno_baja(datos, borrar=url.path.endswith('borrar')))
@@ -416,6 +420,15 @@ def crear_servidor(aplicacion, anfitrion='0.0.0.0', clave_apagar=None):
                 if url.path == '/api/respaldo':
                     return self._enviar(200, app.bandeja.respaldar())
                 quien = 'administrador' if self.usuario.get('local') else self.usuario['nombre']
+                if url.path == '/api/releer_todo':  # La auditoría completa: se encarga todo y se manda al cerebro poco a poco.
+                    with app.candado:
+                        hecho = app.bandeja.releer_todo(quien)
+
+                    def mandar():
+                        with app.candado:
+                            app.bandeja.enviar_pendientes()
+                    threading.Thread(target=mandar, daemon=True).start()
+                    return self._enviar(200, hecho)
                 if url.path == '/api/dato/varios':
                     return self._enviar(200, app.bandeja.dato_varios(datos, quien))
                 if url.path in ('/api/biblioteca/alta', '/api/biblioteca/prestar', '/api/biblioteca/devolver'):

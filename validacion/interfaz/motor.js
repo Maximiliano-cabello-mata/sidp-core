@@ -180,10 +180,12 @@ function motorLocal() {
     alumno: (curp) => api('/api/alumno?curp=' + encodeURIComponent(curp)),
     pdfUrl: (ruta) => `/api/pdf?ruta=${encodeURIComponent(ruta)}&t=${encodeURIComponent(SIDP.token || '')}`,
     trabajos: () => api('/api/trabajos'),
+    releerTodo: () => api('/api/releer_todo', {}),
     porConfirmar: () => api('/api/por_confirmar'),
     datoConfirmar: (id, valor, descartar = false) => api('/api/dato/confirmar', { id, valor, descartar }),
     datoAgregar: (datos) => api('/api/dato/agregar', datos),
     alumnoBaja: (datos) => api('/api/alumno/baja', datos),
+    alumnosDistintos: (a, b) => api('/api/alumno/distintos', { a, b }),
     alumnoBorrar: (datos) => api('/api/alumno/borrar', datos),
     camposProponer: (archivo) => {
       const formulario = new FormData();
@@ -310,6 +312,8 @@ def recibir(captura, archivos):
     alumno: null,
     porConfirmar: null,
     trabajos: null,
+    releerTodo: null,
+    alumnosDistintos: null,
     camposProponer: null,
     guardarConfiguracion: null,
     buscarCerebro: null,

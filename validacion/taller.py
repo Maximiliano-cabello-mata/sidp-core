@@ -4,9 +4,12 @@ El servidor guarda los PDF al momento y le encarga a la PC 4 sacar sus datos (PO
 trabaja en fila, en segundo plano, aunque tarde (el modelo que ve tarda de 30 segundos a 2 minutos por hoja):
 
 1. Procesos fijos: texto del PDF u OCR, QR, CURP con dígito verificador, fechas, la franja de la INE.
-2. El modelo que ve (si está instalado) lee la hoja con la lista de campos de su plantilla, incluida la letra a mano.
-3. Las reglas de campos.py limpian cada valor y le ponen confianza; lo que coincide entre los dos sube a "alta".
-4. Todo va a sidp.dato. Lo dudoso queda "por confirmar" y una persona lo ve en el panel con la hoja al lado.
+2. Lectura completa: el modelo que ve transcribe cada hoja entera (frente y vuelta, cada una aparte) y purificar.py
+   saca de ahí lo que sirve: teléfonos y correos con de quién son, el contacto de emergencia y la salud del alumno.
+3. El modelo lee además la hoja dos veces con la lista de campos de su plantilla (en orden normal e inverso).
+4. Las reglas de campos.py limpian cada valor; lo que coincide entre lecturas sube de confianza. Cada enfermedad,
+   alergia o condición encontrada se revisa una vez más, sola; las graves siempre las confirma una persona.
+5. Todo va a sidp.dato. Lo dudoso queda "por confirmar" y una persona lo ve en el panel con la hoja al lado.
 
 Los archivos del trabajo se guardan en C:\\SIDP-datos\\trabajos\\<id> y se borran al terminar (el servidor tiene
 los originales y la PC 4 ya tiene su copia en el respaldo).
@@ -22,9 +25,11 @@ import time
 from pathlib import Path
 
 from validacion import campos as campos_mod
-from validacion import comparador, estandar, extraer, lector, modelo, vision
+from validacion import comparador, estandar, extraer, lector, modelo, purificar, vision
 
 MAXIMO_HOJAS = 3  # Por documento, al modelo que ve (las demás hojas casi nunca traen datos nuevos).
+MAXIMO_HOJAS_COMPLETAS = 4  # Hojas de un documento que se transcriben completas (dos hojas con frente y vuelta).
+SIN_CONTACTOS = campos_mod.SIN_CONTACTOS
 INTENTOS = 3
 # Con 2 lecturas compara orden normal e inverso: en la Tarea 021 (12 hojas inventadas, letra clara y fea) dio 86 % bien
 # contra 80 % con una sola, y ningún dato mal marcado como seguro.
@@ -169,29 +174,40 @@ def coinciden(tipo, uno, otro, hoy=None):
 def necesita_ver(lista, procesos):
     """False si los procesos fijos ya sacaron todos los campos de texto impreso o QR (sin OCR): ahí el modelo que ve
     solo gastaría minutos. Las hojas a mano, escaneadas o con campos que faltan sí pasan por él."""
-    return any(procesos.get(c['clave'], (None, 'ocr'))[1] == 'ocr' for c in lista)
+    return any(procesos.get(c['clave'], (None, 'ocr'))[1] in ('ocr', 'lectura') for c in lista)
+
+
+def _lectura(v):
+    """La lectura cruda como texto, con "?" al final si el modelo dudó (así la cuenta cada lista y cada contacto)."""
+    if isinstance(v, dict):
+        valor = str(v.get('valor') or '').strip()
+        return valor + ('?' if valor and v.get('seguro') is False and not valor.endswith('?') else '')
+    return str(v or '').strip()
 
 
 def ver(hojas, nombre_documento, lista, modelo_vision, url=modelo.URL, lecturas=None, hoy=None):
-    """Lo que lee el modelo que ve: ({clave: {valor, seguro}}, segundos). Con dos lecturas, lo que no coincide no es seguro."""
+    """Lo que lee el modelo que ve: ({clave: {valor, seguro, lecturas}}, segundos). Con dos lecturas, lo que no coincide
+    no es seguro. lecturas: lo que dijo cada una, tal cual (con "?" si dudó)."""
     cuantas = lecturas or LECTURAS
-    primera, segundos = vision.preguntar(hojas, campos_mod.pregunta(nombre_documento, lista), campos_mod.esquema(lista), modelo_vision, url)
-    if not primera:
-        return primera, segundos
-    primera = {c['clave']: _visto(primera.get(c['clave']), c['tipo'], cuantas) for c in lista if c['clave'] in primera}
+    cruda, segundos = vision.preguntar(hojas, campos_mod.pregunta(nombre_documento, lista), campos_mod.esquema(lista), modelo_vision, url)
+    if not cruda:
+        return cruda, segundos
+    primera = {c['clave']: {**_visto(cruda.get(c['clave']), c['tipo'], cuantas), 'lecturas': [_lectura(cruda.get(c['clave']))]}
+               for c in lista if c['clave'] in cruda}
     if cuantas < 2:
         return primera, segundos
     al_reves = list(reversed(lista))
     segunda, mas = vision.preguntar(hojas, campos_mod.pregunta(nombre_documento, al_reves), campos_mod.esquema(al_reves), modelo_vision, url)
     for c in lista:
-        a, b = _visto(primera.get(c['clave']), c['tipo'], 2), _visto((segunda or {}).get(c['clave']), c['tipo'], 2)
+        a, b = _visto(cruda.get(c['clave']), c['tipo'], 2), _visto((segunda or {}).get(c['clave']), c['tipo'], 2)
+        crudas = [_lectura(cruda.get(c['clave'])), _lectura((segunda or {}).get(c['clave']))]
         uno, otro = str(a.get('valor') or '').strip(), str(b.get('valor') or '').strip()
         if not uno and not otro:
             continue
         if not coinciden(c['tipo'], uno, otro, hoy):
-            primera[c['clave']] = {'valor': uno or otro, 'seguro': False, 'otra': otro if uno else ''}
+            primera[c['clave']] = {'valor': uno or otro, 'seguro': False, 'otra': otro if uno else '', 'lecturas': crudas}
         else:
-            primera[c['clave']] = {'valor': uno, 'seguro': bool(a.get('seguro')) and bool(b.get('seguro'))}
+            primera[c['clave']] = {'valor': uno, 'seguro': bool(a.get('seguro')) and bool(b.get('seguro')), 'lecturas': crudas}
     return primera, segundos + mas
 
 
@@ -204,23 +220,22 @@ def combinar(campos, procesos, vistos, identidad, hoy):
         crudo_visto = str(visto.get('valor') or '').strip()
         limpio_p, detalle_p = campos_mod.limpiar(c['tipo'], de_proceso, hoy) if de_proceso else (None, {})
         limpio_v, detalle_v = campos_mod.limpiar(c['tipo'], crudo_visto, hoy) if crudo_visto and not campos_mod.vacio(crudo_visto) else (None, {})
-        if c['tipo'] == 'lista' and crudo_visto and campos_mod.vacio(crudo_visto):
-            # "Ninguna" lo confirma una persona: si el modelo no leyó bien una alergia escrita, no se pierde sin que nadie la vea.
-            nada_seguro = visto.get('seguro') or (de_proceso and campos_mod.vacio(de_proceso))
-            salida.append({**c, 'valores': [], 'confianza': 'media' if nada_seguro else 'baja', 'metodo': 'vision', 'nada': True})
+        if c['tipo'] == 'lista':
+            salida += _lista(c, de_proceso, metodo, visto)
             continue
         if limpio_p and limpio_v:
             iguales = comparador.normalizar(str(limpio_p)) == comparador.normalizar(str(limpio_v))
             valor, detalle = (limpio_p, detalle_p)
             confianza, metodo = ('alta', f'{metodo}+vision') if iguales else ('baja', metodo)
-            if not iguales and metodo == 'ocr':  # En una foto, el modelo que ve suele leer mejor que el OCR: se propone lo suyo.
+            if not iguales and metodo in ('ocr', 'lectura'):  # En una foto, el modelo que ve suele leer mejor que el OCR: se propone lo suyo.
                 valor, detalle, metodo = limpio_v, {**detalle_v, 'otra_lectura': limpio_p}, 'vision'
             elif not iguales:
                 detalle = {**detalle, 'otra_lectura': limpio_v}
         elif limpio_p:
             valor, detalle = limpio_p, detalle_p
-            # El OCR de una foto confunde 5 con 3 o 7 con 1: solo, queda por confirmar (la CURP se salva con su dígito).
-            confianza = 'alta' if c['tipo'] == 'curp' or metodo == 'qr' else 'baja' if metodo == 'ocr' else 'media'
+            # El OCR de una foto confunde 5 con 3 o 7 con 1, y una sola lectura del modelo también se equivoca: solo, queda por
+            # confirmar (la CURP se salva con su dígito).
+            confianza = 'alta' if c['tipo'] == 'curp' or metodo == 'qr' else 'baja' if metodo in ('ocr', 'lectura') else 'media'
         elif limpio_v:
             valor, detalle, metodo = limpio_v, detalle_v, 'vision'
             confianza = 'media' if visto.get('seguro') else 'baja'
@@ -266,6 +281,224 @@ def de_la_curp(campos, salida):
     return salida
 
 
+def _lista(c, de_proceso, metodo, visto):
+    """Una lista (alergias, padecimientos...): un resultado por valor, con cuántas lecturas lo vieron.
+
+    Las lecturas son lo que sacó la lectura completa o el texto de la hoja (de_proceso) y cada lectura del modelo con
+    la lista de campos. Un valor que vio una sola lectura, o que otra lectura dice que no hay, queda por confirmar; las
+    enfermedades graves siempre. "Ninguna" también se guarda, para que se vea que el certificado sí se leyó.
+    """
+    fuentes = [(metodo, str(de_proceso))] if de_proceso is not None else []
+    for crudo in (visto.get('lecturas') or [_lectura(visto)]) if visto else []:
+        if str(crudo or '').strip():
+            fuentes.append(('vision', str(crudo)))
+    grupos, nada, nada_dudoso = [], 0, False
+    for numero, (metodo_fuente, crudo) in enumerate(fuentes):
+        dudoso = crudo.strip().endswith('?')  # El modelo dudó: lo propone, pero no cuenta como lectura que coincide.
+        texto = crudo.strip().rstrip('?').strip()
+        valores = [v for v in campos_mod.lista(texto) if not purificar.es_ninguno(v)]
+        if not valores:
+            if purificar.es_ninguno(texto) or campos_mod.vacio(texto):
+                nada += not dudoso
+                nada_dudoso = nada_dudoso or dudoso
+            continue
+        for valor in valores:
+            grupo = next((g for g in grupos if purificar.parecido(g['valor'], valor)), None)
+            if grupo is None:
+                grupo = {'valor': valor, 'fuentes': set(), 'metodos': set()}
+                grupos.append(grupo)
+            grupo['metodos'].add(metodo_fuente)
+            if not dudoso:
+                grupo['fuentes'].add(numero)
+    de = {'de': c['de']} if c.get('de') else {}
+    if not grupos:
+        return [{**c, 'valores': [], 'valor': 'NINGUNA', 'confianza': 'media' if nada >= 2 else 'baja', 'nada': True,
+                 'metodo': '+'.join(sorted({m for m, _ in fuentes})), 'detalle': {'nada': True, 'lecturas': nada, **de}}] if nada or nada_dudoso else []
+    salida = []
+    for grupo in grupos:
+        vieron = len(grupo['fuentes'])
+        detalle = {'lecturas': vieron, 'de_lecturas': len(fuentes), **de}
+        confianza = 'media' if vieron >= 2 and not nada else 'baja'
+        if nada:
+            detalle['otra_lectura'] = 'NINGUNA'
+        if c['categoria'] == 'salud' and purificar.es_grave(grupo['valor']):
+            confianza, detalle['grave'] = 'baja', True  # Hipertensión, epilepsia, una enfermedad mental: la confirma una persona.
+        salida.append({**c, 'valores': [grupo['valor']], 'valor': grupo['valor'], 'confianza': confianza, 'detalle': detalle,
+                       'metodo': '+'.join(sorted(grupo['metodos'])), 'metodos': sorted(grupo['metodos'])})
+    return salida
+
+
+def revisar_salud(resultado, hojas, modelo_vision, url, cuenta):
+    """Cada alergia, padecimiento, medicamento o condición encontrada se revisa una vez más, sola, con la hoja.
+
+    Si el modelo dice que sí lo tiene el alumno, se queda como estaba. Si dice que no (es de un familiar, es una opción
+    impresa sin marcar, está negado), se queda por confirmar cuando una lectura con etiqueta o casilla lo vio, y si no,
+    no se guarda: lo había "visto" solo el modelo y al revisarlo no lo sostiene.
+    """
+    salida = []
+    for r in resultado:
+        if r['categoria'] != 'salud' or r.get('nada') or not r.get('valor'):
+            salida.append(r)
+            continue
+        try:
+            visto, segundos = vision.preguntar(hojas, vision.pregunta_verificar(r['valor'], r['etiqueta']), vision.ESQUEMA_VERIFICAR,
+                                               modelo_vision, url, largo=200)
+            cuenta['segundos_vision'] += segundos
+        except vision.ErrorVision as error:
+            print(f'revisión de salud: {error}', flush=True)
+            salida.append({**r, 'confianza': 'baja', 'detalle': {**r['detalle'], 'revision': 'sin_revisar'}})
+            continue
+        cuenta['revisados'] += 1
+        respuesta = visto.get('respuesta') if visto.get('respuesta') in vision.RESPUESTAS_VERIFICAR else 'no_aparece'
+        detalle = {**r['detalle'], 'revision': respuesta, **({'dice': str(visto['dice'])[:120]} if str(visto.get('dice') or '').strip() else {})}
+        if respuesta == 'lo_tiene':
+            salida.append({**r, 'detalle': detalle})
+        elif set(r.get('metodos') or ()) & {'lectura', 'texto', 'ocr'}:
+            salida.append({**r, 'confianza': 'baja', 'detalle': detalle})
+        else:
+            cuenta['descartados'] += 1
+    return salida
+
+
+NIVELES = ('baja', 'media', 'alta')
+
+
+def _juntar(fuentes, clase, mismo, casi):
+    """Los teléfonos o correos de todas las lecturas: cada uno con cuántas lo vieron (peso) y de quién es."""
+    grupos = []
+    for numero, (metodo, peso, datos) in enumerate(fuentes):
+        for dato in datos[clase]:
+            grupo = next((g for g in grupos if mismo(g['valor'], dato['valor'])), None)
+            if grupo is None:
+                grupo = {'valor': dato['valor'], 'peso': 0, 'fuentes': set(), 'metodos': set(), 'de': ''}
+                grupos.append(grupo)
+            if numero not in grupo['fuentes']:
+                grupo['fuentes'].add(numero)
+                grupo['metodos'].add(metodo)
+                grupo['peso'] += peso
+            grupo['de'] = grupo['de'] or dato.get('de', '')  # El de la lectura completa manda: va primero.
+    grupos.sort(key=lambda g: -g['peso'])
+    quedan = []
+    for grupo in grupos:  # Una lectura que cambia un dígito no es otro teléfono: es el mismo leído distinto.
+        fuerte = next((q for q in quedan if casi(q['valor'], grupo['valor']) and min(q['peso'], grupo['peso']) == 1), None)
+        if fuerte:
+            fuerte['otra'] = grupo['valor']
+        else:
+            quedan.append(grupo)
+    return quedan
+
+
+def _nivel(peso, dudoso=False):
+    nivel = 2 if peso >= 3 else 1 if peso == 2 else 0
+    return NIVELES[max(0, nivel - 1) if dudoso else nivel]
+
+
+def contactos_de(transcrito, texto, metodo_texto, vistos):
+    """Teléfonos, correos y contacto de emergencia de toda la hoja, aunque su plantilla no tenga esos campos.
+
+    Fuentes: la lectura completa, el texto del PDF o el OCR (el del PDF es exacto: vale por tres) y cada lectura del
+    modelo de "¿qué teléfonos hay?". Visto en tres lecturas: seguro; en dos: vigente; en una: por confirmar.
+    """
+    fuentes = []
+    if transcrito.strip():
+        fuentes.append(('lectura', 1, purificar.contactos(transcrito)))
+    if str(texto or '').strip():
+        fuentes.append((metodo_texto, 3 if metodo_texto == 'texto' else 1, purificar.contactos(texto)))
+    vistos = vistos or {}
+    claves = (('telefonos_en_la_hoja', 'TELEFONOS'), ('correos_en_la_hoja', 'CORREOS'), ('emergencia_en_la_hoja', 'EN CASO DE EMERGENCIA AVISAR A'))
+    for numero in range(2):
+        partes = []
+        for clave, etiqueta in claves:
+            visto = vistos.get(clave) or {}
+            lecturas = visto.get('lecturas') or [visto.get('valor')]
+            if numero < len(lecturas) and str(lecturas[numero] or '').strip() and not campos_mod.vacio(lecturas[numero]):
+                partes.append(f'{etiqueta}: {lecturas[numero]}')
+        if partes:
+            fuentes.append(('vision', 1, purificar.contactos('\n'.join(partes), exigir_etiqueta=False)))
+    salida = []
+    telefonos = _juntar(fuentes, 'telefonos', lambda a, b: a == b, purificar.un_digito)
+    correos = _juntar(fuentes, 'correos', lambda a, b: a == b, lambda a, b: purificar.parecido(a, b, 0.92))
+    for clase, grupos, tipo in (('telefono', telefonos, 'telefono'), ('correo', correos, 'correo')):
+        for n, g in enumerate(grupos, 1):
+            detalle = {'lecturas': len(g['fuentes']), **({'de': g['de']} if g['de'] else {}), **({'otra_lectura': g['otra']} if g.get('otra') else {})}
+            salida.append({**campos_mod.campo(f'{clase}_en_la_hoja_{n}', f'{clase.capitalize()} escrito en la hoja', tipo, 'contacto', clase, g['de']),
+                           'valores': [g['valor']], 'valor': g['valor'], 'confianza': _nivel(g['peso'], bool(g.get('otra'))), 'detalle': detalle,
+                           'metodo': '+'.join(sorted(g['metodos'])), 'varios': True, 'extra': True})
+    personas = []
+    for numero, (metodo, peso, datos) in enumerate(fuentes):
+        for persona in datos['emergencia']:
+            grupo = next((g for g in personas if purificar.parecido(g['valor'], persona['nombre'])), None)
+            if grupo is None:
+                grupo = {'valor': persona['nombre'], 'peso': 0, 'fuentes': set(), 'metodos': set(), 'parentesco': '', 'distintos': set()}
+                personas.append(grupo)
+            if numero not in grupo['fuentes']:
+                grupo['fuentes'].add(numero)
+                grupo['metodos'].add(metodo)
+                grupo['peso'] += peso
+            grupo['distintos'].add(comparador.normalizar(persona['nombre']))
+            grupo['parentesco'] = grupo['parentesco'] or persona.get('parentesco', '')
+    if personas:
+        g = max(personas, key=lambda x: x['peso'])
+        otras = sorted(g['distintos'] - {comparador.normalizar(g['valor'])})
+        detalle = {'lecturas': len(g['fuentes']), 'de': 'emergencia', **({'parentesco': g['parentesco']} if g['parentesco'] else {}),
+                   **({'otra_lectura': otras[0]} if otras else {})}
+        salida.append({**campos_mod.campo('emergencia_en_la_hoja', 'Contacto de emergencia', 'nombre', 'contacto', 'nombre_emergencia', 'emergencia'),
+                       'valores': [g['valor']], 'valor': g['valor'], 'confianza': _nivel(g['peso'], bool(otras)), 'detalle': detalle,
+                       'metodo': '+'.join(sorted(g['metodos'])), 'extra': True})
+    return salida
+
+
+def leer_documento(archivo, documento, identidad, hoy, modelo_vision=None, url=modelo.URL, lecturas=None):
+    """Todo lo que sale de un documento, ya purificado: (resultado, cuenta). Lo usan el taller y medir_lectura.
+
+    documento: {tipo, nombre, campos}. La lectura completa va hoja por hoja (un certificado con frente y vuelta son dos
+    hojas, uno de una sola cara es una): así se adapta a cuántas caras traiga.
+    """
+    cuenta = {'segundos_vision': 0.0, 'hojas_completas': 0, 'revisados': 0, 'descartados': 0}
+    tipo, lista = documento['tipo'], documento['campos']
+    lectura = lector.leer(archivo)
+    metodo_texto = 'ocr' if any('ocr' in m for m in lectura['metodo']) else 'texto'
+    procesos = de_procesos(tipo, lectura['texto'], lectura['qr'], hoy, metodo_texto)
+    for clave, valor in campos_mod.de_texto(lectura['texto'], lista, hoy).items():
+        procesos.setdefault(clave, (valor, metodo_texto))
+    con_contactos = tipo not in SIN_CONTACTOS
+    hojas, transcrito = [], ''
+    if modelo_vision and (con_contactos or necesita_ver(lista, procesos)):
+        hojas = vision.paginas(archivo.read_bytes(), archivo.name)
+        partes = []
+        for numero, hoja in enumerate(hojas[:MAXIMO_HOJAS_COMPLETAS], 1):
+            try:
+                texto, segundos = vision.transcribir(hoja, modelo_vision, url)
+            except vision.ErrorVision as error:
+                print(f'{archivo.name}: {error}', flush=True)
+                break
+            cuenta['segundos_vision'] += segundos
+            cuenta['hojas_completas'] += 1
+            partes.append(f'[Hoja {numero}]\n{texto}')
+        transcrito = '\n'.join(partes)
+    tipos = {c['clave']: c['tipo'] for c in lista}
+    if transcrito:  # Lo transcrito por el modelo lee mejor la letra a mano que el OCR (la CURP del OCR se salva con su dígito).
+        for clave, valor in purificar.de_campos(transcrito, lista, hoy).items():
+            if clave not in procesos or (procesos[clave][1] == 'ocr' and tipos[clave] != 'curp'):
+                procesos[clave] = (valor, 'lectura')
+    for clave, valor in purificar.de_campos(lectura['texto'], lista, hoy).items():
+        procesos.setdefault(clave, (valor, metodo_texto))
+    preguntas = lista + (campos_mod.EN_LA_HOJA if con_contactos else [])
+    vistos = None
+    if hojas and preguntas and (con_contactos or necesita_ver(lista, procesos)):
+        try:
+            vistos, segundos = ver(hojas[:MAXIMO_HOJAS], documento['nombre'], preguntas, modelo_vision, url, lecturas, hoy)
+            cuenta['segundos_vision'] += segundos
+        except vision.ErrorVision as error:
+            print(f'{archivo.name}: {error}', flush=True)
+    resultado = combinar(lista, procesos, vistos, identidad, hoy)
+    if hojas:
+        resultado = revisar_salud(resultado, hojas[:MAXIMO_HOJAS], modelo_vision, url, cuenta)
+    if con_contactos:
+        resultado += contactos_de(transcrito, lectura['texto'], metodo_texto, vistos)
+    return resultado, cuenta
+
+
 def del_estandar(c):
     """Solo se leen los campos del estándar (y el grado de la boleta, que dice a qué año pertenece cada dato)."""
     return c['clave'] == 'grado_cursado' or (c['categoria'] == 'alumno' and c['campo'] in campos_mod.IDENTIDAD) \
@@ -299,8 +532,16 @@ class Taller:
                                'campos': [c for c in lista if del_estandar(c)]})
         if not documentos:
             raise ValueError('El trabajo no trae documentos')
-        trabajo = self.base._uno('INSERT INTO sidp.trabajo (alumno_id, expediente, documentos) VALUES (%s, %s, CAST(%s AS jsonb)) RETURNING id',
-                                 (alumno, str(pedido.get('expediente') or ''), json.dumps(documentos, ensure_ascii=False)))
+        expediente, relectura = str(pedido.get('expediente') or ''), bool(pedido.get('relectura'))
+        en_fila = self.base._consulta("SELECT id FROM sidp.trabajo WHERE alumno_id = %s AND expediente = %s AND estado = 'pendiente' "
+                                      "ORDER BY id DESC LIMIT 1", (alumno, expediente)) if expediente else []
+        if en_fila:  # Ya esperaba en la fila (se pidió leer todo dos veces): se actualiza, no se lee dos veces.
+            trabajo = en_fila[0][0]
+            self.base._consulta('UPDATE sidp.trabajo SET documentos = CAST(%s AS jsonb), relectura = relectura OR %s WHERE id = %s',
+                                (json.dumps(documentos, ensure_ascii=False), relectura, trabajo))
+        else:
+            trabajo = self.base._uno('INSERT INTO sidp.trabajo (alumno_id, expediente, documentos, relectura) VALUES (%s, %s, CAST(%s AS jsonb), %s) '
+                                     'RETURNING id', (alumno, expediente, json.dumps(documentos, ensure_ascii=False), relectura))
         destino = self.carpeta / str(trabajo)
         destino.mkdir(parents=True, exist_ok=True)
         for d in pedido['documentos']:
@@ -314,37 +555,28 @@ class Taller:
         fila = self.base._consulta(
             "UPDATE sidp.trabajo SET estado = 'trabajando', intentos = intentos + 1 WHERE id = ("
             "SELECT id FROM sidp.trabajo WHERE estado = 'pendiente' OR (estado = 'trabajando' AND intentos < %s) "
-            "ORDER BY id LIMIT 1) RETURNING id, alumno_id, documentos", (INTENTOS,))
+            "ORDER BY relectura, id LIMIT 1) RETURNING id, alumno_id, documentos, expediente, relectura", (INTENTOS,))  # Lo recién escaneado, antes.
         return fila[0] if fila else None
 
-    def hacer(self, trabajo_id, alumno_id, documentos):
+    def hacer(self, trabajo_id, alumno_id, documentos, expediente=None, relectura=False):
         identidad = _identidad(self.base._consulta(
             'SELECT curp, nombres, primer_apellido, segundo_apellido, fecha_nacimiento, sexo FROM sidp.alumno WHERE id = %s', (alumno_id,))[0])
         hoy = self.hoy or datetime.date.today()
         modelo_vision = vision.elegir(self.url) if self.con_vision else None
-        cuenta = {'esperados': 0, 'alta': 0, 'media': 0, 'baja': 0, 'vacios': 0, 'segundos_vision': 0, 'modelo': modelo_vision}
+        cuenta = {'esperados': 0, 'alta': 0, 'media': 0, 'baja': 0, 'vacios': 0, 'segundos_vision': 0, 'modelo': modelo_vision,
+                  'hojas_completas': 0, 'revisados': 0, 'descartados': 0, 'contactos': 0}
         carpeta = self.carpeta / str(trabajo_id)
         documentos = separar_hojas(carpeta, documentos)
         actual = self.base._consulta('SELECT grado, ciclo FROM sidp.v_inscritos WHERE id = %s ORDER BY ciclo DESC LIMIT 1', (alumno_id,))
         actual = actual[0] if actual else None
+        guardar = []  # Primero se lee todo; si algo falla a la mitad, no se toca lo que ya había.
         for documento in documentos:
             archivo = carpeta / documento['archivo']
             if not archivo.exists():
                 continue
-            lectura = lector.leer(archivo)
-            metodo_texto = 'ocr' if any('ocr' in m for m in lectura['metodo']) else 'texto'
-            procesos = de_procesos(documento['tipo'], lectura['texto'], lectura['qr'], hoy, metodo_texto)
-            for clave, valor in campos_mod.de_texto(lectura['texto'], documento['campos'], hoy).items():
-                procesos.setdefault(clave, (valor, metodo_texto))
-            vistos = None
-            if modelo_vision and documento['campos'] and necesita_ver(documento['campos'], procesos):
-                hojas = vision.paginas(archivo.read_bytes(), archivo.name)[:MAXIMO_HOJAS]
-                try:
-                    vistos, segundos = ver(hojas, documento['nombre'], documento['campos'], modelo_vision, self.url, hoy=hoy)
-                    cuenta['segundos_vision'] += segundos
-                except vision.ErrorVision as error:
-                    print(f'trabajo {trabajo_id}: {error}', flush=True)
-            resultado = combinar(documento['campos'], procesos, vistos, identidad, hoy)
+            resultado, parcial = leer_documento(archivo, documento, identidad, hoy, modelo_vision, self.url)
+            for clave in ('segundos_vision', 'hojas_completas', 'revisados', 'descartados'):
+                cuenta[clave] += parcial[clave]
             if documento['tipo'] in POR_HOJA:
                 resultado, grado = por_grado(resultado, actual)
                 cuenta.setdefault('boletas', []).append(grado)
@@ -352,14 +584,20 @@ class Taller:
             cuenta['esperados'] += len(documento['campos'])
             cuenta['vacios'] += len([c for c in documento['campos'] if c['clave'] not in llenos])
             for r in resultado:
-                cuenta[r['confianza'] if r['confianza'] in cuenta else 'alta'] += 1
-                if r.get('confirma_lista') or r.get('nada') or not del_estandar(r):
+                if r.get('extra'):
+                    cuenta['contactos'] += 1
+                else:
+                    cuenta[r['confianza'] if r['confianza'] in cuenta else 'alta'] += 1
+                if r.get('confirma_lista') or not del_estandar(r):
                     continue
-                for valor in r['valores']:
-                    self.base._uno('SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)',
-                                   (alumno_id, r['categoria'], r['campo'], str(valor), json.dumps(r.get('detalle') or {}, ensure_ascii=False),
-                                    r['confianza'], r['metodo'], documento['nombre'], trabajo_id, 'cerebro',
-                                    r.get('varios', r['campo'] in campos_mod.VARIOS)))
+                guardar += [(documento['nombre'], r, valor) for valor in (r['valores'] or (['NINGUNA'] if r.get('nada') else []))]
+        if relectura:  # La auditoría: lo que la máquina leyó antes de este mismo expediente se reemplaza; lo de las personas no.
+            cuenta['reemplazados'] = self.base._uno('SELECT sidp.relectura(%s, %s, %s)', (alumno_id, str(expediente or ''), trabajo_id))
+        for nombre, r, valor in guardar:
+            self.base._uno('SELECT sidp.guardar_dato(%s, %s, %s, %s, CAST(%s AS jsonb), %s, %s, %s, %s, %s, %s)',
+                           (alumno_id, r['categoria'], r['campo'], str(valor), json.dumps(r.get('detalle') or {}, ensure_ascii=False),
+                            r['confianza'], r['metodo'] or 'vision', nombre, trabajo_id, 'cerebro', r.get('varios', r['campo'] in campos_mod.VARIOS)))
+        cuenta['duplicados'] = depurar(self.base, alumno_id)
         # De lo que sí venía en los documentos, cuánto salió seguro (el certificado trae muchos campos posibles; cada uno, solo algunos).
         encontrados = cuenta['alta'] + cuenta['media'] + cuenta['baja']
         cuenta['utiles'] = round(100 * (cuenta['alta'] + cuenta['media']) / encontrados) if encontrados else 0
@@ -373,10 +611,10 @@ class Taller:
         siguiente = self.siguiente()
         if not siguiente:
             return None
-        trabajo_id, alumno_id, documentos = siguiente
+        trabajo_id, alumno_id, documentos, expediente, relectura = siguiente
         self.ahora = trabajo_id
         try:
-            return self.hacer(trabajo_id, alumno_id, documentos)
+            return self.hacer(trabajo_id, alumno_id, documentos, expediente, relectura)
         except Exception as error:
             intentos = self.base._uno('SELECT intentos FROM sidp.trabajo WHERE id = %s', (trabajo_id,))
             estado = 'error' if intentos >= INTENTOS else 'pendiente'
@@ -409,6 +647,22 @@ class Taller:
         return {'trabajos': {e: n for e, n in filas}, 'trabajando': self.ahora, 'modelo_vision': vision.elegir(self.url) if self.con_vision else None,
                 'campos_esperados': esperados, 'campos_utiles': utiles, 'porcentaje_util': round(100 * utiles / encontrados) if encontrados else None,
                 'por_confirmar': self.base._uno("SELECT count(*) FROM sidp.dato WHERE estado = 'por_confirmar'")}
+
+
+def depurar(base, alumno_id=None):
+    """Marca como reemplazadas las lecturas repetidas de la máquina (casi iguales a otra más segura). Nada se borra: la
+    fila se queda con la marca y el id del dato que se quedó. Sin alumno_id, revisa a todos. Devuelve cuántas marcó."""
+    filtro, parametros = ('AND alumno_id = %s', (alumno_id,)) if alumno_id else ('', ())
+    filas = base._consulta('SELECT id, alumno_id, categoria, campo, valor, detalle, confianza, estado, quien FROM sidp.dato '
+                           f"WHERE estado IN ('vigente', 'por_confirmar') {filtro} ORDER BY alumno_id, id", parametros)
+    por_alumno = {}
+    for f in filas:
+        por_alumno.setdefault(f[1], []).append(dict(zip(('id', 'alumno_id', 'categoria', 'campo', 'valor', 'detalle', 'confianza', 'estado', 'quien'), f)))
+    marcados = 0
+    for datos in por_alumno.values():
+        for sobra, queda in purificar.duplicados(datos):
+            marcados += bool(base._uno('SELECT sidp.marcar_duplicado(%s, %s)', (sobra, queda)))
+    return marcados
 
 
 def arrancar(base, **opciones):

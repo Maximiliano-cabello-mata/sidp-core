@@ -279,3 +279,14 @@ def test_borrar_todo_deja_la_base_vacia_solo_si_se_confirma(base, monkeypatch, c
     assert base_cerebro.main(['borrar', '--si-borrar-todo']) == 0
     assert 'Base borrada' in capsys.readouterr().out
     assert base.resumen()['alumnos'] == 0 and base.alumnos() == {'ciclo': None, 'grupos': []}
+
+
+def test_el_respaldo_copia_la_base_como_esta_sin_aplicarle_el_esquema_nuevo(base, monkeypatch, capsys, tmp_path):
+    import shutil
+    if not shutil.which('pg_dump'):
+        pytest.skip('sin pg_dump')
+    base._consulta('DROP INDEX sidp.dato_sin_repetir')  # Como una base de antes de esa defensa.
+    monkeypatch.setenv('SIDP_BASE', os.environ['SIDP_PRUEBA_BASE'])
+    assert base_cerebro.main(['respaldar', '--carpeta', str(tmp_path)]) == 0
+    assert 'Respaldo listo' in capsys.readouterr().out and list(tmp_path.glob('*.dump'))
+    assert not base._uno("SELECT count(*) FROM pg_indexes WHERE schemaname = 'sidp' AND indexname = 'dato_sin_repetir'")

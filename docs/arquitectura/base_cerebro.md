@@ -27,6 +27,7 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
 | `sugerencia_ia` | Lo que propone la IA; solo una persona lo acepta o lo corrige |
 | `bitacora` | Cada alta y cambio, con el antes, el después y quién lo hizo |
 | `dato` | Lo que sale del escaneo, campo por campo, solo los del estándar (`validacion/estandar.py`) |
+| `alumnos_distintos` | Dos alumnos que se parecen, pero una persona dijo que son niños distintos (gemelos, primos) |
 | `biblio_titulo`, `biblio_isbn` | Cada libro distinto (título, autor, editorial, año, serie de Libros del Rincón) y sus ISBN |
 | `biblio_ejemplar` | Cada libro físico con su etiqueta `LIB-000001`, dónde se guarda y cómo está |
 | `biblio_regla` | Cuántos días y cuántos libros: alumno 7 días y 2 libros; personal 14 días y 5 libros |
@@ -40,6 +41,11 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
 - Cada cambio sube la versión de 1 en 1; un cambio que no cambia nada no se guarda.
 - Revisar un documento pide una persona (no "IA" ni "cerebro"); rechazar pide motivo; dar de baja también.
 - Ningún proceso da de baja a un alumno solo: si falta en una lista, se cuenta en `no_vinieron` y decide una persona.
+- Un mismo dato no se guarda dos veces (2026-10-26): el índice único `dato_sin_repetir` no deja dos filas vigentes o
+  por confirmar con el mismo alumno, campo y valor (sin importar acentos ni espacios). Al aplicarlo a una base de antes,
+  lo repetido queda `reemplazado` con `duplicado_de` y se queda el más seguro. Si dos lecturas lo guardan en el mismo
+  instante, `guardar_dato` regresa el que ya estaba en lugar de fallar.
+- La base no une alumnos sola: `alumnos_repetidos` solo avisa.
 
 ## Procesos (funciones del esquema `sidp`)
 
@@ -65,6 +71,16 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
     - extraedad o menor edad;
     - posible duplicado;
     - RENAPO pendiente.
+- **Datos del escaneo (2026-10-26):**
+  - `guardar_dato` guarda sin perder lo anterior; `confirmar_dato` es la persona que confirma, corrige o descarta.
+  - `relectura` (la auditoría «Volver a leer todo»): lo que la máquina leyó antes de ese expediente queda reemplazado;
+    lo de las personas no se toca.
+  - `marcar_duplicado`: una lectura casi igual a otra más segura queda reemplazada (`validacion/purificar.py` decide
+    cuáles con `duplicados`).
+- **Alumnos repetidos (2026-10-26):** `alumnos_repetidos` regresa parejas de alumnos activos con el mismo nombre, con
+  una CURP a una letra de la otra, o con el nombre casi igual (0.85) y la misma fecha o sin CURP. Salen en **Por
+  revisar**; si es el mismo niño, una persona borra el que sobra, y si no, `marcar_distintos` lo anota para no volver
+  a preguntar.
 - **Resumen:** `resumen()`, solo números, para copiar a un informe.
 - **Biblioteca (2026-10-23):**
   - `isbn13` revisa el dígito y pasa un ISBN-10 a 13; `biblio_codigo` corrige lo que escribe el lector de código
@@ -81,6 +97,7 @@ mejores procesos. El código está en `validacion/base_cerebro.sql` (esquema `si
 python -m validacion.base_cerebro                                  # crea o actualiza la base y dice cómo está
 python -m validacion.base_cerebro cargar C:\SIDP-datos\lista.pdf   # la lista oficial de la SEP
 python -m validacion.base_cerebro informe                          # 911, grupos, alertas y faltantes, sin nombres
+python -m validacion.base_cerebro respaldar                        # copia con pg_dump, tal como está (sin aplicar el esquema nuevo)
 python -m validacion.base_cerebro borrar --si-borrar-todo          # deja la base vacía (solo a mano, para empezar de nuevo)
 ```
 

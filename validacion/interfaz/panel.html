@@ -54,6 +54,10 @@
         <div><div class="institucion" id="inicio-escuela">Escuela Primaria</div><div class="datos-escuela" id="inicio-datos-escuela"></div></div>
         <div class="fecha" id="inicio-fecha"></div>
       </div>
+      <div id="inicio-usados-caja">
+        <h2>Lo más usado</h2>
+        <div class="acciones" id="inicio-usados"></div>
+      </div>
       <div class="encabezado-pantalla">
         <div><h1>Cómo funciona SIDP</h1>
           <p class="subtitulo">El trabajo de la escuela en cuatro pasos, en este orden. Cada paso tiene su lugar en el menú de la izquierda.</p></div>
@@ -153,6 +157,16 @@
         <b>Está bien</b>, <b>Corregir</b> o <b>Quitar este dato</b>. Lo demás ya quedó guardado solo.</p>
       <div class="kpis" id="cf-kpis"></div>
       <div id="cf-mensaje"></div>
+      <div class="panel oculto" id="cf-repetidos"></div>
+      <details class="panel" id="cf-releer-caja">
+        <summary><b>Volver a leer todos los expedientes</b> <span class="chico">(auditoría completa)</span></summary>
+        <p class="chico">SIDP vuelve a leer cada hoja ya escaneada con la lectura completa: frente y vuelta, teléfonos, correos,
+          contacto de emergencia y salud, y revisa varias veces lo del certificado médico. Tarda varias horas y avanza sola; lo
+          que se escanee mientras tanto se lee primero.</p>
+        <p class="chico">No se borra nada: lo que escribió o confirmó una persona se queda igual. Lo que la máquina había leído se
+          cambia por la lectura nueva, y los datos repetidos quedan marcados y dejan de mostrarse.</p>
+        <p><button id="cf-releer">Volver a leer todo</button></p>
+      </details>
       <div class="con-visor">
         <div class="panel"><div id="cf-lista"></div></div>
         <div class="panel visor">
@@ -721,6 +735,7 @@ const RECORRIDOS = {
   direccion: [
     { titulo: 'Bienvenida a SIDP', texto: 'SIDP guarda el expediente de cada alumno y prepara los formatos que la escuela entrega. Este recorrido muestra dónde está cada cosa; se puede salir en cualquier momento.' },
     { ir: 'inicio', en: '#inicio-manual', titulo: 'El trabajo, en cuatro pasos', texto: 'Esta página es el manual de SIDP: listas de grupo, escanear, revisar y formatos oficiales. Cada paso dice qué le falta y tiene su botón.' },
+    { ir: 'inicio', en: '#inicio-usados', titulo: 'Lo más usado', texto: 'Las constancias, las listas de grupo, la ficha de salud y emergencia, el 911 y el Metadato, a un clic. Cada botón lleva directo al formato, ya lleno.' },
     { en: '#menu', titulo: 'El menú', texto: 'A la izquierda están las mismas secciones. El número amarillo dice cuántas cosas esperan a una persona.' },
     { ir: 'listas', en: '#ls-nueva', titulo: 'Paso 1. Listas de grupo', texto: 'Primero se carga la lista oficial de cada grupo: escaneada, en foto o escrita. Así cada expediente queda en su grado y su grupo.' },
     { ir: 'escanear', en: '#es-soltar', titulo: 'Paso 2. Escanear expedientes', texto: 'Se elige el grupo y se ponen aquí los documentos del alumno. SIDP distingue el acta del alumno de la del tutor y saca la fecha de nacimiento de la CURP.' },
@@ -965,6 +980,26 @@ function pasosManual() {
   ];
 }
 
+// Lo más usado: lo que la dirección pide casi a diario, a un clic desde Inicio.
+const USADOS = [
+  { doc: 'constancia', ic: 'documento', que: 'Constancia de inscripción', como: 'De un alumno o de todo el grupo, en Word o PDF' },
+  { doc: 'lista', ic: 'listas', que: 'Lista de grupo', como: 'Para el salón o la supervisión, en PDF, Excel o Word' },
+  { doc: 'emergencia', ic: 'alumnos', que: 'Ficha de salud y emergencia', como: 'Alergias, medicamentos y a quién llamar, por grupo' },
+  { doc: '911', ic: 'descargar', que: 'Estadística 911', como: 'El Excel de inicio de curso, ya lleno' },
+  { doc: 'metadato', ic: 'descargar', que: 'Metadato', como: 'La base de 71 columnas, ya llena' },
+];
+// Abre Formatos oficiales y señala ese formato en cuanto la pantalla se llena con lo de la PC 4 (cargarReportes).
+let formatoPorSenalar = null;
+function irAFormato(clave) {
+  formatoPorSenalar = clave;
+  irA('reportes');
+}
+function resaltar(tarjeta) {
+  tarjeta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  tarjeta.classList.add('resaltada');
+  setTimeout(() => tarjeta.classList.remove('resaltada'), 2500);
+}
+
 function mostrarInicio() {
   const { estado: est, curps, grupos } = datos;
   const alumnos = grupos.grupos.reduce((s, g) => s + g.alumnos, 0);
@@ -992,6 +1027,12 @@ function mostrarInicio() {
   $('inicio-otras-caja').classList.toggle('oculto', !acciones.length);
   $('inicio-acciones').innerHTML = acciones.map((a) => `<button class="accion" data-ir="${a.ir}"><span class="ficha azul">${icono(a.ic)}</span>
     <span><span class="que">${esc(a.que)}</span><span class="como">${esc(a.como)}</span></span></button>`).join('');
+
+  const usados = abre('reportes') ? USADOS : [];
+  $('inicio-usados-caja').classList.toggle('oculto', !usados.length);
+  $('inicio-usados').innerHTML = usados.map((a) => `<button class="accion" data-ir-formato="${a.doc}"><span class="ficha azul">${icono(a.ic)}</span>
+    <span><span class="que">${esc(a.que)}</span><span class="como">${esc(a.como)}</span></span></button>`).join('');
+  for (const b of $('inicio-usados').querySelectorAll('[data-ir-formato]')) b.onclick = () => irAFormato(b.dataset.irFormato);
 
   // Lo más urgente primero; se muestran 3 y el resto con "Ver los N pendientes".
   const alertas = [];
@@ -2040,10 +2081,19 @@ function insigniaConfianza(d) {
   return `<span class="insignia ${clase}" title="${esc(metodo ? 'Lo leyó ' + metodo : '')}">${texto}</span>`;
 }
 
+const REVISION = {
+  no_lo_tiene: 'al revisarlo otra vez, la hoja dice que no lo tiene', familiar: 'al revisarlo otra vez, parece de un familiar',
+  solo_impreso: 'al revisarlo otra vez, parece una opción impresa sin marcar', no_aparece: 'al revisarlo otra vez, no se encontró en la hoja',
+  sin_revisar: 'no se pudo revisar otra vez',
+};
 function detalleDato(d) {
   const x = d.detalle || {};
   const partes = [];
+  if (x.grave) partes.push('dato de salud delicado: confírmalo con la hoja');
+  if (REVISION[x.revision]) partes.push(REVISION[x.revision]);
+  if (x.dice) partes.push(`la hoja dice «${x.dice}»`);
   if (x.de) partes.push(DE_QUIEN[x.de] || x.de);
+  if (x.parentesco) partes.push(x.parentesco.toLowerCase());
   const nombres = { calle: 'calle', numero: 'núm.', colonia: 'col.', cp: 'CP', municipio: 'mun.' };
   for (const k of Object.keys(nombres)) if (x[k]) partes.push(`${nombres[k]} ${x[k]}`);
   if (x.otra_lectura) partes.push(`la otra lectura dice «${x.otra_lectura}»`);
@@ -2281,7 +2331,8 @@ async function cargarPorConfirmar() {
   if (trabajos.aviso) avisos.push(trabajos.aviso);
   if (t.error) avisos.push(`${t.error} expediente(s) no se pudieron leer solos; se vuelve a intentar al escanearlos otra vez.`);
   avisoEn('cf-mensaje', avisos.length ? 'ojo' : '', avisos.join(' '));
-  contador('confirmar', lista.datos.length);
+  pintarRepetidos(lista.repetidos || []);
+  contador('confirmar', lista.datos.length + (lista.repetidos || []).length);
   const enFila = (t.pendiente || 0) + (t.trabajando || 0) + (trabajos.pendientes_de_enviar || 0);
   $('cf-kpis').innerHTML = kpi(lista.datos.length ? 'ambar' : 'verde', lista.datos.length ? 'alerta' : 'bien', lista.datos.length, 'Datos dudosos')
     + kpi('azul', 'escanear', enFila, enFila ? 'Expedientes esperando su lectura' : 'Nada esperando')
@@ -2303,6 +2354,39 @@ async function cargarPorConfirmar() {
   const primero = $("cf-lista").querySelector("[data-ver-hoja]");
   if (primero && $('cf-visor').classList.contains('oculto')) primero.click();
 }
+
+// La base avisa de alumnos que pueden ser el mismo niño cargado dos veces; no une nada sola.
+const MOTIVO_REPETIDO = { mismo_nombre: 'Tienen el mismo nombre.', curp_casi_igual: 'Sus CURP solo cambian en una letra (una pudo leerse mal).',
+  nombre_parecido: 'Sus nombres son casi iguales.' };
+function pintarRepetidos(repetidos) {
+  const caja = $('cf-repetidos');
+  caja.classList.toggle('oculto', !repetidos.length);
+  if (!repetidos.length) { caja.innerHTML = ''; return; }
+  const alumno = (x) => `<p><b>${esc(x.nombre)}</b> · ${x.grado ? `${x.grado}.° ${esc(x.letra)}` : 'sin grupo'}
+    <span class="chico curp">${esc(x.curp || 'sin CURP')}</span>
+    ${x.curp && motor.alumno ? ` <button class="enlace" data-ver-alumno="${esc(x.curp)}">Abrir su ficha</button>` : ''}</p>`;
+  caja.innerHTML = `<h2>¿Alumnos repetidos?</h2>
+    <p class="chico">Si es el mismo niño, abre la ficha del que sobra y, en <b>Más acciones</b>, usa <b>Borrar al alumno</b> con el motivo
+      «repetido». Si son niños distintos (por ejemplo, gemelos), dilo aquí y no se vuelve a preguntar.</p>`
+    + repetidos.map((r) => `<div class="caja-alumno"><p class="chico">${esc(MOTIVO_REPETIDO[r.motivo] || '')}</p>${alumno(r.a)}${alumno(r.b)}
+      <p><button data-distintos="${r.a.id},${r.b.id}">Son niños distintos</button></p></div>`).join('');
+  for (const b of caja.querySelectorAll('[data-distintos]')) b.onclick = async () => {
+    const [uno, otro] = b.dataset.distintos.split(',').map(Number);
+    const r = await trabajar('Guardando…', () => motor.alumnosDistintos(uno, otro), (c, t, d) => avisoEn('cf-mensaje', c, t, d));
+    if (r) cargarPorConfirmar();
+  };
+}
+
+$('cf-releer').onclick = async () => {
+  if (!motor.releerTodo) { avisoEn('cf-mensaje', 'ojo', SIN_PC4); return; }
+  const r = await trabajar('Encargando la lectura de todos los expedientes…', () => motor.releerTodo(), (c, t, d) => avisoEn('cf-mensaje', c, t, d));
+  if (!r) return;
+  $('cf-releer-caja').open = false;
+  avisoEn('cf-mensaje', 'bien', `Listo: ${r.expedientes} expediente(s) se volverán a leer, uno por uno.`
+    + (r.duplicados ? ` Se marcaron ${r.duplicados} dato(s) repetido(s).` : '')
+    + (r.cerebro ? '' : ' El cerebro no está conectado: empiezan cuando se conecte.'));
+  cargarPorConfirmar();
+};
 
 async function verHoja(curp, documento) {
   if (!pdfsDe[curp]) {
@@ -2399,7 +2483,7 @@ function mostrarReportes() {
   }).join('');
   for (const b of $('rp-calendario').querySelectorAll('[data-ir-documento]')) b.onclick = () => {
     const tarjeta = document.querySelector(`[data-documento="${b.dataset.irDocumento}"]`);
-    if (tarjeta) { tarjeta.scrollIntoView({ behavior: 'smooth', block: 'center' }); tarjeta.classList.add('resaltada'); setTimeout(() => tarjeta.classList.remove('resaltada'), 2500); }
+    if (tarjeta) resaltar(tarjeta);
   };
   window.reportesPendientes = vigentes.filter((e) => e.desde && e.desde <= hoy && e.doc && documentos[e.doc] && e.doc !== 'lista_grupo')
     .map((e) => ({ texto: `<b>Ahora:</b> ${esc(e.que)} (hasta el ${esc(fechaLarga(e.hasta))}).`, boton: 'Ver', ir: 'reportes' }));
@@ -2465,6 +2549,9 @@ async function cargarReportes() {
     : `<div class="alerta verde"><div>${icono('bien')}<span>Los reportes tienen todos los datos que necesitan.</span></div></div>`;
   for (const b of $('rp-faltan').querySelectorAll('[data-completar]')) b.onclick = () => $('rp-completar').scrollIntoView({ behavior: 'smooth', block: 'start' });
   mostrarInicio();
+  const senalada = formatoPorSenalar && document.querySelector(`#rp-documentos [data-documento="${formatoPorSenalar}"]`);
+  formatoPorSenalar = null;
+  if (senalada) resaltar(senalada);
 }
 
 // «Completar datos del 911»: una rejilla por grupo con lo que anota la escuela. Solo se manda lo que cambió.

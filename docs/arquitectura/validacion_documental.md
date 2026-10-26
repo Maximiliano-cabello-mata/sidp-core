@@ -233,3 +233,29 @@ mejores procesos. Después solo se escanean los documentos físicos de cada alum
 - **Dónde vive cada cosa.** El .exe del administrador sigue guardando los archivos y su SQLite; la base
   de la PC 4 es para procesar mejor. Desde la versión 2 guarda el expediente completo con sus procesos:
   ver [base_cerebro.md](base_cerebro.md). Instalación: Tarea 008; carga de los alumnos: Tarea 009.
+
+## Lectura completa, filtro de datos y auditoría (2026-10-26)
+
+Pedido de Maximiliano: no salían los contactos de emergencia (nombre, teléfonos, correos) y del certificado médico casi
+nada; algunos alumnos aparecían con hipertensión o «enfermedad mental o nerviosa» que eran de la familia. Quiere que la
+lectura vea todo lo que trae la hoja, aunque tarde más, y que de eso se queden solo los datos del estándar.
+
+- **Primero se transcribe todo.** `vision.transcribir` copia cada hoja tal como está (etiquetas con su valor, casillas
+  `[X]`/`[ ]`, dígitos uno por uno), hasta 4 hojas por documento: el certificado de frente y vuelta entra completo. Una
+  hoja sin título que viene justo después de otra se toma como su reverso (`servicio._clasificar`).
+- **Luego se filtra.** `validacion/purificar.py` saca de ese texto solo teléfonos y correos (con de quién son: madre,
+  padre, tutor o emergencia; nunca los de la escuela, la clínica o el médico), el contacto de emergencia con su
+  parentesco y la salud del alumno. Un antecedente heredofamiliar o una opción impresa sin marcar no cuenta. Todo lo
+  demás de la hoja se descarta: solo se guarda lo que permite `estandar.permitido`.
+- **La salud se revisa varias veces.** Cada valor se compara entre la transcripción, el texto del PDF o el OCR y dos
+  lecturas con campos (una en orden inverso). Después, `vision.pregunta_verificar` le pregunta al modelo por cada
+  valor si es del alumno, de un familiar, solo impreso o no aparece. Lo grave (hipertensión, epilepsia, enfermedad
+  mental, cardiopatía, asma, autismo...) siempre queda por confirmar por una persona, aunque todas las lecturas
+  coincidan. Lo que todavía no confirma una persona no sale en los formatos de salud.
+- **Repetidos.** Lo que la máquina leyó casi igual a un dato más seguro queda reemplazado (`purificar.duplicados`), y la
+  base misma no deja guardar dos veces el mismo dato (ver [base_cerebro.md](base_cerebro.md)). Nada se borra, y lo
+  que escribió o confirmó una persona no se toca.
+- **Auditoría.** **Por revisar > Volver a leer todo** encarga de nuevo cada expediente autorizado. Lo nuevo que se
+  escanea va primero; lo que la máquina había leído de ese expediente se cambia por la lectura nueva.
+- **Los archivos de la escuela no se tocan.** SIDP no mueve, renombra ni borra los archivos de los directivos aunque
+  tengan copias repetidas: solo concentra los datos dentro de la plataforma.

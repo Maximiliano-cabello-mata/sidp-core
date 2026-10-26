@@ -173,6 +173,47 @@ def hoja_medico(verdad, escrito, fuente, azar, fea):
     return imagen
 
 
+# El reverso de algunos certificados: casillas impresas de antecedentes. Las de la familia vienen marcadas (la trampa: no son
+# del niño) y las del alumno solo si de verdad las tiene. Abajo, el contacto de emergencia escrito a mano.
+FAMILIARES = ('Hipertensión', 'Diabetes', 'Cáncer', 'Enfermedad mental o nerviosa')
+PERSONALES = ('Asma', 'Epilepsia', 'Cardiopatía', 'Hipertensión')
+
+
+def casillas(imagen, dibujo, x, y, opciones, marcadas, fuente, azar, fea):
+    etiqueta = fotos.fuente(28)
+    for opcion in opciones:
+        dibujo.text((x, y), opcion, fill=(30, 30, 30), font=etiqueta)
+        x += int(dibujo.textlength(opcion + ' ', font=etiqueta))
+        dibujo.rectangle((x, y + 2, x + 34, y + 36), outline=(40, 40, 40), width=3)
+        if opcion in marcadas:
+            escribir(imagen, x - 2, y - 4, 'X', fuente, azar, fea)
+        x += 70
+        if x > 1300:
+            x, y = 160, y + 70
+    return y
+
+
+def hoja_medico_reverso(verdad, escrito, fuente, azar, fea):
+    from PIL import Image, ImageDraw
+    imagen = Image.new('RGB', (1700, 2200), 'white')
+    dibujo = ImageDraw.Draw(imagen)
+    titulo = fotos.fuente(34)
+    dibujo.text((120, 140), 'ANTECEDENTES HEREDOFAMILIARES:', fill=(20, 20, 20), font=titulo)
+    familia = azar.sample(FAMILIARES, azar.choice((1, 2, 2, 3)))
+    y = casillas(imagen, dibujo, 160, 220, FAMILIARES, familia, fuente, azar, fea)
+    dibujo.text((120, y + 130), 'ANTECEDENTES PERSONALES PATOLÓGICOS:', fill=(20, 20, 20), font=titulo)
+    propias = [o for o in PERSONALES if o.upper() in verdad['padecimientos'].split(', ')]
+    y = casillas(imagen, dibujo, 160, y + 210, PERSONALES, propias, fuente, azar, fea)
+    etiqueta = fotos.fuente(30)
+    for texto, valor in (('En caso de emergencia avisar a', escrito['contacto_emergencia']), ('Teléfono de emergencia', escrito['telefono_emergencia'])):
+        y += 150
+        dibujo.text((120, y), texto + ':', fill=(30, 30, 30), font=etiqueta)
+        x = 120 + int(dibujo.textlength(texto + ': ', font=etiqueta))
+        dibujo.line((x, y + 40, 1600, y + 40), fill=(150, 150, 150), width=2)
+        escribir(imagen, x + 10, y, valor, fuente, azar, fea)
+    return imagen
+
+
 def datos_medico(azar):
     import datetime
     fecha = datetime.date(2026, azar.randint(7, 9), azar.randint(1, 28))
@@ -213,15 +254,20 @@ def crear(destino, cuantas=12, semilla=7, en_blanco=False):
         medico_escrito.update(alergias=escrito['alergias'], padecimientos=escrito['enfermedades'], nombre_alumno=escrito['nombre_alumno'])
         opciones = fuentes_a_mano(azar.randint(40, 54))
         nombre_fuente, letra, fuente = opciones[numero % len(opciones)]
-        for tipo, imagen, respuestas in (('ficha_inscripcion', hoja_ficha(escrito, fuente, azar, letra == 'fea'), verdad),
-                                          ('certificado_medico', hoja_medico(verdad, medico_escrito, fuente, azar, letra == 'fea'), medico_verdad)):
+        fea = letra == 'fea'
+        hojas_medico = [hoja_medico(verdad, medico_escrito, fuente, azar, fea)]
+        if numero % 2:  # La mitad de los certificados traen reverso (frente y vuelta en un PDF de dos hojas).
+            hojas_medico.append(hoja_medico_reverso(medico_verdad, escrito, fuente, azar, fea))
+            medico_verdad.update(contacto_emergencia=verdad['contacto_emergencia'], telefono_emergencia=verdad['telefono_emergencia'])
+        for tipo, imagenes, respuestas in (('ficha_inscripcion', [hoja_ficha(escrito, fuente, azar, fea)], verdad),
+                                            ('certificado_medico', hojas_medico, medico_verdad)):
             variante = fotos.VARIANTES[(numero + (tipo == 'certificado_medico')) % len(fotos.VARIANTES)]
-            foto = fotos.deformar(imagen, variante, cv2, numpy)
-            archivo = f'{numero + 1:02d}_{tipo}.' + ('pdf' if variante == 'escaneo' else 'jpg')
-            if variante == 'escaneo':
-                Image.fromarray(cv2.cvtColor(foto, cv2.COLOR_BGR2RGB)).save(destino / archivo, resolution=200)
+            fotos_hoja = [Image.fromarray(cv2.cvtColor(fotos.deformar(imagen, variante, cv2, numpy), cv2.COLOR_BGR2RGB)) for imagen in imagenes]
+            archivo = f'{numero + 1:02d}_{tipo}.' + ('pdf' if variante == 'escaneo' or len(imagenes) > 1 else 'jpg')
+            if archivo.endswith('.pdf'):
+                fotos_hoja[0].save(destino / archivo, resolution=200, save_all=True, append_images=fotos_hoja[1:])
             else:
-                cv2.imwrite(str(destino / archivo), foto, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                fotos_hoja[0].save(destino / archivo, quality=85)
             renglones += [{'archivo': archivo, 'tipo': tipo, 'clave': clave, 'valor': valor, 'letra': f'{letra} ({nombre_fuente})',
                            'variante': variante} for clave, valor in respuestas.items()]
     with open(destino / 'respuestas.csv', 'w', newline='', encoding='utf-8') as salida:

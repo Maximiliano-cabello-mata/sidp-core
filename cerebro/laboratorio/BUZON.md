@@ -1168,3 +1168,72 @@ respaldo antes; no se borra nada. Las reglas de [LEEME.md](LEEME.md) siguen igua
    git push origin claude/project-thread-vp6ab8
    ```
    Al final avísale a Maximiliano que ya se subió.
+
+## Tarea 023: bajar todo el repositorio y volver a leer todos los expedientes (2026-10-26)
+
+**Para el agente del servidor.** Maximiliano pidió que la lectura saque los contactos de emergencia (nombre, teléfonos
+y correos) y todo el certificado médico, de frente y de vuelta; que revise la salud con más cuidado (los antecedentes
+de la familia y las opciones impresas sin marcar ya no cuentan como del alumno); que se vuelva a leer todo lo que ya se
+escaneó; y que la base no guarde datos repetidos y avise de alumnos que pueden estar repetidos. El código nuevo ya lo
+hace. Las reglas de [LEEME.md](LEEME.md) siguen igual, y hay una nueva de Maximiliano:
+
+> **No muevas, renombres, borres ni "limpies" ningún archivo de la escuela** (Escritorio, Documentos, Descargas ni
+> ninguna carpeta de los directivos), aunque haya copias repetidas o archivos con errores. Eso es de ellos. SIDP solo
+> concentra los datos dentro de la plataforma. La auditoría de la PC del 25 de octubre era para saber qué formatos usa
+> la escuela, no para ordenar sus carpetas.
+
+1. Revisa que no haya cambios sin subir en la copia del servidor:
+   ```
+   cd C:\SIDP-cerebro\sidp-core
+   git status --short
+   ```
+   Si sale alguna línea que empiece con `M` o `D`, **detente**: no descartes nada, anota esas líneas en el informe y
+   avísale a Maximiliano. Las líneas con `??` (archivos que solo están en el servidor) no estorban.
+2. **Antes de bajar el código**, respalda la base. Al arrancar con el código nuevo, la base marca como reemplazados los
+   datos que estaban repetidos (no borra nada), así que el respaldo va primero:
+   ```
+   python -m validacion.base_cerebro respaldar
+   ```
+   Debe decir `Respaldo listo: ... (N MB)`. Si dice `No se respaldó`, detente y anota el error completo.
+3. Baja todo el repositorio, en la rama de trabajo, y sus requisitos:
+   ```
+   git fetch origin
+   git checkout claude/project-thread-vp6ab8
+   git pull origin claude/project-thread-vp6ab8
+   git log -1 --oneline
+   python -m pip install -r validacion/requisitos.txt
+   ```
+4. Si la Tarea 022 no se hizo, haz ahora su paso 2 (leer cada hoja dos veces, con respaldo de `ajustes.ps1`).
+5. Reinicia los servicios para que el cerebro use el código nuevo. **Pídele a Maximiliano** que abra PowerShell con clic
+   derecho > «Ejecutar como administrador» y que corra ahí (agrega `-ComoSistema` si la 019 lo usó):
+   ```
+   cd C:\SIDP-cerebro\sidp-core
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\instalar_servicios.ps1 -MismaPC
+   powershell -ExecutionPolicy Bypass -File cerebro\pc4\estado_servicios.ps1
+   ```
+6. Mide la lectura nueva con hojas inventadas (la mitad de los certificados trae reverso con el contacto de
+   emergencia):
+   ```
+   python -m validacion.ejemplo.manuscritos C:\SIDP-datos\manuscritos_023 --cuantas 6 --semilla 23
+   python -m validacion.medir_lectura C:\SIDP-datos\manuscritos_023 --modelo qwen2.5vl:3b --lecturas 2 --lado 960 --etiqueta completa
+   ```
+   Tarda más que antes: ahora transcribe cada hoja completa y revisa cada dato de salud.
+7. Lo hace Maximiliano, no tú: cuando tenga el SIDP nuevo (GitHub > Actions, artefacto `sidp-windows`), abre
+   **Por revisar** > «Volver a leer todos los expedientes» y da **Volver a leer todo**. La relectura avanza sola, un
+   expediente a la vez, y puede tardar horas. Cuando termine (en **Por revisar** ya no quedan expedientes esperando),
+   corre esto, que solo cuenta y no muestra datos de nadie:
+   ```
+   python -m validacion.base_cerebro estado
+   ```
+8. Escribe `cerebro\laboratorio\resultados\AAAA-MM-DD_tarea023.md` con: la salida de `git log -1 --oneline`, la línea
+   del respaldo (sin la ruta completa si trae el nombre de la escuela), si el paso 5 terminó bien, el
+   `resumen_lectura_completa.md` completo y, si ya se pudo, la salida del paso 7. **No** subas los `detalle_local_*.csv`
+   ni las hojas. Revisa que no haya CURP, teléfono, correo, nombre ni la clave de la escuela, tampoco en el mensaje del
+   commit. Súbelo solo a él:
+   ```
+   git add cerebro/laboratorio/resultados/AAAA-MM-DD_tarea023.md
+   git commit -m "laboratorio: resultado de la tarea 023"
+   git pull --rebase
+   git push origin claude/project-thread-vp6ab8
+   ```
+   Al final avísale a Maximiliano que ya se subió.

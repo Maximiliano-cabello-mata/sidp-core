@@ -329,12 +329,13 @@ def _palabras(texto):
     return re.findall(r'[A-Z0-9@._-]+', texto)
 
 
-def de_texto(texto, campos, hoy=None):
+def de_texto(texto, campos, hoy=None, libres=False):
     """En una hoja impresa o escrita a máquina: el valor que está junto a la etiqueta de cada campo, si pasa las reglas.
 
     Busca el renglón que trae las palabras de la etiqueta ("TELEFONO DE LA MADRE: 722 123 4567") y toma lo que sigue;
     si no sigue nada, el renglón de abajo. Con letra a mano el OCR casi nunca da algo que pase las reglas: ahí lee el
-    modelo que ve.
+    modelo que ve. libres: también nombres, textos y domicilios escritos tras "etiqueta:" en el mismo renglón (para
+    lo que transcribió el modelo, que copia cada etiqueta con su valor; en el OCR de una foto serían basura).
     """
     renglones = [r for r in str(texto or '').splitlines() if r.strip()]
     salida = {}
@@ -353,9 +354,13 @@ def de_texto(texto, campos, hoy=None):
             ultima = max(j for j, p in enumerate(palabras) if p in clave_palabras)
             resto = ' '.join(renglon.split(':', 1)[1:]).strip() if ':' in renglon else ''
             resto = resto or ' '.join(_palabras_originales(renglon)[ultima + 1:])
-            for candidato in (resto, renglones[i + 1] if i + 1 < len(renglones) else ''):
+            libre = libres and c['tipo'] in ('texto', 'nombre', 'domicilio') and ':' in renglon
+            for candidato in (resto, renglones[i + 1] if i + 1 < len(renglones) and not libre else ''):
                 limpio, _ = limpiar(c['tipo'], candidato, hoy) if candidato.strip() else (None, {})
                 if limpio and c['tipo'] not in ('texto', 'nombre', 'lista', 'domicilio'):
+                    salida[c['clave']] = candidato.strip()
+                    break
+                if limpio and libre and not vacio(candidato) and 'ILEGIBLE' not in candidato.upper() and len(candidato.strip()) >= 3:
                     salida[c['clave']] = candidato.strip()
                     break
             if c['clave'] in salida:
@@ -374,10 +379,29 @@ def _palabras_originales(renglon):
 
 def pregunta(nombre_documento, campos):
     renglones = '\n'.join(f'- {c["clave"]}: {c["etiqueta"]}' for c in campos)
+    salud = any(c['categoria'] == 'salud' for c in campos)
     return (f'Hoja: {nombre_documento}. Copia cada campo tal como está escrito en la hoja, incluida la letra a mano. '
             'Si el campo no aparece, deja el valor vacío. Si el campo dice que no hay nada ("ninguna", "no", "negadas" o una raya), '
             'escribe NINGUNA. Si no se entiende bien, escribe lo que más se parezca y pon ? '
-            f'al final. No inventes datos.\nCampos:\n{renglones}')
+            'al final. No inventes datos.'
+            + (' En salud copia solo lo que el médico escribió o marcó del alumno: una opción impresa sin marcar no cuenta, y '
+               'los antecedentes de familiares (heredofamiliares: padres, abuelos) tampoco.' if salud else '')
+            + f'\nCampos:\n{renglones}')
+
+
+# Documentos donde no vienen teléfonos de la familia: no se buscan contactos (el recibo trae los de la compañía).
+SIN_CONTACTOS = ('acta_alumno', 'acta_tutor', 'ine_tutor', 'boleta', 'comprobante')
+# Lo que se le pregunta al modelo de toda hoja que puede traer contactos (ficha, certificado, formatos de la escuela), además
+# de los campos de su plantilla. Se purifica después con validacion/purificar.py: aquí no se guardan tal cual.
+EN_LA_HOJA = [
+    {**campo('telefonos_en_la_hoja', 'Todos los teléfonos o celulares de la familia escritos en la hoja, cada uno con de quién es '
+                                     '(madre, padre, tutor, abuela, emergencia). No los del médico, la clínica ni la escuela', 'texto',
+             'contacto', 'telefono'), 'extra': True},
+    {**campo('correos_en_la_hoja', 'Correos electrónicos de la familia escritos en la hoja, con de quién es cada uno', 'texto',
+             'contacto', 'correo'), 'extra': True},
+    {**campo('emergencia_en_la_hoja', 'Nombre de la persona a quien avisar en caso de emergencia y su parentesco', 'texto',
+             'contacto', 'nombre_emergencia', 'emergencia'), 'extra': True},
+]
 
 
 def esquema(campos):
@@ -394,17 +418,21 @@ ESQUEMA_PROPONER = {'type': 'object', 'properties': {'titulo': {'type': 'string'
                     'required': ['titulo', 'senas', 'campos']}
 
 
-def clasificar(tipos):
+def clasificar(tipos, anterior=None):
     """Pregunta para una hoja que no se reconoció: qué documento parece, entre las plantillas de la escuela.
 
-    tipos: [{'clave', 'nombre', 'senas'}]. La persona que escanea confirma o cambia lo que diga la IA.
+    tipos: [{'clave', 'nombre', 'senas'}]. anterior: el nombre del documento de la hoja de antes, por si esta es su
+    reverso (un certificado médico con frente y vuelta). La persona que escanea confirma o cambia lo que diga la IA.
     """
     renglones = '\n'.join(f'- {t["clave"]}: {t["nombre"]}' + (f' (suele decir: {", ".join(t["senas"][:5])})' if t.get('senas') else '')
                           for t in tipos)
     return ('Esta hoja viene del expediente de un alumno de primaria en México. ¿Qué documento es? Elige en "tipo" una clave '
             'de la lista; si no es ninguno, elige "otro". En "titulo" escribe el nombre del documento como aparece impreso '
             '(por ejemplo "Certificado médico" o "Constancia de estudios"). En "motivo" di en pocas palabras qué lo delata '
-            f'(un título, un sello, un logotipo). No copies datos de nadie.\nTipos:\n{renglones}')
+            '(un título, un sello, un logotipo). No copies datos de nadie.'
+            + (f' La hoja anterior de este escaneo es «{anterior}»: si esta hoja es su parte de atrás o su continuación (sin '
+               'título propio), elige la misma clave.' if anterior else '')
+            + f'\nTipos:\n{renglones}')
 
 
 def esquema_clasificar(tipos):

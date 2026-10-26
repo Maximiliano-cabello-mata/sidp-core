@@ -167,6 +167,23 @@ class BaseCerebro:
             "ORDER BY i.grado, i.letra, a.primer_apellido, d.id LIMIT %s", (limite,))
         return [dict(zip(('id', 'curp', 'alumno', 'grado', 'letra', 'categoria', 'campo', 'valor', 'detalle', 'documento'), f)) for f in filas]
 
+    def alumnos_repetidos(self):
+        """Parejas de alumnos que pueden ser el mismo niño cargado dos veces (sidp.alumnos_repetidos), para que una persona decida."""
+        filas = self._consulta(
+            "SELECT r.alumno_a, r.alumno_b, r.motivo, r.parecido, "
+            "a.curp, a.primer_apellido || ' ' || a.segundo_apellido || ' ' || a.nombres, a.fecha_nacimiento, va.grado, va.letra, "
+            "b.curp, b.primer_apellido || ' ' || b.segundo_apellido || ' ' || b.nombres, b.fecha_nacimiento, vb.grado, vb.letra "
+            "FROM sidp.alumnos_repetidos() r JOIN sidp.alumno a ON a.id = r.alumno_a JOIN sidp.alumno b ON b.id = r.alumno_b "
+            "LEFT JOIN sidp.v_alumnos va ON va.id = a.id LEFT JOIN sidp.v_alumnos vb ON vb.id = b.id ORDER BY r.alumno_a, r.alumno_b")
+
+        def uno(id_alumno, curp, nombre, nacimiento, grado, letra):
+            return {'id': id_alumno, 'curp': curp, 'nombre': ' '.join(nombre.split()), 'nacimiento': nacimiento.isoformat() if nacimiento else None,
+                    'grado': grado, 'letra': letra}
+        return [{'motivo': f[2], 'parecido': f[3], 'a': uno(f[0], *f[4:9]), 'b': uno(f[1], *f[9:14])} for f in filas]
+
+    def marcar_distintos(self, uno, otro, persona):
+        return self._uno('SELECT sidp.marcar_distintos(%s, %s, %s)', (int(uno), int(otro), persona or 'administrador'))
+
     def confirmar_dato(self, id_dato, valor, persona, descartar=False):
         return self._uno('SELECT sidp.confirmar_dato(%s, %s, %s, %s)', (int(id_dato), valor or '', persona or 'administrador', bool(descartar)))
 
@@ -385,6 +402,18 @@ def main(argumentos=None):
     parser.add_argument('--si-borrar-todo', action='store_true', help='con "borrar": confirma que se borra todo')
     parser.add_argument('--carpeta', type=Path, default=CARPETA_RESPALDOS, help='con "respaldar": dónde dejar la copia')
     args = parser.parse_args(argumentos)
+    if args.accion == 'respaldar':  # La copia es de la base tal como está: no se le aplica antes el esquema nuevo.
+        url = direccion(args.base)
+        if not url:
+            print(f'Sin base de datos: no hay dirección de la base (falta {args.base})')
+            return 1
+        try:
+            copia = BaseCerebro(url).respaldar(args.carpeta)
+        except ErrorBase as error:
+            print(f'No se respaldó: {error}')
+            return 1
+        print(f'Respaldo listo: {copia["archivo"]} ({copia["mb"]} MB). Se restaura con pg_restore.')
+        return 0
     base, problema = abrir(args.base)
     if problema:
         print(f'Sin base de datos: {problema}')
@@ -396,14 +425,6 @@ def main(argumentos=None):
             return 1
         base.borrar_todo()
         print('Base borrada: quedó vacía, con el esquema nuevo.')
-    if args.accion == 'respaldar':
-        try:
-            copia = base.respaldar(args.carpeta)
-        except ErrorBase as error:
-            print(f'No se respaldó: {error}')
-            return 1
-        print(f'Respaldo listo: {copia["archivo"]} ({copia["mb"]} MB). Se restaura con pg_restore.')
-        return 0
     if args.accion == 'optimizar':
         hecho = base.optimizar()
         print(f'Base optimizada: de {hecho["antes_mb"]} MB a {hecho["despues_mb"]} MB, estadísticas e índices al día.')
@@ -442,6 +463,11 @@ def main(argumentos=None):
             print('Documentos que faltan validar: ' + ', '.join(f'{tipo} {n}' for tipo, n in datos['faltantes'].items()))
         return 0
     _imprimir_resumen(base.resumen())
+    if args.accion == 'estado':  # Solo cuentas: lo que sacó la lectura y los alumnos que pueden estar repetidos.
+        datos = dict(base._consulta('SELECT estado, count(*) FROM sidp.dato GROUP BY estado'))
+        print(f'Datos de los alumnos: {datos.get("vigente", 0)} vigentes, {datos.get("por_confirmar", 0)} por confirmar, '
+              f'{datos.get("reemplazado", 0)} reemplazados y {datos.get("descartado", 0)} descartados (nada se borra).')
+        print(f'Parejas de alumnos que pueden estar repetidos: {base._uno("SELECT count(*) FROM sidp.alumnos_repetidos()")}.')
     return 0
 
 

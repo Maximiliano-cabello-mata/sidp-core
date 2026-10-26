@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 
 from validacion import campos as campos_mod
-from validacion import comparador, lector, modelo, taller, vision
+from validacion import comparador, modelo, taller, vision
 
 CLASES = ('bien_solo', 'bien_un_clic', 'corregir', 'vacio', 'peligroso')
 NOMBRES = {'bien_solo': 'Bien y solo', 'bien_un_clic': 'Bien, un clic', 'corregir': 'Leído mal (por confirmar)',
@@ -53,21 +53,35 @@ def clase(resultado, tipo, correcto, hoy):
     return ('peligroso' if seguro else 'corregir'), leido
 
 
+# Lo que la lectura completa saca de cualquier hoja aunque su plantilla no lo pida (el reverso del certificado lo trae).
+EXTRAS = {'contacto_emergencia': 'nombre', 'telefono_emergencia': 'telefono'}
+NIVEL = {'baja': 0, 'media': 1, 'alta': 2, 'confirmado': 3}
+
+
 def leer_hoja(archivo, tipo, lista, hoy, modelo_vision, url, lecturas=None):
-    """Lo mismo que hace el taller con un documento. Devuelve ({clave: resultado}, segundos del modelo)."""
-    lectura = lector.leer(archivo)
-    metodo = 'ocr' if any('ocr' in m for m in lectura['metodo']) else 'texto'
-    procesos = taller.de_procesos(tipo, lectura['texto'], lectura['qr'], hoy, metodo)
-    for clave, valor in campos_mod.de_texto(lectura['texto'], lista, hoy).items():
-        procesos.setdefault(clave, (valor, metodo))
-    vistos, segundos = None, 0.0
-    if modelo_vision and taller.necesita_ver(lista, procesos):
-        hojas = vision.paginas(archivo.read_bytes(), archivo.name)[:taller.MAXIMO_HOJAS]
-        try:
-            vistos, segundos = taller.ver(hojas, tipo.replace('_', ' '), lista, modelo_vision, url, lecturas, hoy)
-        except vision.ErrorVision as error:
-            print(f'{archivo.name}: {error}', flush=True)
-    return {r['clave']: r for r in taller.combinar(lista, procesos, vistos, {}, hoy)}, segundos
+    """Lo mismo que hace el taller con un documento (taller.leer_documento). Devuelve ({clave: resultado}, segundos del modelo).
+
+    Una lista (alergias) da un resultado por valor: aquí se juntan en uno, con la confianza del más dudoso."""
+    resultado, cuenta = taller.leer_documento(archivo, {'tipo': tipo, 'nombre': tipo.replace('_', ' '), 'campos': lista}, {}, hoy,
+                                              modelo_vision, url, lecturas)
+    salida = {}
+    for r in resultado:
+        clave = r['clave']
+        if r.get('extra'):  # Los contactos de toda la hoja: el de emergencia se mide como si la plantilla lo pidiera.
+            clave = 'contacto_emergencia' if r['campo'] == 'nombre_emergencia' else \
+                'telefono_emergencia' if r['campo'] == 'telefono' and (r.get('detalle') or {}).get('de') == 'emergencia' else None
+            if not clave or any(c['clave'] == clave for c in lista):
+                continue
+        if clave not in salida:
+            salida[clave] = {**r, 'valores': list(r.get('valores') or [])}
+            continue
+        junto = salida[clave]
+        junto['valores'] += r.get('valores') or []
+        junto['valor'] = ', '.join(junto['valores'])
+        junto['nada'] = junto.get('nada') and r.get('nada')
+        if NIVEL.get(r['confianza'], 0) < NIVEL.get(junto['confianza'], 0):
+            junto['confianza'] = r['confianza']
+    return salida, cuenta['segundos_vision']
 
 
 def medir(carpeta, hoy=None, con_vision=True, nombre_modelo=None, url=modelo.URL, lecturas=None, hojas=None):
@@ -95,7 +109,7 @@ def medir(carpeta, hoy=None, con_vision=True, nombre_modelo=None, url=modelo.URL
         inicio = time.monotonic()
         leidos, segundos = leer_hoja(archivo, tipo, lista, hoy, modelo_vision, url, lecturas)
         tiempos.append((time.monotonic() - inicio, segundos))
-        tipos = {c['clave']: c['tipo'] for c in lista}
+        tipos = {**EXTRAS, **{c['clave']: c['tipo'] for c in lista}}
         for fila in filas:
             if fila['clave'] not in tipos:
                 continue
